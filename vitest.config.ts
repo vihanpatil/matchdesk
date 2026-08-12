@@ -16,7 +16,7 @@ export default defineConfig({
   },
   test: {
     globals: false,
-    include: ['{apps,packages}/*/src/**/*.test.ts'],
+    include: ['{apps,packages}/*/src/**/*.test.{ts,mts,cts}', 'scripts/**/*.test.mjs'],
 
     /* Section 0.2.2, first line of defence: a `.only` anywhere fails the run
        outright rather than quietly narrowing it. Enforced by the runner, so
@@ -30,7 +30,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json-summary', 'lcov'],
       reportsDirectory: './coverage',
-      include: ['{apps,packages}/*/src/**/*.ts'],
+      include: ['{apps,packages}/*/src/**/*.{ts,mts,cts}'],
       /* Barrels are NOT excluded. An earlier config exempted them by name,
          which left a path where real logic could live unmeasured. */
       exclude: ['**/*.test.ts', '**/dist/**'],

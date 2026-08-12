@@ -1,0 +1,18 @@
+{
+  /* Build tooling is plain JS but is load-bearing — assert-no-skipped-tests.mjs
+     is the sole enforcement of Section 0.2.2. Typecheck it with checkJs rather
+     than leaving it unverified. */
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "allowJs": true,
+    "checkJs": true,
+    "types": ["node"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
+  },
+  "include": ["scripts/**/*.mjs", "scripts/**/*.js"]
+}

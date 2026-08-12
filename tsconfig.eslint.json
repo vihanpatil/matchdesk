@@ -11,9 +11,15 @@
   },
   "include": [
     "packages/*/src/**/*.ts",
+    "packages/*/src/**/*.mts",
+    "packages/*/src/**/*.cts",
     "apps/*/src/**/*.ts",
+    "apps/*/src/**/*.mts",
+    "apps/*/src/**/*.cts",
     "*.config.ts",
+    "*.config.mts",
     "scripts/**/*.ts",
+    "scripts/**/*.mts",
     "e2e/**/*.ts"
   ]
 }

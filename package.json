@@ -10,15 +10,17 @@
     "node": ">=24.15.0"
   },
   "scripts": {
-    "typecheck": "tsc --build --force && pnpm typecheck:tests",
+    "typecheck": "tsc --build --force && pnpm typecheck:tests && pnpm typecheck:scripts",
     "typecheck:tests": "tsc -p tsconfig.eslint.json --noEmit",
+    "typecheck:scripts": "tsc -p tsconfig.scripts.json --noEmit",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run && pnpm test:assert-ran",
+    "pretest-clean": "node scripts/pretest-clean.mjs",
+    "test": "pnpm pretest-clean && vitest run && pnpm test:assert-ran",
     "test:watch": "vitest",
-    "test:cov": "vitest run --coverage && pnpm test:assert-ran",
+    "test:cov": "pnpm pretest-clean && vitest run --coverage && pnpm test:assert-ran",
     "test:assert-ran": "node scripts/assert-no-skipped-tests.mjs",
     "license:audit": "node scripts/license-audit.mjs",
     "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm license:audit && pnpm test:cov",
@@ -37,7 +39,7 @@
     "vitest": "^4.1.10"
   },
   "lint-staged": {
-    "*.{ts,tsx,mts,cts}": [
+    "*.{ts,tsx,mts,cts,js,mjs,cjs}": [
       "eslint --max-warnings=0",
       "prettier --check"
     ],

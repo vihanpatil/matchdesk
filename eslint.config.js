@@ -65,6 +65,94 @@ const NODE_BUILTINS = [
   'zlib',
 ];
 
+/**
+ * Selectors that apply everywhere.
+ *
+ * DANGER — READ BEFORE EDITING. ESLint flat config **replaces** a rule's
+ * options when the same rule is declared again in a later block; it does not
+ * merge them. Declaring `no-restricted-syntax` in a scoped block therefore
+ * silently deletes every selector below from that scope.
+ *
+ * This has already happened twice in this project (HONESTY_LOG H-009 and
+ * H-016). The defence is structural: these selectors live in a named constant,
+ * and the one scoped block that needs extras spreads this array rather than
+ * restating the rule. Never write a bare `no-restricted-syntax` in a scoped
+ * block.
+ */
+const BASE_RESTRICTED_SYNTAX = [
+  {
+    selector: 'TSAsExpression > TSUnknownKeyword, TSAsExpression > TSAnyKeyword',
+    message:
+      'Section 0.2.3: `as unknown as` / `as any` are forbidden. Narrow the type properly, or stop and ask.',
+  },
+  {
+    // Covers both `describe.only` and computed `describe["only"]`. Aliasing
+    // (`const d = describe`) and runtime `ctx.skip()` cannot be caught
+    // syntactically — those are caught by allowOnly and by
+    // scripts/assert-no-skipped-tests.mjs, which inspect the run result.
+    selector:
+      'MemberExpression[computed=false][property.name=/^(only|skip|todo|failing)$/][object.name=/^(describe|it|test|suite|bench)$/],' +
+      'MemberExpression[computed=true][property.value=/^(only|skip|todo|failing)$/][object.name=/^(describe|it|test|suite|bench)$/]',
+    message:
+      'Section 0.2.2: .only / .skip / .todo are forbidden. Fix the test or fix the code, then log it in HONESTY_LOG.md.',
+  },
+  {
+    // `no-empty` ignores any block containing a comment, so
+    // `catch { /* ignored */ }` passes it. This does not.
+    selector: 'CatchClause > BlockStatement[body.length=0]',
+    message:
+      'Section 0.2.4: never swallow an error. Handle it, re-throw it, or log it with full context. A comment is not handling.',
+  },
+  {
+    selector: "VariableDeclarator[init.name='Math'], VariableDeclarator[init.name='Date']",
+    message:
+      'Section 6.6: aliasing Math or Date defeats the determinism ban. Reference them directly so the restricted-property rules apply.',
+  },
+];
+
+/** Additional selectors that apply only inside `packages/core`. */
+const CORE_RESTRICTED_SYNTAX = [
+  {
+    selector: 'ImportExpression',
+    message:
+      'Section 3.1: dynamic import() is forbidden in packages/core — it is an I/O escape hatch that static import rules cannot see.',
+  },
+  {
+    selector: "MemberExpression[object.name='globalThis']",
+    message:
+      'Section 3.1 / 6.6: reaching through globalThis bypasses the purity and determinism bans. packages/core takes everything it needs as a parameter.',
+  },
+  {
+    selector: "MemberExpression[object.name='Reflect']",
+    message:
+      'Section 3.1: Reflect is a dynamic escape hatch that static analysis cannot follow. Not permitted in packages/core.',
+  },
+  {
+    selector: "NewExpression[callee.name='Date']",
+    message: 'Section 6.6: no wall-clock reads inside scoring. Pass timestamps in from the caller.',
+  },
+  {
+    // Locale-dependent formatting and comparison are nondeterministic across
+    // machines — the same class of hazard as Math.random for our purposes.
+    selector:
+      'MemberExpression[property.name=/^(toLocaleString|toLocaleDateString|toLocaleTimeString|toLocaleLowerCase|toLocaleUpperCase|localeCompare)$/]',
+    message:
+      'Section 6.6: locale-dependent behaviour is machine-dependent behaviour. Use a locale-independent comparison.',
+  },
+  {
+    selector: "Identifier[name='Intl']",
+    message: 'Section 6.6: Intl output varies by environment. Not permitted in scoring.',
+  },
+  {
+    // [...].sort() with no comparator sorts by UTF-16 code unit, which is
+    // implementation-defined for equal keys and surprising for numbers.
+    // Section 6.6 requires explicit ordering for anything score-affecting.
+    selector: "CallExpression[callee.property.name='sort'][arguments.length=0]",
+    message:
+      'Section 6.6: always pass an explicit comparator. The default sort is lexicographic and its tie behaviour is not guaranteed.',
+  },
+];
+
 export default tseslint.config(
   {
     ignores: [
@@ -93,7 +181,7 @@ export default tseslint.config(
 
   /* ---- Type-aware linting, TypeScript sources only. ---- */
   {
-    files: ['**/*.ts', '**/*.tsx'],
+    files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
     extends: [...tseslint.configs.strictTypeChecked, ...tseslint.configs.stylisticTypeChecked],
     languageOptions: {
       parserOptions: {
@@ -115,9 +203,6 @@ export default tseslint.config(
       ],
 
       /* ---- Section 0.2.4: never swallow an error. ---- */
-      // `no-empty` alone is insufficient: it ignores any block containing a
-      // comment, so `catch { /* ignored */ }` passed it. The selector below
-      // catches an empty catch body regardless of comments.
       'no-empty': ['error', { allowEmptyCatch: false }],
       '@typescript-eslint/no-empty-function': 'error',
       'no-unsafe-finally': 'error',
@@ -126,6 +211,8 @@ export default tseslint.config(
       '@typescript-eslint/no-misused-promises': 'error',
 
       /* ---- Section 6.6: determinism. ---- */
+      'no-eval': ['error', { allowIndirect: false }],
+      'no-implied-eval': 'error',
       'no-restricted-properties': [
         'error',
         {
@@ -142,36 +229,8 @@ export default tseslint.config(
         },
       ],
 
-      /* ---- Section 0.2.2 + 0.2.3: banned syntax. ---- */
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: 'TSAsExpression > TSUnknownKeyword, TSAsExpression > TSAnyKeyword',
-          message:
-            'Section 0.2.3: `as unknown as` / `as any` are forbidden. Narrow the type properly, or stop and ask.',
-        },
-        {
-          // Covers both `describe.only` and computed `describe["only"]`.
-          // Aliasing (`const d = describe`) and runtime `ctx.skip()` cannot be
-          // caught syntactically — those are caught by allowOnly and by
-          // scripts/assert-no-skipped-tests.mjs, which inspect the run result.
-          selector:
-            'MemberExpression[computed=false][property.name=/^(only|skip|todo|failing)$/][object.name=/^(describe|it|test|suite|bench)$/],' +
-            'MemberExpression[computed=true][property.value=/^(only|skip|todo|failing)$/][object.name=/^(describe|it|test|suite|bench)$/]',
-          message:
-            'Section 0.2.2: .only / .skip / .todo are forbidden. Fix the test or fix the code, then log it in HONESTY_LOG.md.',
-        },
-        {
-          selector: 'CatchClause > BlockStatement[body.length=0]',
-          message:
-            'Section 0.2.4: never swallow an error. Handle it, re-throw it, or log it with full context. A comment is not handling.',
-        },
-        {
-          selector: "VariableDeclarator[init.name='Math'], VariableDeclarator[init.name='Date']",
-          message:
-            'Section 6.6: aliasing Math or Date defeats the determinism ban. Reference them directly so the restricted-property rules apply.',
-        },
-      ],
+      /* See the DANGER note on BASE_RESTRICTED_SYNTAX before touching this. */
+      'no-restricted-syntax': ['error', ...BASE_RESTRICTED_SYNTAX],
 
       /* ---- General hygiene. ---- */
       '@typescript-eslint/consistent-type-imports': [
@@ -189,29 +248,12 @@ export default tseslint.config(
 
   /* ---- Section 3.1: the core boundary, enforced not merely documented. ---- */
   {
-    files: ['packages/core/**/*.ts'],
+    files: ['packages/core/**/*.ts', 'packages/core/**/*.mts', 'packages/core/**/*.cts'],
     rules: {
-      /* Static imports are only half the surface. Phase 0 verification reached
-         the filesystem from inside core via `await import('node:fs')` and via
-         ambient globals that need no import at all. */
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: 'ImportExpression',
-          message:
-            'Section 3.1: dynamic import() is forbidden in packages/core — it is an I/O escape hatch that static import rules cannot see.',
-        },
-        {
-          selector: "MemberExpression[object.name='globalThis']",
-          message:
-            'Section 3.1 / 6.6: reaching through globalThis bypasses the purity and determinism bans. packages/core takes everything it needs as a parameter.',
-        },
-        {
-          selector: "NewExpression[callee.name='Date']",
-          message:
-            'Section 6.6: no wall-clock reads inside scoring. Pass timestamps in from the caller.',
-        },
-      ],
+      /* Spreads the base selectors — see the DANGER note. Restating this rule
+         without the spread silently deletes every project-wide ban here. */
+      'no-restricted-syntax': ['error', ...BASE_RESTRICTED_SYNTAX, ...CORE_RESTRICTED_SYNTAX],
+
       'no-restricted-globals': [
         'error',
         {
@@ -240,6 +282,7 @@ export default tseslint.config(
           message: 'Section 3.1: packages/core has no filesystem awareness.',
         },
       ],
+
       'no-restricted-imports': [
         'error',
         {
@@ -280,6 +323,7 @@ export default tseslint.config(
     },
     rules: {
       'no-console': 'off',
+      'no-restricted-syntax': ['error', ...BASE_RESTRICTED_SYNTAX],
     },
   },
 );

@@ -12,3 +12,9 @@ pnpm typecheck
 
 echo "▸ pre-commit: license audit"
 pnpm license:audit
+
+# Tests run here as well as pre-push: a commit containing ctx.skip() or an empty
+# it.each() passes lint and typecheck cleanly, so only running the suite catches
+# it. Revisit if the suite grows slow enough to discourage small commits.
+echo "▸ pre-commit: tests + skip guard"
+pnpm test

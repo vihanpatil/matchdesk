@@ -13,7 +13,8 @@ import * as core from './index.js';
  */
 describe('@matchdesk/core public API', () => {
   it('exports exactly the intended surface', () => {
-    expect(Object.keys(core).sort()).toEqual(['quantize', 'roundHalfUp']);
+    const exported = Object.keys(core).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    expect(exported).toEqual(['quantize', 'roundHalfUp']);
   });
 
   it('re-exports working implementations, not just names', () => {

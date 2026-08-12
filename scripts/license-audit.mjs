@@ -43,6 +43,9 @@ const DEVELOPMENT_EXTRA = new Set(['MPL-2.0', 'CC-BY-4.0', 'CC-BY-3.0']);
  * `(MIT OR Apache-2.0)` is acceptable if *any* branch is allowed; `A AND B`
  * requires all. We conservatively require every atom to be allowed, which can
  * only ever be stricter than the true SPDX semantics.
+ *
+ * @param {string} expression
+ * @returns {string[]}
  */
 function atomsOf(expression) {
   return expression
@@ -52,8 +55,15 @@ function atomsOf(expression) {
     .filter(Boolean);
 }
 
+/**
+ * @typedef {{ name: string, version: string, license: string }} AuditedPackage
+ *
+ * @param {'production' | 'development'} scope
+ * @returns {AuditedPackage[]}
+ */
 function collect(scope) {
   const flag = scope === 'production' ? '--prod' : '--dev';
+  /** @type {string} */
   let raw;
   try {
     raw = execFileSync('pnpm', ['licenses', 'list', '--json', flag, '--recursive'], {
@@ -62,7 +72,11 @@ function collect(scope) {
     });
   } catch (error) {
     // pnpm exits non-zero when a workspace has no dependencies of that kind.
-    const stdout = typeof error?.stdout === 'string' ? error.stdout.trim() : '';
+    const errStdout =
+      typeof error === 'object' && error !== null
+        ? /** @type {Record<string, unknown>} */ (error)['stdout']
+        : undefined;
+    const stdout = typeof errStdout === 'string' ? errStdout.trim() : '';
     if (!stdout) {
       const detail = error instanceof Error ? error.message : String(error);
       throw new Error(`pnpm licenses list ${flag} failed: ${detail}`, { cause: error });
@@ -89,12 +103,19 @@ function collect(scope) {
     throw new Error(`Could not parse pnpm licenses output as JSON: ${detail}`, { cause: error });
   }
 
+  /** @type {AuditedPackage[]} */
   const packages = [];
-  for (const [license, entries] of Object.entries(parsed)) {
-    for (const entry of entries) {
+  const groups = /** @type {Record<string, unknown>} */ (parsed);
+  for (const [license, entries] of Object.entries(groups)) {
+    if (!Array.isArray(entries)) continue;
+    for (const rawEntry of entries) {
+      const entry = /** @type {Record<string, unknown>} */ (
+        typeof rawEntry === 'object' && rawEntry !== null ? rawEntry : {}
+      );
+      const versions = entry['versions'];
       packages.push({
-        name: entry.name,
-        version: Array.isArray(entry.versions) ? entry.versions.join(', ') : String(entry.versions),
+        name: typeof entry['name'] === 'string' ? entry['name'] : '(unknown)',
+        version: Array.isArray(versions) ? versions.join(', ') : String(versions),
         license,
       });
     }
@@ -102,6 +123,10 @@ function collect(scope) {
   return packages;
 }
 
+/**
+ * @param {'production' | 'development'} scope
+ * @param {Set<string>} allowed
+ */
 function audit(scope, allowed) {
   const packages = collect(scope);
   const violations = packages.filter((pkg) => {
