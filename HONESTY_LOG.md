@@ -932,3 +932,62 @@ until it is.
 `taxonomy/data.ts` is excluded from mutation deliberately: it is 96 rows of
 data, and mutating data entries yields thousands of meaningless mutants that
 would drown the signal.
+
+### H-036 · Mutation baseline: 65.03%. Branch coverage said 95.22%.
+
+**Severity:** the single clearest measurement of the pattern in H-030.
+
+Stryker ran for real. 1749 mutants against `packages/core`:
+
+```
+1129 killed | 13 timeout | 607 SURVIVED
+Final mutation score 65.03 (branch coverage on the same code: 95.22%)
+```
+
+**607 surviving mutants.** Roughly a third of this package's behaviour can be
+changed arbitrarily without a single test failing — while coverage reports
+95.22% of branches taken. That gap, measured on our own code, is the entire
+argument: **coverage counts lines executed; mutation counts behaviour pinned.**
+
+Per file:
+
+| File                           | Score      | Survivors |
+| ------------------------------ | ---------- | --------- |
+| `scoring/explain.ts`           | **28.93%** | **140**   |
+| `extraction/certifications.ts` | 49.66%     | 73        |
+| `extraction/skills.ts`         | 55.60%     | 108       |
+| `extraction/experience.ts`     | 64.21%     | 67        |
+| `extraction/education.ts`      | 65.47%     | 114       |
+| `scoring/eligibility.ts`       | 75.53%     | 23        |
+| `scoring/score.ts`             | 85.86%     | 14        |
+| `scoring/dimensions.ts`        | 89.25%     | 10        |
+| `scoring/cascade.ts`           | 90.00%     | 6         |
+| `numeric/round.ts`             | 96.88%     | 1         |
+| `extraction/span.ts`           | 100.00%    | 0         |
+
+**`explain.ts` at 28.93% is the finding that matters most.** That module builds
+the explanation the recruiter reads to justify a shortlisting decision to a
+hiring manager or a candidate. 140 of its mutants survive, so its behaviour is
+very largely unverified — in a product whose stated guiding principle is that
+every number must be traceable to evidence. The arithmetic is comparatively well
+pinned; **the human-facing reasoning is not.**
+
+The two files written under the most adversarial pressure — `span.ts` (100%) and
+`round.ts` (96.88%, after H-013's mutation work) — are the two best scores in the
+package. That is not a coincidence; it is what happens when tests are written
+against an adversary rather than against the author's own expectations.
+
+**The threshold is a RATCHET, set to 64, just below the measured baseline.**
+The score can never get worse without failing the build; raising it is tracked
+work. An aspirational 75 would have blocked every commit behind a 607-mutant
+backlog, which helps nobody. **Never lower this number without an entry here
+explaining why.**
+
+Runs as a separate CI job (~8.5 min) rather than in `pnpm verify`, so it does
+not sit in front of every commit.
+
+**Also recorded:** the first `pnpm mutate` failed outright —
+`Cannot find TestRunner plugin "vitest"` — because pnpm's isolated
+`node_modules` defeats Stryker's plugin auto-discovery. Fixed by naming plugins
+explicitly in the config. Noted because "the tool is installed" and "the tool
+runs" are different claims, and only the second one counts.

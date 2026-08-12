@@ -53,3 +53,30 @@ jobs:
           name: coverage
           path: coverage/
           retention-days: 7
+
+  mutation:
+    name: mutation score (packages/core)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Separate job, not part of `verify`: it takes ~8.5 min, which is too slow
+    # to sit in front of every commit, but it is the only check that measures
+    # whether the tests are REAL rather than whether lines ran (ADR-020).
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable corepack
+        run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+      - name: Mutation test
+        run: pnpm mutate
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: reports/mutation/
+          retention-days: 7
