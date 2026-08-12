@@ -223,6 +223,41 @@ describe('extractEducation', () => {
       expect(attrs).toEqual([]);
     });
 
+    it('does not treat "Associate" in a job title as a degree', () => {
+      const attrs = extractEducation('Associate Software Engineer, Acme Corporation');
+      expect(attrs).toEqual([]);
+    });
+
+    it('does not treat "Associate" in "Associate Director of Engineering" as a degree', () => {
+      const attrs = extractEducation('Associate Director of Engineering, Acme Corporation');
+      expect(attrs).toEqual([]);
+    });
+
+    it('does not treat "Associate" in a certification level name as a degree', () => {
+      const attrs = extractEducation('AWS Certified Solutions Architect - Associate');
+      expect(attrs).toEqual([]);
+    });
+
+    it('does not treat "Associate" in a second certification level name as a degree', () => {
+      const attrs = extractEducation('Microsoft Certified: Azure Administrator Associate');
+      expect(attrs).toEqual([]);
+    });
+
+    it('does not treat "Bachelor" in "Bachelor Party Coordinator" (job title) as a degree', () => {
+      const attrs = extractEducation('Bachelor Party Coordinator, Acme Corporation');
+      expect(attrs).toEqual([]);
+    });
+
+    it('does not treat "Master" in "Master Data Analyst" (job title) as a degree', () => {
+      const attrs = extractEducation('Master Data Analyst, Acme Corporation');
+      expect(attrs).toEqual([]);
+    });
+
+    it('still detects a bare "Associate" degree with a stated field', () => {
+      const attrs = extractEducation('Associate of Arts, State College.');
+      expect(attrs.some((a) => a.degreeLevel === 'associate')).toBe(true);
+    });
+
     it('does not treat "BA" in "BA testing" (business-analyst context) as a degree', () => {
       // Documented call: "BA" with no supporting degree context (no "degree"
       // keyword, no recognized field of study) is treated as NOT a degree.

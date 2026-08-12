@@ -84,4 +84,105 @@ describe('extractSkills', () => {
     const second = extractSkills(text);
     expect(second).toEqual(first);
   });
+
+  describe('single-character/short-term false positives (H-028 D3)', () => {
+    it('does not match "r" inside an accented name like "Rémi Dubois"', () => {
+      const attrs = extractSkills('Rémi Dubois');
+      expect(attrs.some((a) => a.canonicalId === 'r')).toBe(false);
+    });
+
+    it('does not match "r" inside "Résumé"', () => {
+      const attrs = extractSkills('Résumé');
+      expect(attrs.some((a) => a.canonicalId === 'r')).toBe(false);
+    });
+
+    it('does not match "r" in "Led R&D for payments"', () => {
+      const attrs = extractSkills('Led R&D for payments');
+      expect(attrs.some((a) => a.canonicalId === 'r')).toBe(false);
+    });
+
+    it('does not match "c" in "C\'est la vie"', () => {
+      const attrs = extractSkills("C'est la vie");
+      expect(attrs.some((a) => a.canonicalId === 'c')).toBe(false);
+    });
+
+    it('does not match "go" in "Go-to-market strategy"', () => {
+      const attrs = extractSkills('Go-to-market strategy');
+      expect(attrs.some((a) => a.canonicalId === 'go')).toBe(false);
+    });
+
+    it('still matches a genuine standalone "R" in a comma-delimited skills list', () => {
+      const attrs = extractSkills('Skills: R, Python, Docker');
+      expect(attrs.some((a) => a.canonicalId === 'r')).toBe(true);
+    });
+
+    it('still matches a genuine standalone "Go" in a comma-delimited skills list', () => {
+      const attrs = extractSkills('Skills: Go, Python, Docker');
+      expect(attrs.some((a) => a.canonicalId === 'go')).toBe(true);
+    });
+
+    it('still matches "C" on its own line in a skills list', () => {
+      const attrs = extractSkills(['Skills', 'C, Python, Docker'].join('\n'));
+      expect(attrs.some((a) => a.canonicalId === 'c')).toBe(true);
+    });
+  });
+
+  describe('genuinely-implied shorter skills (H-028 D2)', () => {
+    it('emits both "rails" and the implied "ruby" for "Ruby on Rails"', () => {
+      const attrs = extractSkills('Skills: Ruby on Rails');
+      const ids = attrs.map((a) => a.canonicalId);
+      expect(ids).toContain('rails');
+      expect(ids).toContain('ruby');
+    });
+
+    it('emits both "sql-server" and the implied "sql" for "SQL Server"', () => {
+      const attrs = extractSkills('Skills: SQL Server');
+      const ids = attrs.map((a) => a.canonicalId);
+      expect(ids).toContain('sql-server');
+      expect(ids).toContain('sql');
+    });
+
+    it('emits both "spring-boot" and the implied "spring" for "Spring Boot"', () => {
+      const attrs = extractSkills('Skills: Spring Boot');
+      const ids = attrs.map((a) => a.canonicalId);
+      expect(ids).toContain('spring-boot');
+      expect(ids).toContain('spring');
+    });
+
+    it('emits both "github-actions" and the implied "github" for "GitHub Actions"', () => {
+      const attrs = extractSkills('Skills: GitHub Actions');
+      const ids = attrs.map((a) => a.canonicalId);
+      expect(ids).toContain('github-actions');
+      expect(ids).toContain('github');
+    });
+
+    it('the implied skill carries a valid span pointing at the specific mention', () => {
+      const text = 'Skills: Ruby on Rails';
+      const attrs = extractSkills(text);
+      const implied = attrs.find((a) => a.canonicalId === 'ruby');
+      expect(implied).toBeDefined();
+      if (implied === undefined) throw new Error('unreachable: asserted above');
+      expect(() => {
+        assertValidSpan(text, implied.sourceSpan, implied.value);
+      }).not.toThrow();
+    });
+
+    it('does NOT imply "c" from "C Sharp" — C# is a different language from C', () => {
+      const attrs = extractSkills('Skills: C Sharp');
+      expect(attrs.some((a) => a.canonicalId === 'c')).toBe(false);
+      expect(attrs.some((a) => a.canonicalId === 'csharp')).toBe(true);
+    });
+
+    it('does NOT imply "java" from "JavaScript"', () => {
+      const attrs = extractSkills('Skills: JavaScript');
+      expect(attrs.some((a) => a.canonicalId === 'java')).toBe(false);
+      expect(attrs.some((a) => a.canonicalId === 'javascript')).toBe(true);
+    });
+
+    it('does not duplicate "ruby" when both "Ruby" and "Ruby on Rails" are already present', () => {
+      const attrs = extractSkills('Skills: Ruby, Ruby on Rails');
+      const rubyMatches = attrs.filter((a) => a.canonicalId === 'ruby');
+      expect(rubyMatches).toHaveLength(1);
+    });
+  });
 });

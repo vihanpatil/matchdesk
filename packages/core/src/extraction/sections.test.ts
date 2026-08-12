@@ -84,4 +84,51 @@ describe('detectSections', () => {
     const sections = detectSections(text);
     expect(sections.map((s) => s.name)).toEqual(['skills']);
   });
+
+  describe('realistic header synonyms (H-028 D1)', () => {
+    it.each([
+      'Experience',
+      'Work Experience',
+      'Professional Experience',
+      'Employment History',
+      'Work History',
+      'Career History',
+      'Employment',
+      'Relevant Experience',
+      'Experience:',
+      'WORK EXPERIENCE',
+      'Professional Background',
+      'Career Summary',
+    ])('recognizes "%s" as an experience header', (header) => {
+      const text = [header, 'Senior Engineer, Acme Corp, Jan 2019 - Present'].join('\n');
+      const sections = detectSections(text);
+      expect(sections.map((s) => s.name)).toEqual(['experience']);
+    });
+
+    it.each([
+      'Skills',
+      'Technical Skills',
+      'Key Skills',
+      'Core Skills',
+      'Skills & Tools',
+      'Skills:',
+      'TECHNICAL SKILLS',
+    ])('recognizes "%s" as a skills header', (header) => {
+      const text = [header, 'PostgreSQL, Python, Docker'].join('\n');
+      const sections = detectSections(text);
+      expect(sections.map((s) => s.name)).toEqual(['skills']);
+    });
+
+    it.each([
+      'Education',
+      'Education & Training',
+      'Academic Background',
+      'Education:',
+      'EDUCATION',
+    ])('recognizes "%s" as an education header', (header) => {
+      const text = [header, "Bachelor's in Computer Science"].join('\n');
+      const sections = detectSections(text);
+      expect(sections.map((s) => s.name)).toEqual(['education']);
+    });
+  });
 });

@@ -18,18 +18,49 @@ export interface Section {
  * Header synonyms, matched as a WHOLE trimmed line (case-insensitive), most
  * specific first within a name so "work experience" is recognized as
  * 'experience' rather than requiring a separate branch.
+ *
+ * H-028 D1: only ~4 experience synonyms were recognized, so a section ran
+ * until the next RECOGNIZED header — an unrecognized `Education` header, for
+ * example, silently swallowed everything after it, including an entire
+ * employment history. The vocabulary below is drawn from real-world CV
+ * conventions (see `testkit/cv.ts`), not from what the original author
+ * imagined. Every alternative here is matched against a line ALREADY
+ * normalized by `normalizeHeaderLine` (trailing colon stripped, `&`
+ * rewritten to `and`, whitespace collapsed, case-folded via the `i` flag) so
+ * "Skills & Tools", "Skills and Tools", "SKILLS & TOOLS:" and "skills &
+ * tools" all reach the same alternative without being listed separately.
  */
 const HEADER_PATTERNS: readonly { readonly name: SectionName; readonly pattern: RegExp }[] = [
   { name: 'summary', pattern: /^(summary|professional summary|profile|about)$/i },
-  { name: 'skills', pattern: /^(skills|technical skills|core competencies)$/i },
+  {
+    name: 'skills',
+    pattern:
+      /^(skills|technical skills|key skills|core skills|skills and tools|core competencies)$/i,
+  },
   {
     name: 'experience',
-    pattern: /^(experience|work experience|employment history|professional experience)$/i,
+    pattern:
+      /^(experience|work experience|professional experience|employment history|work history|career history|employment|relevant experience|professional background|career summary)$/i,
   },
-  { name: 'education', pattern: /^(education|academic background)$/i },
-  { name: 'certifications', pattern: /^(certifications?|licenses? (and|&) certifications?)$/i },
+  { name: 'education', pattern: /^(education|education and training|academic background)$/i },
+  { name: 'certifications', pattern: /^(certifications?|licenses? and certifications?)$/i },
   { name: 'projects', pattern: /^(projects|personal projects)$/i },
 ];
+
+/**
+ * Normalizes a header CANDIDATE line for matching against `HEADER_PATTERNS`
+ * only — the original `trimmed` text (colon and all) is still what
+ * `headerSpan` covers, so evidence shown to a recruiter is never rewritten.
+ * Handles three variations generally, per real CVs, rather than by listing
+ * every literal string: a trailing colon ("Experience:"), `&` vs "and"
+ * ("Skills & Tools" / "Skills and Tools"), and incidental extra whitespace
+ * left behind by stripping either of those. Case is handled separately, by
+ * the `i` flag on every pattern above.
+ */
+function normalizeHeaderLine(trimmed: string): string {
+  const withoutColon = trimmed.endsWith(':') ? trimmed.slice(0, -1) : trimmed;
+  return withoutColon.replace(/&/g, ' and ').replace(/\s+/g, ' ').trim();
+}
 
 /**
  * Splits text into sections by scanning for lines that are ENTIRELY a
@@ -58,7 +89,8 @@ export function detectSections(text: string): readonly Section[] {
     const trimmed = rawLine.trim();
     if (trimmed.length === 0) continue;
 
-    const match = HEADER_PATTERNS.find((candidate) => candidate.pattern.test(trimmed));
+    const normalized = normalizeHeaderLine(trimmed);
+    const match = HEADER_PATTERNS.find((candidate) => candidate.pattern.test(normalized));
     if (match === undefined) continue;
 
     const leadingWs = rawLine.length - rawLine.trimStart().length;

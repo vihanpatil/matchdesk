@@ -24,3 +24,7 @@ files/
 test-results/
 playwright-report/
 .playwright/
+
+# Mutation testing (ADR-020)
+.stryker-tmp/
+reports/

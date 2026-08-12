@@ -61,6 +61,28 @@ const AMBIGUOUS_BARE_FORMS: ReadonlySet<string> = new Set([
   'as',
 ]);
 
+/**
+ * Bare, undotted FULL WORDS with the same problem as `AMBIGUOUS_BARE_FORMS`
+ * above, but a different shape: "associate" had NO ambiguity guard at all
+ * (H-028 D4), so "Associate Software Engineer", "Associate Director of
+ * Engineering" and "AWS Certified Solutions Architect - Associate" each
+ * produced a phantom associate degree — +50 points and a flipped
+ * eligibility gate for a candidate with no degree. "bachelor" and "master"
+ * have the identical gap: the adversarial job titles "Bachelor Party
+ * Coordinator" and "Master Data Analyst" produce phantom degrees today for
+ * the same reason. Guarded the same way as `AMBIGUOUS_BARE_FORMS` — via
+ * `normalizedForm` membership — but checked with `hasBareWordContext`
+ * instead of `hasDegreeContext` (see that function for why).
+ */
+const AMBIGUOUS_BARE_WORD_FORMS: ReadonlySet<string> = new Set([
+  'bachelor',
+  'bachelors',
+  'master',
+  'masters',
+  'associate',
+  'associates',
+]);
+
 /** Small controlled vocabulary of fields of study — deliberately never institutions. */
 const FIELD_VOCAB: readonly { readonly id: string; readonly aliases: readonly string[] }[] = [
   { id: 'computer-science', aliases: ['computer science', 'cs', 'computer engineering'] },
@@ -143,6 +165,44 @@ function hasDegreeContext(text: string, start: number, end: number): boolean {
   return false;
 }
 
+/** "in"/"of" immediately (allowing only a few characters of whitespace) after the match. */
+const IMMEDIATE_PREPOSITION = /^\s{0,3}(?:in|of)\b/i;
+
+/**
+ * Guard for `AMBIGUOUS_BARE_WORD_FORMS`. Reuses `hasDegreeContext` — the
+ * "degree" keyword or a RECOGNIZED field of study nearby is always
+ * sufficient — but also accepts an immediate "in"/"of" preposition right
+ * after the word even when what follows is not a recognized field.
+ *
+ * Why looser than `hasDegreeContext` alone: "Bachelor of Arts" and "Master
+ * of Fine Arts" are ordinary, extremely common degree phrasings, but
+ * "arts"/"fine arts" are not in the (deliberately small) `FIELD_VOCAB`
+ * whitelist, so `hasDegreeContext` alone would reject them — which an
+ * existing test (`'Bachelor of Arts.'` -> degreeLevel 'bachelor') requires
+ * NOT to happen. The full English words "bachelor"/"master"/"associate" are
+ * also far less ambiguous in general prose than the two-letter abbreviations
+ * `hasDegreeContext` was designed for (nobody writes a job title as
+ * "Bachelor of Engineering Manager"), so requiring only a grammatically
+ * plausible preposition — not a recognized field — is a deliberately
+ * narrower relaxation than loosening `hasDegreeContext` itself, which stays
+ * exactly as strict as before for MS/BA/MD/JD/AA/AS.
+ *
+ * This is what distinguishes the false positives from the genuine mentions:
+ * "Associate Software Engineer" / "Associate Director of Engineering" /
+ * "Bachelor Party Coordinator" / "Master Data Analyst" are all immediately
+ * followed by a plain noun, never "in"/"of" — while "Bachelor's in Computer
+ * Science" and "Bachelor of Arts" are.
+ */
+function hasBareWordContext(text: string, start: number, end: number): boolean {
+  if (hasDegreeContext(text, start, end)) return true;
+  const lineEnd = (() => {
+    const nl = text.indexOf('\n', end);
+    return nl === -1 ? text.length : nl;
+  })();
+  const after = text.slice(end, Math.min(lineEnd, end + 10));
+  return IMMEDIATE_PREPOSITION.test(after);
+}
+
 /**
  * Detects degree-level mentions and (when stated) a field of study. One
  * attribute is emitted per distinct degree keyword found, so a candidate
@@ -151,7 +211,7 @@ function hasDegreeContext(text: string, start: number, end: number): boolean {
  * Section-header detection and bullet segmentation are not needed here — a
  * degree keyword is meaningful wherever it appears, and restricting the scan
  * to an "Education" section would silently miss degrees listed inline (e.g.
- * "Master's, self-funded while working full time").
+ * "Master's in Computer Science, self-funded while working full time").
  */
 export function extractEducation(text: string): readonly EducationAttribute[] {
   if (text.length === 0) return [];
@@ -180,13 +240,22 @@ export function extractEducation(text: string): readonly EducationAttribute[] {
 
       const value = text.slice(start, end);
 
-      // Guard: a bare ambiguous abbreviation (MS, BA, MD, AS, ...) is only
+      // Guard: a bare ambiguous abbreviation (MS, BA, MD, AS, ...) or bare
+      // ambiguous full word (Associate, Bachelor, Master — H-028 D4) is only
       // kept when the surrounding text corroborates it as a degree. This
       // check runs before claiming the span, so a rejected "MS" in "MS
-      // Office" leaves that text unclaimed rather than silently blocking
-      // some other pattern from it.
-      const normalizedForm = value.toLowerCase().replace(/[.\s]/g, '');
+      // Office" (or "Associate" in "Associate Software Engineer") leaves
+      // that text unclaimed rather than silently blocking some other
+      // pattern from it. An explicit "degree" suffix on the full-word forms
+      // (matched as part of the SAME token, e.g. "Associate's degree") is
+      // always self-corroborating and never reaches this branch's word-only
+      // set, since stripping punctuation leaves "associatesdegree", not
+      // "associates".
+      const normalizedForm = value.toLowerCase().replace(/[.\s'’]/g, '');
       if (AMBIGUOUS_BARE_FORMS.has(normalizedForm) && !hasDegreeContext(text, start, end)) {
+        continue;
+      }
+      if (AMBIGUOUS_BARE_WORD_FORMS.has(normalizedForm) && !hasBareWordContext(text, start, end)) {
         continue;
       }
 

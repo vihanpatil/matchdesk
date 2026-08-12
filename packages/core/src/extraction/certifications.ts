@@ -96,7 +96,13 @@ export function extractCertifications(text: string): readonly CertificationAttri
   const found: CertificationAttribute[] = [];
 
   for (const { term, canonicalId, isExact } of GAZETTEER) {
-    const pattern = new RegExp(`(?<![A-Za-z0-9])${escapeRegExp(term)}(?![A-Za-z0-9])`, 'gi');
+    // Unicode-aware boundary (H-028 D3, same root cause as extractSkills):
+    // an ASCII-only guard treats every accented letter as a word boundary,
+    // so a certification abbreviation could spuriously match adjacent to a
+    // non-English name. No certification surface form here is short enough
+    // (all are 3+ characters) to need the additional list-context guard
+    // `extractSkills` applies to single/double-character skill terms.
+    const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(term)}(?![\\p{L}\\p{N}])`, 'giu');
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(text)) !== null) {
       const start = match.index;

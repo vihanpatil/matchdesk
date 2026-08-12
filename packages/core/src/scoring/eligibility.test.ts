@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { extractSkills } from '../extraction/skills.js';
 import type {
   CertificationAttribute,
   EducationAttribute,
@@ -182,6 +183,23 @@ describe('evaluateEligibility', () => {
     };
     const result = evaluateEligibility(job, candidate([]));
     expect(result.unmet.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('a candidate who writes "Ruby on Rails" is eligible for a job requiring "Ruby" (H-028 D2)', () => {
+    // The real defect: a Rails developer was scored ineligible for a Ruby
+    // job because "Ruby on Rails" only ever extracted as `rails`, never as
+    // `ruby` — describing themselves more precisely made them ineligible.
+    const job: Job = {
+      id: 'j1',
+      skills: {
+        weight: 1,
+        requirements: [{ id: 'r1', canonicalSkillId: 'ruby', label: 'Ruby', mustHave: true }],
+      },
+    };
+    const candidateSkills = extractSkills('Skills: Ruby on Rails');
+    const result = evaluateEligibility(job, candidate(candidateSkills));
+    expect(result.eligible).toBe(true);
+    expect(result.unmet).toEqual([]);
   });
 
   it('is deterministic across repeated calls', () => {

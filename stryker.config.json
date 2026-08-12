@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "Mutation testing per ADR-020. Scoped to packages/core because that is where a surviving mutant means a wrong score for a real person. Run with `pnpm mutate`.",
+  "packageManager": "pnpm",
+  "testRunner": "vitest",
+  "reporters": ["progress", "clear-text", "html"],
+  "coverageAnalysis": "perTest",
+  "mutate": [
+    "packages/core/src/**/*.ts",
+    "!packages/core/src/**/*.test.ts",
+    "!packages/core/src/testkit/**",
+    "!packages/core/src/metamorphic/**",
+    "!packages/core/src/index.ts",
+    "!packages/core/src/taxonomy/data.ts"
+  ],
+  "thresholds": {
+    "high": 90,
+    "low": 80,
+    "break": 75
+  },
+  "timeoutMS": 20000,
+  "concurrency": 4,
+  "tempDirName": ".stryker-tmp",
+  "htmlReporter": {
+    "fileName": "reports/mutation/index.html"
+  }
+}

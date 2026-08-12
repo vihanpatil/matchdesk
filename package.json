@@ -25,10 +25,13 @@
     "license:audit": "node scripts/license-audit.mjs",
     "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm license:audit && pnpm test:cov",
     "prepare": "husky",
-    "test:manifest": "node scripts/update-test-manifest.mjs"
+    "test:manifest": "node scripts/update-test-manifest.mjs",
+    "mutate": "stryker run"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@stryker-mutator/core": "9.6.1",
+    "@stryker-mutator/vitest-runner": "9.6.1",
     "@types/node": "^26.2.0",
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.8.1",
