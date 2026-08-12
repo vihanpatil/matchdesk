@@ -16,10 +16,13 @@ import {
 } from './types.js';
 
 /**
- * ADR-007's eligibility predicate: must-have requirements PARTITION results
- * rather than entering the weighted sum. This is the one and only place a
- * "must-have" is checked. Every unmet requirement is named — never hidden,
- * never merged into a single boolean.
+ * The eligibility predicate (ADR-007, amended by ADR-017): must-have
+ * requirements PARTITION results into eligible/ineligible groups. Since
+ * ADR-017, must-haves ALSO enter the weighted sum exactly like preferred
+ * requirements (see `skillsSubscore` etc. in `./dimensions.js`) — that is
+ * additive, not a replacement for this predicate. This remains the one and
+ * only place a "must-have" is *checked for eligibility*. Every unmet
+ * requirement is named — never hidden, never merged into a single boolean.
  *
  * A must-have SKILL requirement counts as met only for an "exact" or "alias"
  * cascade match (subscore >= 0.95). A merely "related" match (0.70) is

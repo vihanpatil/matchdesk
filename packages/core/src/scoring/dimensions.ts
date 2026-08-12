@@ -40,17 +40,20 @@ export function matchAllSkillRequirements(
 }
 
 /**
- * Skills dimension subscore. ADR-007 is binding: must-have requirements are
- * evaluated ONLY as the separate eligibility predicate (see `./eligibility.js`)
- * and NEVER enter this average. When there are no preferred (non-must-have)
- * requirements to average, the dimension is neutrally 1.0 for every
- * candidate under this job — a constant, so it cannot violate monotonicity.
+ * Skills dimension subscore. ADR-017 (amending ADR-007) is binding: a
+ * must-have requirement contributes to this average exactly like a
+ * preferred one — every requirement in the dimension is weighted equally.
+ * Must-haves are ALSO evaluated separately as the eligibility predicate
+ * (see `./eligibility.js`), which is what partitions eligible from
+ * ineligible; that partition is structural and does not depend on this
+ * average. When there are no requirements at all, the dimension is
+ * neutrally 1.0 for every candidate under this job — a constant, so it
+ * cannot violate monotonicity.
  */
 export function skillsSubscore(matches: readonly SkillRequirementMatch[]): number {
-  const preferred = matches.filter((m) => !m.requirement.mustHave);
-  if (preferred.length === 0) return 1;
-  const sum = preferred.reduce((acc, m) => acc + m.match.subscore, 0);
-  return quantize(sum / preferred.length);
+  if (matches.length === 0) return 1;
+  const sum = matches.reduce((acc, m) => acc + m.match.subscore, 0);
+  return quantize(sum / matches.length);
 }
 
 // -------------------------------------------------------------------------

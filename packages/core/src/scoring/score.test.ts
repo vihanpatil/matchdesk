@@ -296,3 +296,107 @@ describe('rankCandidates', () => {
     expect(reversed).toEqual(forward);
   });
 });
+
+describe('ADR-017: must-have requirements both score and partition', () => {
+  // The exact live-probe scenario from ADR-017: PostgreSQL is must-have,
+  // React is preferred. "weak" meets the hard requirement only; "strong"
+  // meets the preferred requirement only.
+  const job: Job = {
+    id: 'j1',
+    skills: {
+      weight: 1,
+      requirements: [
+        { id: 'r1', canonicalSkillId: 'postgresql', label: 'PostgreSQL', mustHave: true },
+        { id: 'r2', canonicalSkillId: 'react', label: 'React', mustHave: false },
+      ],
+    },
+  };
+
+  it('a must-have requirement contributes to its dimension subscore exactly like a preferred one', () => {
+    const weak = scoreCandidate(
+      job,
+      candidate('weak', '2026-01-01T00:00:00.000Z', [skill('postgresql')]),
+    );
+    const strong = scoreCandidate(
+      job,
+      candidate('strong', '2026-01-01T00:00:00.000Z', [skill('react')]),
+    );
+
+    // Each candidate met exactly 1 of the 2 skill requirements, so both
+    // should land at the same ~50% subscore — must-have no longer excluded.
+    expect(weak.score).toBe(50);
+    expect(strong.score).toBe(50);
+  });
+
+  it('"weak" (meets the must-have) is eligible; "strong" (fails the must-have) is not — despite equal scores', () => {
+    const weak = scoreCandidate(
+      job,
+      candidate('weak', '2026-01-01T00:00:00.000Z', [skill('postgresql')]),
+    );
+    const strong = scoreCandidate(
+      job,
+      candidate('strong', '2026-01-01T00:00:00.000Z', [skill('react')]),
+    );
+
+    expect(weak.eligibility.eligible).toBe(true);
+    expect(strong.eligibility.eligible).toBe(false);
+  });
+
+  it('the old ADR-007 bug does not reproduce: the candidate who meets the hard requirement never shows 0 while a candidate who fails it shows 100', () => {
+    const weak = scoreCandidate(
+      job,
+      candidate('weak', '2026-01-01T00:00:00.000Z', [skill('postgresql')]),
+    );
+    const strong = scoreCandidate(
+      job,
+      candidate('strong', '2026-01-01T00:00:00.000Z', [skill('react')]),
+    );
+    expect(weak.score).not.toBe(0);
+    expect(strong.score).not.toBe(100);
+  });
+
+  it('an ineligible candidate can still numerically outscore an eligible one, yet the partition still holds it below (structural guarantee, not score-derived)', () => {
+    // 3 skill requirements: A must-have, B and C preferred. "weak" meets
+    // only A (eligible, subscore 1/3). "strong" meets B and C but not A
+    // (ineligible, subscore 2/3) — strictly higher raw score.
+    const threeSkillJob: Job = {
+      id: 'j2',
+      skills: {
+        weight: 1,
+        requirements: [
+          { id: 'a', canonicalSkillId: 'postgresql', label: 'PostgreSQL', mustHave: true },
+          { id: 'b', canonicalSkillId: 'react', label: 'React', mustHave: false },
+          { id: 'c', canonicalSkillId: 'docker', label: 'Docker', mustHave: false },
+        ],
+      },
+    };
+    const weak = candidate('weak', '2026-01-01T00:00:00.000Z', [skill('postgresql')]);
+    const strong = candidate('strong', '2026-01-01T00:00:00.000Z', [
+      skill('react'),
+      skill('docker'),
+    ]);
+    const result = rankCandidates(threeSkillJob, [weak, strong]);
+
+    const weakResult = result.eligible.find((r) => r.candidateId === 'weak');
+    const strongResult = result.ineligible.find((r) => r.candidateId === 'strong');
+    expect(weakResult).toBeDefined();
+    expect(strongResult).toBeDefined();
+    // Numerically, ineligible "strong" outscores eligible "weak" — proving
+    // the guarantee comes from the grouping, not from the score.
+    expect(strongResult?.score).toBeGreaterThan(weakResult?.score ?? 100);
+    // Yet strong never appears in the eligible array, and weak never
+    // appears in the ineligible array — structural, not score-derived.
+    expect(result.eligible.some((r) => r.candidateId === 'strong')).toBe(false);
+    expect(result.ineligible.some((r) => r.candidateId === 'weak')).toBe(false);
+  });
+
+  it('a met must-have skill appears in the strengths breakdown with a nonzero contribution', () => {
+    const weak = scoreCandidate(
+      job,
+      candidate('weak', '2026-01-01T00:00:00.000Z', [skill('postgresql')]),
+    );
+    const pgStrength = weak.explanation.strengths.find((s) => s.label === 'PostgreSQL');
+    expect(pgStrength).toBeDefined();
+    expect(pgStrength?.contribution).toBeGreaterThan(0);
+  });
+});

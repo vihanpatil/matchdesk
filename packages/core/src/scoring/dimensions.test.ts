@@ -92,25 +92,34 @@ describe('matchAllSkillRequirements / skillsSubscore', () => {
     );
   });
 
-  it('skillsSubscore averages ONLY the non-must-have (preferred) requirements — ADR-007', () => {
+  it('skillsSubscore averages EVERY requirement, must-have and preferred alike — ADR-017 (amends ADR-007)', () => {
     const reqs = [requirement('postgresql', true), requirement('react', false)];
-    // Must-have postgresql is unmet, but that must NOT drag the weighted-sum
-    // subscore down — only the preferred "react" requirement (also unmet)
-    // determines it here.
+    // Neither requirement is met: average is 0 regardless of mustHave.
     const matches = matchAllSkillRequirements({ weight: 1, requirements: reqs }, []);
     expect(skillsSubscore(matches)).toBe(0);
 
+    // The must-have is now met (react preferred still unmet): the must-have
+    // DOES enter the average under ADR-017, unlike the old ADR-007 rule
+    // this test previously asserted (where it was excluded and this stayed
+    // 0). One of two requirements met -> 0.5.
     const matchesWithMustHaveMet = matchAllSkillRequirements({ weight: 1, requirements: reqs }, [
       skill('postgresql'),
     ]);
-    // The must-have is now met, but it still never entered the average.
-    expect(skillsSubscore(matchesWithMustHaveMet)).toBe(0);
+    expect(skillsSubscore(matchesWithMustHaveMet)).toBe(0.5);
   });
 
-  it('skillsSubscore is 1.0 (neutral) when there are no preferred requirements at all', () => {
+  it('skillsSubscore counts a must-have requirement even when it is the only requirement in the dimension — ADR-017', () => {
+    // Previously (ADR-007) this returned the "neutral" 1.0 because there
+    // were no PREFERRED requirements to average, regardless of whether the
+    // sole must-have was met. Under ADR-017 must-haves are real dimension
+    // contributors, so an unmet lone must-have now correctly scores 0, and
+    // a met one now correctly scores 1.
     const reqs = [requirement('postgresql', true)];
-    const matches = matchAllSkillRequirements({ weight: 1, requirements: reqs }, []);
-    expect(skillsSubscore(matches)).toBe(1);
+    const unmet = matchAllSkillRequirements({ weight: 1, requirements: reqs }, []);
+    expect(skillsSubscore(unmet)).toBe(0);
+
+    const met = matchAllSkillRequirements({ weight: 1, requirements: reqs }, [skill('postgresql')]);
+    expect(skillsSubscore(met)).toBe(1);
   });
 
   it('skillsSubscore returns 1.0 for an empty requirement list', () => {

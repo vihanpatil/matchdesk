@@ -37,35 +37,29 @@ function representativeSpan(
   return cert?.sourceSpan ?? null;
 }
 
+/**
+ * ADR-017: every skill requirement — must-have or preferred — is weighted
+ * equally within the dimension (matching `skillsSubscore`'s plain average),
+ * so a met must-have shows its real contribution here rather than a
+ * hardcoded 0. It remains true, separately, that must-haves are also the
+ * eligibility predicate (`./eligibility.js`) — that is additive, not this
+ * function's concern.
+ */
 function skillStrengths(
   skillMatches: readonly SkillRequirementMatch[],
   skillsDim: DimensionContribution | null,
 ): readonly StrengthItem[] {
-  const preferred = skillMatches.filter((m) => !m.requirement.mustHave);
   const perReqWeight =
-    skillsDim !== null && preferred.length > 0 ? skillsDim.weight / preferred.length : 0;
+    skillsDim !== null && skillMatches.length > 0 ? skillsDim.weight / skillMatches.length : 0;
 
   const items: StrengthItem[] = [];
-  for (const m of preferred) {
+  for (const m of skillMatches) {
     if (m.match.subscore <= 0) continue;
     items.push({
       dimension: 'skills',
       label: m.requirement.label,
       matchType: m.match.matchType,
       contribution: quantize(perReqWeight * m.match.subscore),
-      evidence: m.match.evidence,
-    });
-  }
-  for (const m of skillMatches) {
-    if (!m.requirement.mustHave) continue;
-    if (m.match.subscore <= 0) continue;
-    // Met must-haves contribute 0 to the score (ADR-007) but are still
-    // valuable evidence for why the candidate is eligible.
-    items.push({
-      dimension: 'skills',
-      label: m.requirement.label,
-      matchType: m.match.matchType,
-      contribution: 0,
       evidence: m.match.evidence,
     });
   }

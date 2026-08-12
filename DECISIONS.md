@@ -149,7 +149,13 @@ Stated plainly in `docs/LIMITATIONS.md`.
 
 ## ADR-007 — Protected-characteristic proxies and the eligibility partition
 
-**Date:** 2026-08-12 · **Status:** Accepted
+**Date:** 2026-08-12 · **Status:** Accepted, **PARTIALLY SUPERSEDED by ADR-017**
+
+> **Read ADR-017 before implementing anything from this entry.** The clause
+> below stating that must-have requirements never enter the weighted sum is
+> **no longer in force** — they now both score and partition. Everything else
+> here, in particular the protected-characteristic proxy dispositions, remains
+> fully binding.
 
 Section 10.4 requires flagging any scoring signal that could proxy for a
 protected characteristic. Three were identified:
