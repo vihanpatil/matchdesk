@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { analyzeTestReport } from './analyze-test-report.mjs';
+import { analyzeTestReport, collectTestIds, testId } from './analyze-test-report.mjs';
 
 /**
  * Builds a minimal report with `statuses.length` assertions in one suite.
@@ -76,6 +76,35 @@ describe('analyzeTestReport', () => {
     expect(analyzeTestReport(empty, OK).code).toBe(2);
   });
 
+  it('names a manifest test that has disappeared', () => {
+    // The R-1 attack: delete a named regression test, add a filler test so the
+    // count is unchanged. A floor cannot see this; identities can.
+    const result = analyzeTestReport(report(['passed', 'passed']), {
+      floor: 2,
+      manifest: ['/repo/some.test.ts :: test 0', '/repo/some.test.ts :: deleted regression test'],
+    });
+    expect(result.code).toBe(1);
+    expect(result.messages.join('\n')).toContain('deleted regression test');
+    expect(result.messages.join('\n')).toContain('no longer exist');
+  });
+
+  it('permits added tests without complaint', () => {
+    const result = analyzeTestReport(report(['passed', 'passed', 'passed']), {
+      floor: 0,
+      manifest: ['/repo/some.test.ts :: test 0'],
+    });
+    expect(result.code).toBe(0);
+  });
+
+  it('still rejects a skip even when the manifest is satisfied', () => {
+    const result = analyzeTestReport(report(['passed', 'skipped']), {
+      floor: 0,
+      manifest: [],
+    });
+    expect(result.code).toBe(1);
+    expect(result.messages.join('\n')).toContain('[skipped]');
+  });
+
   it('counts across multiple suites', () => {
     const multi = {
       numTotalTests: 3,
@@ -93,5 +122,34 @@ describe('analyzeTestReport', () => {
     const result = analyzeTestReport(multi, OK);
     expect(result.total).toBe(3);
     expect(result.code).toBe(1);
+  });
+});
+
+describe('test identities', () => {
+  it('builds a stable id from repo-relative path and full name', () => {
+    expect(testId('/x/matchdesk/packages/core/a.test.ts', 'suite does thing')).toBe(
+      'packages/core/a.test.ts :: suite does thing',
+    );
+  });
+
+  it('leaves paths outside the repo root intact', () => {
+    expect(testId('/elsewhere/a.test.ts', 'n')).toBe('/elsewhere/a.test.ts :: n');
+  });
+
+  it('collects every id, sorted and deterministic', () => {
+    const r = {
+      numTotalTests: 2,
+      testResults: [
+        { name: '/x/matchdesk/b.test.ts', assertionResults: [{ status: 'passed', fullName: 'z' }] },
+        { name: '/x/matchdesk/a.test.ts', assertionResults: [{ status: 'passed', fullName: 'y' }] },
+      ],
+    };
+    expect(collectTestIds(r)).toEqual(['a.test.ts :: y', 'b.test.ts :: z']);
+  });
+
+  it('returns nothing for a structurally invalid report rather than throwing', () => {
+    expect(collectTestIds(null)).toEqual([]);
+    expect(collectTestIds({})).toEqual([]);
+    expect(collectTestIds({ testResults: 'no' })).toEqual([]);
   });
 });

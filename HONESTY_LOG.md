@@ -310,3 +310,94 @@ client-side.
 
 CI is the real backstop, which makes H-003 (CI has never actually run) more
 significant than it looked in isolation.
+
+### H-016 · I regressed the ESLint config while fixing it — same trap, second time
+
+**Severity:** was critical; fixed.
+
+The commit that closed H-011 redeclared `no-restricted-syntax` inside the
+`packages/core` block. **ESLint flat config replaces a rule's options rather
+than merging them**, so all four project-wide selectors were silently deleted
+from the only package containing logic. The empty-catch ban and the Math/Date
+aliasing ban were dead on arrival exactly where they mattered.
+
+This is the identical bug class already recorded as H-009 item 2. Knowing about
+it was not enough to avoid it.
+
+Fixed structurally rather than by correction: the selectors live in a named
+constant carrying a `DANGER` note, and the scoped block spreads
+`[...BASE, ...CORE]`. Verified: 11 Section-tagged errors now fire on a probe
+file inside `packages/core`.
+
+**Residual risk, stated:** the constant protects `no-restricted-syntax` only.
+The next scoped block anyone adds for `no-restricted-globals` or
+`no-restricted-properties` will hit the same trap with no constant to spread.
+
+### H-017 · A test-count floor is not enough — counts can be padded
+
+**Severity:** was high; fixed.
+
+The first defence against tests vanishing was a committed minimum count. The
+verifier defeated it in one move: delete a named regression test, add one
+trivial passing test, count unchanged.
+
+```
+eslint 0 errors · typecheck exit=0 · Tests 37 passed
+✅ All 37 tests executed  ·  pnpm test:cov exit=0
+→ then apply mutant M14 → exit=0, the exact bug ships
+```
+
+The deleted test was written in the previous commit specifically to kill M14.
+A green "all tests executed" over a padded count is a **stronger false
+assurance than no guard at all.**
+
+Fixed with `scripts/test-manifest.json`: a committed list of test identities
+(`file :: full name`). Additions are free; disappearances are named. Verified —
+the same attack now reports the exact missing test by name and exits 1.
+Regenerating the manifest is a deliberate `pnpm test:manifest` step, so removing
+a test is a visible line in a diff a reviewer can question.
+
+### H-018 · Report-freshness by source mtime was bypassable three ways
+
+**Severity:** was medium-high; fixed.
+
+The staleness check compared the report against source-file mtimes. Defeated by:
+untouched config files (`vitest.config.ts` decides which tests run and was not
+watched), backdating a source file, and touching the report forward.
+
+Replaced with run-identity rather than inferred time: a Vitest `globalSetup`
+stamps `coverage/.run-marker` at run **start**; the report is written at run
+**end**. A marker newer than the report proves a run happened that produced no
+report — precisely what a reporter override does. Verified: the attack now exits
+2 naming the discrepancy.
+
+**Residual, accepted:** an author who directly forges `coverage/` artifacts —
+editing the JSON or touching the report forward — defeats any local check. That
+is not solvable client-side, for the same reason `--no-verify` is not. CI
+running from a clean checkout is the answer, which is why H-003 matters.
+
+### H-019 · Coverage and lint gaps in build tooling
+
+**Severity:** low; fixed.
+
+`scripts/lib/` was not coverage-measured, so the load-bearing integrity code had
+good tests and nothing preventing their decay — now included. And four rules
+(`no-eval`, `no-implied-eval`, `eqeqeq`, `no-restricted-properties`) were absent
+from `.js`/`.mjs` files because the TS block's globs did not cover them, meaning
+`eval()` was permitted inside the integrity scripts specifically. Restated in
+the tooling block.
+
+### H-020 · Two findings judged minor and deliberately NOT fixed
+
+**Severity:** open, accepted, with reasoning.
+
+1. **`roundHalfUp` cutoff unpinned in `[1e15, ~1.0000001e15)`.** 35 differing
+   inputs exist, but the docstring already declares that regime irrelevant —
+   beyond 1e15 there is no fractional part to round. Verifier independently
+   agreed the judgement is correct.
+2. **A stale `dist/` survives a failing compile.** `noEmitOnError` prevents new
+   output but the previous build persists. Currently unreachable: Vitest aliases
+   both workspace packages to source, and nothing imports the built artifact.
+   **This becomes live the moment `apps/server` imports `@matchdesk/core`,**
+   because `package.json` still points `main`/`exports` at `./dist/index.js`.
+   Flagged here so Phase 6 does not meet it by surprise.

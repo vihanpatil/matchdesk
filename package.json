@@ -24,7 +24,8 @@
     "test:assert-ran": "node scripts/assert-no-skipped-tests.mjs",
     "license:audit": "node scripts/license-audit.mjs",
     "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm license:audit && pnpm test:cov",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:manifest": "node scripts/update-test-manifest.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

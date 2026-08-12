@@ -324,6 +324,20 @@ export default tseslint.config(
     rules: {
       'no-console': 'off',
       'no-restricted-syntax': ['error', ...BASE_RESTRICTED_SYNTAX],
+      /* These are declared in the TS block too, and the TS block's file globs
+         do not cover .js/.mjs/.cjs — so without restating them here, eval() and
+         Math.random() were permitted in the integrity scripts. */
+      'no-eval': ['error', { allowIndirect: false }],
+      'no-implied-eval': 'error',
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Math',
+          property: 'random',
+          message: 'Section 6.6: no randomness. Take a seed as a parameter.',
+        },
+      ],
     },
   },
 );

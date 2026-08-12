@@ -1,70 +1,34 @@
 #!/usr/bin/env node
 /**
- * Section 0.2.2: no skipped, `.only`-ed or todo tests. Ever.
+ * Section 0.2.2: no skipped, `.only`-ed or todo tests. Ever. And no test may
+ * silently cease to exist.
  *
  * A syntactic ESLint ban is not enough — Phase 0 verification defeated one with
  * `const d = describe; d.only(...)` and with runtime `ctx.skip()`, both
  * ESLint-clean, both silently skipping tests that contained a deliberately
  * failing assertion while every hook reported success.
  *
- * This reads the RESULT of the run, so aliasing and computed access cannot
- * evade it. The report is deleted before each run (see pretest-clean.mjs), so a
- * missing report means the run did not produce one and this exits 2 rather than
- * validating a stale file from a previous run.
+ * Three independent checks, in order, each fail-CLOSED:
  *
- * Exit codes: 0 every test ran · 1 real violation · 2 the check could not be
- * trusted. Never a silent pass.
+ *   1. FRESHNESS — the run marker (written at run start) must not be newer than
+ *      the report (written at run end). A run that produced no report is
+ *      therefore detectable, which is what a reporter override does.
+ *   2. INTEGRITY — no test may report a status other than passed/failed.
+ *   3. IDENTITY  — every test in the committed manifest must still exist. A
+ *      count can be padded with filler tests to hide a deletion; identities
+ *      cannot.
+ *
+ * Exit codes: 0 clean · 1 real violation · 2 the check could not be trusted.
  */
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 
 import { analyzeTestReport } from './lib/analyze-test-report.mjs';
 
 const REPORT = new URL('../coverage/test-results.json', import.meta.url);
+const MARKER = new URL('../coverage/.run-marker', import.meta.url);
 const FLOOR = new URL('./test-floor.json', import.meta.url);
-const ROOT = fileURLToPath(new URL('..', import.meta.url));
-
-/** Directories whose contents, if newer than the report, make it stale. */
-const WATCHED = ['packages', 'apps', 'scripts'];
-const WATCHED_EXT = /\.(ts|tsx|mts|cts|js|mjs|cjs)$/;
-
-/**
- * Newest modification time across all source and test files.
- *
- * Deleting the report before a run only protects the sanctioned scripts. Phase 0
- * verification bypassed that by invoking vitest directly with a reporter
- * override, so no fresh JSON was written and the guard validated the PREVIOUS
- * run — certifying 30 passing tests while the actual run skipped a failing one.
- *
- * Comparing against source mtimes closes it: if anything has been edited since
- * the report was produced, the report cannot describe the current tree.
- *
- * @returns {{ mtimeMs: number, file: string }}
- */
-function newestSource() {
-  let newest = { mtimeMs: 0, file: '(none)' };
-  for (const dir of WATCHED) {
-    /** @type {string} */
-    const base = join(ROOT, dir);
-    /** @type {import('node:fs').Dirent[]} */
-    let entries;
-    try {
-      entries = readdirSync(base, { withFileTypes: true, recursive: true });
-    } catch {
-      continue; // Directory absent (e.g. apps/ before Phase 6) — not an error.
-    }
-    for (const entry of entries) {
-      if (!entry.isFile() || !WATCHED_EXT.test(entry.name)) continue;
-      const full = join(entry.parentPath, entry.name);
-      if (full.includes('node_modules') || full.includes(`${'dist'}/`)) continue;
-      const { mtimeMs } = statSync(full);
-      if (mtimeMs > newest.mtimeMs) newest = { mtimeMs, file: full };
-    }
-  }
-  return newest;
-}
+const MANIFEST = new URL('./test-manifest.json', import.meta.url);
 
 /**
  * @param {URL} url
@@ -86,22 +50,32 @@ function readJson(url, label) {
   }
 }
 
-const report = readJson(REPORT, 'the test report');
-
-// Staleness gate, before anything else is trusted.
-const reportMtime = statSync(REPORT).mtimeMs;
-const newest = newestSource();
-if (newest.mtimeMs > reportMtime) {
-  console.error('❌ The test report is stale — source has changed since it was written.');
-  console.error(`   Newest source: ${newest.file.replace(ROOT, './')}`);
+/* ---- 1. Freshness ---- */
+if (!existsSync(MARKER)) {
+  console.error('❌ No run marker — the test run did not start through the sanctioned path.');
+  console.error('   Run `pnpm test` or `pnpm test:cov`, not vitest directly.');
+  process.exit(2);
+}
+if (!existsSync(REPORT)) {
+  console.error('❌ A run started but wrote no report. Refusing to report success.');
+  console.error('   This is what a reporter override looks like. Run `pnpm test`.');
+  process.exit(2);
+}
+const markerAt = statSync(MARKER).mtimeMs;
+const reportAt = statSync(REPORT).mtimeMs;
+if (markerAt > reportAt) {
+  console.error('❌ The test report is stale.');
+  console.error('   A run started after this report was written but produced no new report,');
   console.error(
-    `   Report is ${String(Math.round((newest.mtimeMs - reportMtime) / 1000))}s older than it.`,
+    `   so the report describes an earlier run (marker is ${String(Math.round((markerAt - reportAt) / 1000))}s newer).`,
   );
-  console.error('   Run `pnpm test` (which regenerates the report) rather than vitest directly.');
+  console.error('   Run `pnpm test` rather than invoking vitest directly.');
   process.exit(2);
 }
 
+const report = readJson(REPORT, 'the test report');
 const floorConfig = readJson(FLOOR, 'scripts/test-floor.json');
+const manifestRaw = readJson(MANIFEST, 'scripts/test-manifest.json');
 
 const floor =
   typeof floorConfig === 'object' && floorConfig !== null
@@ -112,7 +86,20 @@ if (typeof floor !== 'number' || !Number.isInteger(floor) || floor < 0) {
   process.exit(2);
 }
 
-const { code, messages, total } = analyzeTestReport(report, { floor });
+const manifestTests =
+  typeof manifestRaw === 'object' && manifestRaw !== null
+    ? /** @type {Record<string, unknown>} */ (manifestRaw)['tests']
+    : undefined;
+if (!Array.isArray(manifestTests) || !manifestTests.every((t) => typeof t === 'string')) {
+  console.error('❌ scripts/test-manifest.json: "tests" must be an array of strings.');
+  process.exit(2);
+}
+
+/* ---- 2 + 3. Integrity and identity ---- */
+const { code, messages, total } = analyzeTestReport(report, {
+  floor,
+  manifest: /** @type {string[]} */ (manifestTests),
+});
 
 if (code === 2) {
   console.error('❌ Test report could not be trusted:');
@@ -128,5 +115,5 @@ if (code === 1) {
 }
 
 console.log(
-  `✅ All ${String(total)} tests executed — none skipped, todo, or .only-ed (floor: ${String(floor)}).`,
+  `✅ All ${String(total)} tests executed — none skipped, and all ${String(manifestTests.length)} manifest tests present.`,
 );

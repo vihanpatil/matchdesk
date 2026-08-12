@@ -24,13 +24,21 @@ export default defineConfig({
        scripts/assert-no-skipped-tests.mjs, which inspects the result. */
     allowOnly: false,
 
+    /* Stamps coverage/.run-marker at run START. The report is written at run
+       END, so marker-newer-than-report proves a run happened that produced no
+       report — which is what a reporter override does. See the guard. */
+    globalSetup: ['./scripts/vitest-run-marker.mjs'],
+
     reporters: ['default', ['json', { outputFile: './coverage/test-results.json' }]],
 
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary', 'lcov'],
       reportsDirectory: './coverage',
-      include: ['{apps,packages}/*/src/**/*.{ts,mts,cts}'],
+      /* scripts/lib is in scope: assert-no-skipped-tests.mjs is load-bearing
+         for Section 0.2.2, and excellent tests today are no guarantee against
+         decay tomorrow if nothing gates them. */
+      include: ['{apps,packages}/*/src/**/*.{ts,mts,cts}', 'scripts/lib/**/*.mjs'],
       /* Barrels are NOT excluded. An earlier config exempted them by name,
          which left a path where real logic could live unmeasured. */
       exclude: ['**/*.test.ts', '**/dist/**'],

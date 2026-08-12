@@ -28,12 +28,53 @@ function asText(value) {
 }
 
 /**
+ * Stable identity for a single test: repo-relative file + full test name.
+ * @param {string} file
+ * @param {string} name
+ * @returns {string}
+ */
+export function testId(file, name) {
+  const rel = file.includes('/matchdesk/') ? file.slice(file.indexOf('/matchdesk/') + 11) : file;
+  return `${rel} :: ${name}`;
+}
+
+/**
+ * Every test identity present in a report, sorted.
+ * @param {unknown} report
+ * @returns {string[]}
+ */
+export function collectTestIds(report) {
+  if (!isRecord(report)) return [];
+  const suites = report['testResults'];
+  if (!Array.isArray(suites)) return [];
+  /** @type {string[]} */
+  const ids = [];
+  for (const rawSuite of suites) {
+    const suite = /** @type {Suite} */ (isRecord(rawSuite) ? rawSuite : {});
+    const file = asText(suite.name) || '(unknown file)';
+    const assertions = Array.isArray(suite.assertionResults) ? suite.assertionResults : [];
+    for (const rawAssertion of assertions) {
+      const assertion = /** @type {Assertion} */ (isRecord(rawAssertion) ? rawAssertion : {});
+      const name = asText(assertion.fullName) || asText(assertion.title) || '(unnamed test)';
+      ids.push(testId(file, name));
+    }
+  }
+  return ids.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+}
+
+/**
  * @param {unknown} report Parsed contents of Vitest's JSON reporter output.
- * @param {{ floor: number }} options Minimum number of tests that must run.
+ * @param {{ floor: number, manifest?: string[] }} options
+ *        `floor` is a cheap lower bound; `manifest` is the authoritative list of
+ *        test identities that must still exist. A count can be padded with
+ *        filler tests to mask a deletion — Phase 0 verification demonstrated
+ *        removing a named regression test, keeping the count at 30, and then
+ *        shipping the exact mutant that test was written to catch. Identities
+ *        cannot be padded: a missing test is named.
  * @returns {Analysis} code 0 = every test ran; 1 = a real violation;
  *          2 = the check itself could not be trusted.
  */
-export function analyzeTestReport(report, { floor }) {
+export function analyzeTestReport(report, { floor, manifest }) {
   if (!isRecord(report)) {
     return { code: 2, messages: ['Report is not an object.'], total: 0 };
   }
@@ -107,6 +148,27 @@ export function analyzeTestReport(report, { floor }) {
       ],
       total: counted,
     };
+  }
+
+  // Identity check. Additions are fine; disappearances are not.
+  if (manifest !== undefined) {
+    const present = new Set(collectTestIds(report));
+    const missing = manifest.filter((id) => !present.has(id));
+    if (missing.length > 0) {
+      return {
+        code: 1,
+        messages: [
+          ...messages,
+          `${String(missing.length)} test(s) in the committed manifest no longer exist:`,
+          ...missing.map((id) => `  - ${id}`),
+          '',
+          'A test was renamed, deleted, or failed to register. Adding filler tests cannot mask',
+          'this, which is the point. If the removal is intentional, regenerate the manifest with',
+          '`pnpm test:manifest` in the same commit and say why in HONESTY_LOG.md.',
+        ],
+        total: counted,
+      };
+    }
   }
 
   if (messages.length > 0) {
