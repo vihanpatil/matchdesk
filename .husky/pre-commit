@@ -2,6 +2,8 @@
 # Section 0.2.9: cannot commit broken code. Do not bypass with --no-verify.
 set -e
 
+. "$(dirname -- "$0")/common.sh"
+
 echo "▸ pre-commit: staged lint + format"
 pnpm exec lint-staged
 

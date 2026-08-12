@@ -2,5 +2,7 @@
 # Full suite with coverage thresholds before anything leaves the machine.
 set -e
 
+. "$(dirname -- "$0")/common.sh"
+
 echo "▸ pre-push: tests with coverage gates"
 pnpm test:cov
