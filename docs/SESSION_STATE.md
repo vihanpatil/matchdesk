@@ -4,7 +4,7 @@
 the end of every working session. If this file disagrees with the code, **the
 code is right and this file is a bug** — fix it.
 
-**Last updated:** 2026-08-12
+**Last updated:** 2026-08-12 · **HEAD at last update:** `e778837`
 
 ---
 
@@ -35,39 +35,42 @@ two clicks, to a highlighted span in the source document.
 
 ---
 
-## 2. Current status
+## 2. Status
 
-**Phase 0 (Foundation): COMPLETE**, gate evidence pasted and independently
-verified. CI green on ubuntu.
+**Phase 0: COMPLETE**, gate evidence pasted, independently verified, CI green.
 
-**Thin vertical slice (ADR-011): IN PROGRESS.**
+**Thin slice (ADR-011): built, then FAILED adversarial verification (H-028).**
+Six of seven defect classes now fixed. Extraction hardening continues; **no UI
+work until it is done** (ADR-018).
 
-| Area                        | State                                                                                |
-| --------------------------- | ------------------------------------------------------------------------------------ |
-| `packages/core`             | Taxonomy, extraction with spans, cascade steps 1–3, eligibility, explanation — built |
-| `apps/server`               | SQLite, migrations, repositories, dedup, file store, PDF/DOCX ingestion — built      |
-| `apps/web`                  | **NOT STARTED** — next major piece                                                   |
-| Embeddings (cascade step 4) | Deliberately deferred, typed seam exists                                             |
-| OCR                         | Deliberately deferred                                                                |
+| Area                        | State                                                         |
+| --------------------------- | ------------------------------------------------------------- |
+| `packages/core`             | Taxonomy, extraction, cascade 1-3, eligibility, explanation   |
+| `apps/server`               | SQLite, migrations, repositories, dedup, file store, PDF/DOCX |
+| Metamorphic relations       | 11, all green (ADR-019)                                       |
+| Mutation testing            | Configured, baseline measured, ratchet at 64 (ADR-020)        |
+| `apps/web`                  | **NOT STARTED** — blocked behind extraction hardening         |
+| Embeddings (cascade step 4) | Deferred; typed seam exists                                   |
+| OCR                         | Deferred                                                      |
 
-**369 tests.** `packages/core` 99.80% lines / 94.13% branches (bar 90/90).
-`apps/server` ~96% / ~88% (bar 75). CI green. HEAD `7fda53f`.
+**428 tests.** `packages/core` 98.78% statements / 95.22% branches.
+**Mutation score 65.03%** — see section 6; that gap is the most important
+number in this document.
 
-**ADR-017 is implemented and verified against live behaviour** (H-027):
+### IN FLIGHT at last update — VERIFY BEFORE TRUSTING
 
-```
-before:  eligible weak=0     ineligible strong=100
-after:   eligible weak=50    ineligible strong=50
-partition holds: eligible lo=100 sits above ineligible hi=50
-```
+Two agents were dispatched and had **not** reported:
 
-**IN FLIGHT:** the Opus adversarial verifier is running its first pass over the
-whole slice (ADR-015). It has NOT yet reported. Nothing in the slice has been
-independently falsified. Treat every claim here as lead-verified only until that
-pass lands — and note that on Phase 0 the verifier falsified the lead's gate
-claim three times running.
+1. **Platform (`apps/server`)** — D6 language detector rewrite + **the
+   enforcement gate** (nothing currently reads the language flag, so ADR-006
+   and C7 are unenforced), and D7 `PRAGMA recursive_triggers` + a
+   property-based audit-log test across every mutating statement form.
+2. **Core (`packages/core`)** — D5b/D5c experience de-duplication, and killing
+   `explain.ts` mutation survivors (28.93%, target >75%).
 
----
+**If resuming cold: run `git status` and `git log` first.** Their work may sit
+uncommitted in the working tree. Run `pnpm verify` before trusting anything, and
+re-verify their claims against live behaviour rather than reading their reports.
 
 ## 3. How to run anything
 
@@ -86,8 +89,16 @@ cd /Users/vihanpatil/personal/projects/Resume-Match/matchdesk
 | `pnpm test:manifest` | Regenerate the test identity manifest — **required after adding tests** |
 | `pnpm license:audit` | Two-tier license gate                                                   |
 
+| `pnpm mutate` | Stryker, ~8.5 min, scoped to `packages/core` |
+
 **After adding tests you MUST** run `pnpm test:manifest` and bump `minTests` in
 `scripts/test-floor.json`, or CI fails.
+
+**Commit with `git commit -F <file>`, never `-m`.** Backticks inside a `-m`
+string get shell-interpreted and the commit silently fails.
+
+**Never commit while an agent is mid-edit.** The pre-commit hook runs the full
+suite and will correctly block on a transiently red tree.
 
 ---
 
@@ -119,43 +130,48 @@ accident:
 
 ## 5. Open items — nothing here is signed off
 
-| ID    | Item                                                         | Why it matters                                                                           |
-| ----- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| H-002 | Cross-machine determinism not guaranteed                     | Limits C4; mitigated by 6dp quantization, not solved                                     |
-| H-007 | LLM output validator cannot do what Section 7 literally asks | Entity-grounding catches fabricated entities, not fabricated relations                   |
-| H-008 | OCR throughput and matrix first-fill budgets unmeasured      | Section 11 numbers may be unachievable                                                   |
-| H-014 | Production license tier has never rejected anything          | Resolves as real prod deps accumulate                                                    |
-| H-015 | `--no-verify` bypasses hooks                                 | Unfixable client-side; CI is the backstop                                                |
-| H-020 | Stale `dist/` survives a failing compile                     | Currently unreachable; **goes live when `apps/server` imports `@matchdesk/core`**        |
-| H-023 | Language detection calibrated on **two** documents           | Load-bearing for ADR-006; a false negative scores a document we cannot read (C7 failure) |
+| ID    | Item                                          | Why it matters                                                      |
+| ----- | --------------------------------------------- | ------------------------------------------------------------------- |
+| H-002 | Cross-machine determinism not guaranteed      | Limits C4; mitigated by 6dp quantization, not solved                |
+| H-007 | Section 7 LLM validator can't do what's asked | Catches fabricated entities, not fabricated relations               |
+| H-008 | OCR + matrix budgets unmeasured               | Section 11 numbers may be unachievable                              |
+| H-015 | `--no-verify` bypasses hooks                  | Unfixable client-side; CI is the backstop                           |
+| H-020 | Stale `dist/` survives a failing compile      | **Goes live when `apps/server` imports `@matchdesk/core`**          |
+| H-033 | Degree guard is context-window dependent      | Bare fragment "such as Mathematics" still yields a degree           |
+| H-034 | Invisible characters                          | ZWSP/soft-hyphen break extraction; routine in PDFs. No relation yet |
+| H-036 | **607 mutation survivors**                    | `explain.ts` 28.93% — the recruiter-facing reasoning is unverified  |
 
-**Known extraction gaps, reported but not fixed** (same shape as H-022):
+**From H-028, open at last update** (dispatched, unconfirmed): D5b/D5c
+experience double-counting; D6 language detection + enforcement; D7 audit-log
+`REPLACE` bypass; D8 (negative weights unvalidated, `confidence` computed but
+never read, evidence spans order-dependent, empty-requirement job marks everyone
+eligible, cert level-variant identity, `migrate.ts` `localeCompare`).
 
-- UK secondary/vocational: A-Level, GCSE, HND, Foundation Degree, BTEC, NVQ
-- Postgraduate: PGDip, PGCE
-- Non-English degrees: Licenciatura, Laurea, Diplom, Bacharelado
-- `FIELD_VOCAB` is a 14-entry US/English-skewed list — `field` returns null for
-  many real majors
-- Date-format locale assumptions likely in `experience.ts`
+**Known extraction gaps, reported not fixed:** UK vocational (A-Level, GCSE,
+HND, BTEC, NVQ); PGDip/PGCE; non-English degree names; `FIELD_VOCAB` is 14
+US-skewed entries; date-format locale assumptions in `experience.ts`.
 
 ---
 
-## 6. The failure pattern this project keeps hitting
+## 6. The failure pattern — read before trusting any green number
 
-**Read this before trusting any green number.** Four separate times, a passing
-metric has concealed a real defect:
+Six times a passing metric has concealed a real defect:
 
-| Entry | The green signal          | What it concealed                                                                     |
-| ----- | ------------------------- | ------------------------------------------------------------------------------------- |
-| H-004 | 100% coverage             | The measured file set was quietly too small                                           |
-| H-013 | 100% branch coverage      | Four untested behaviours in one guard (v8 does not count `\|\|` operands as branches) |
-| H-022 | 93% branch coverage       | Every test used American degree conventions; `BSc` extracted as nothing               |
-| H-025 | All tests, lint, CI green | A commit claiming work that was never done — no test can fail for absent work         |
+| Entry | Green signal               | What it concealed                                           |
+| ----- | -------------------------- | ----------------------------------------------------------- |
+| H-004 | 100% coverage              | Measured file set quietly too small                         |
+| H-013 | 100% branch coverage       | Four untested behaviours (v8 ignores `\|\|` operands)       |
+| H-022 | 93% branch coverage        | Every test used American degree forms                       |
+| H-025 | All tests + CI green       | A commit claiming work never done                           |
+| H-028 | 369 tests, 94% branches    | Seven defect classes producing wrong scores for real people |
+| H-036 | **95.22% branch coverage** | **65.03% mutation score — 607 survivors**                   |
 
-The generalisable lesson: **coverage measures which lines ran, never whether the
-inputs were representative — and no automated gate can detect a false claim.**
-This is why the Section 9.2 fixture corpus, with its deliberate spread of
-conventions and adversarial cases, is load-bearing rather than ceremony.
+**Coverage counts lines executed. Mutation counts behaviour pinned. They are not
+the same number, and the gap is 30 points on this codebase.**
+
+The two best-scoring files under mutation — `span.ts` (100%) and `round.ts`
+(96.88%) — are the two written under adversarial pressure. Tests written against
+an adversary beat tests written against the author's own expectations.
 
 ---
 
@@ -175,34 +191,30 @@ conventions and adversarial cases, is load-bearing rather than ceremony.
 
 ---
 
-## 8. Next steps, in order — REVISED after slice verification FAILED
+## 8. Next steps, in order
 
-**The slice failed adversarial verification (H-028). Do not build UI yet.**
-Seven defect classes produce wrong numbers for real candidates, with a green
-suite. Per ADR-018, extraction hardening and the fixture corpus come first.
+**No UI work until extraction is hardened** (ADR-018). A clickable demo over
+wrong numbers invites trust the tool has not earned.
 
-1. **Section 9.2 fixture corpus, pulled forward** (ADR-018). It is the mechanism
-   that would have caught D1, D2, D3, D4 and D6. Everything below is verified
-   against it, not against hand-written examples.
-2. **D3 — single-letter skill false positives.** `Rémi`, `Résumé`, `R&D` all
-   yield an exact `r` match that passes a must-have gate. Correlates with
-   non-English names. Fix the boundary guard to be unicode-aware; consider
-   requiring corroborating context for single-letter skills.
-3. **D1 — section detection.** 8 of 14 realistic experience headers unrecognised,
-   including `Experience:` with a colon. Adding a degree costs 53 points.
-4. **D2 — gazetteer character claiming.** "Ruby on Rails" must still yield `ruby`.
-   Emit both the specific and the general skill.
-5. **D5 — schooling dates scored as employment.** Age proxy reaching the score.
-   De-duplicate overlapping ranges; ignore ranges before first employment.
-6. **D4 — phantom `associate` degrees** from job titles and cert levels.
-7. **D6 — language detection.** Rewrite (n-gram or character-frequency), and
-   **wire an enforcement point** — currently nothing reads the flag, so ADR-006
-   and C7 are unenforced.
-8. **D7 — `PRAGMA recursive_triggers = ON`**, plus re-test the audit log across
-   every statement form, not just UPDATE.
-9. **H-029 — pin the seniority ladder and confidence constants.** 22 of 46
-   mutants survive; the whole ladder can be moved with a green suite.
-10. Re-run the Opus verifier. Only then: `apps/web`.
+1. **Land the two in-flight agents** (section 2). Verify against LIVE BEHAVIOUR,
+   not their reports. Then `pnpm test:manifest`, bump `minTests`, commit.
+2. **Add metamorphic relations for the gaps that have none:** invisible
+   characters (H-034), bare-fragment degree guard (H-033), and experience
+   de-duplication once D5 lands. Each of these is currently a defect no
+   automated check would catch.
+3. **Re-run the Opus adversarial verifier** over the hardened slice (ADR-015).
+   It falsified the previous two gate claims and produced H-028. Do not skip it.
+4. **Kill mutation survivors, ratcheting the threshold up as they fall.** Order
+   by human impact: `explain.ts` (28.93%, in flight) → `certifications.ts`
+   (49.66%) → `skills.ts` (55.60%) → `education.ts` (65.47%).
+5. **Section 9.2 fixture corpus**, ~12 focused fixtures (ADR-018): one per known
+   defect class plus clean baselines.
+6. **Then** `apps/web`: Jobs, Candidates, Shortlist. React 19 + Vite +
+   Tailwind 4 + Radix, TanStack Query/Table.
+7. Fastify API wiring core to web; launcher script (ADR-013); then the remaining
+   directive phases (matrix, PDF report, optional LLM narrative, hardening).
+
+---
 
 ## 9. Team
 
@@ -211,5 +223,10 @@ communication) + Sonnet engineers scoped to one package each + **an Opus
 adversarial verifier whose job is to falsify gate claims, not confirm them.**
 
 The verifier has falsified a gate claim **three times**, including two
-regressions the lead introduced — one of which repeated a trap the lead had
-already written down. It is the highest-value role on the team. Do not skip it.
+regressions the lead introduced — one repeating a trap the lead had already
+written down — and it produced H-028, which stopped a demonstrably broken slice
+from reaching a recruiter. **It is the highest-value role on the team. Do not
+skip it.**
+
+The user is on Claude Pro (5-hour and weekly rate limits, not per-token
+billing) and has explicitly chosen to keep this role at Opus for quality.
