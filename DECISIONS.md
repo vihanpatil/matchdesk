@@ -236,3 +236,101 @@ verified.
 **Decision:** Section 4 stands (forward-only). The Phase 1 gate becomes: migrate
 empty → head against a real SQLite file, restore-from-backup verified, and
 proof that `UPDATE` on `audit_log` fails.
+
+---
+
+## ADR-011 — Thin vertical slice before full rigour
+
+**Date:** 2026-08-12 · **Status:** Accepted · **Deviates from Section 12**
+
+Section 12 mandates strict phase order. Phases 1–7 do deliver the core loop, but
+they front-load a 30-CV fixture corpus, OCR, a LinkedIn parser and property
+tests before anything is clickable.
+
+**Decision:** build the narrowest end-to-end path first — upload one PDF/DOCX job
+and CV, persist to SQLite, rule-based extraction, score, show evidence — then
+loop back and bring each stage up to directive standard.
+
+**Rationale:** the recruiter's real workflow is the thing most likely to be
+misunderstood, and it is cheaper to be wrong about it before 30 fixtures are
+built around the wrong assumptions than after.
+
+**Cost, stated plainly:** work will be revisited, and for a period the codebase
+will not meet Section 9's coverage and fixture requirements. That is a temporary
+state, not a reduction in the target. Every gate deferred this way is tracked in
+`HONESTY_LOG.md` until met.
+
+---
+
+## ADR-012 — Recruiter data lives in `~/.matchdesk/`
+
+**Date:** 2026-08-12 · **Status:** Accepted
+
+The repository is public (ADR-014), so anything inside the working tree is one
+mistaken `git add -f` away from publication, and a re-clone or fresh checkout
+would silently start with an empty database.
+
+**Decision:** the SQLite file and the content-addressed `files/` directory
+(ADR-008) live in `~/.matchdesk/`, outside the repository entirely. Survives
+re-cloning, deleting the project folder, and pulling updates. Backup is "copy
+`~/.matchdesk`".
+
+**Cost:** less discoverable for a non-technical user than a folder inside the
+project. Mitigated by naming the exact path in the UI's settings screen and in
+the README.
+
+---
+
+## ADR-013 — Distribution: documented setup plus a launcher script
+
+**Date:** 2026-08-12 · **Status:** Accepted
+
+The goal is that any recruiter can use this, but running it currently requires
+Node 24, pnpm, and a terminal.
+
+**Decision:** Section 13's one-command start, plus a double-clickable launcher
+(`.command` on macOS, `.bat` on Windows) that starts the server and opens the
+browser. The README states Node as a prerequisite honestly rather than implying
+zero-install.
+
+Packaging as a desktop application (Tauri/Electron) is explicitly **out of scope
+for now** and revisited after Phase 11 — it carries its own build, signing and
+update concerns.
+
+---
+
+## ADR-014 — Public repository
+
+**Date:** 2026-08-12 · **Status:** Accepted
+
+**Decision:** `github.com/vihanpatil/matchdesk` is public, so the project can be
+shown as portfolio work and used by other recruiters.
+
+**This does not weaken C3.** Candidate data never enters the repository: the
+database and uploaded files live in `~/.matchdesk/` (ADR-012), and `.gitignore`
+excludes `data/`, `files/`, `*.db` and `.models/`. Every fixture is synthetic by
+Section 9.2 mandate.
+
+**Standing constraint this creates:** no real CV, no real job description, and
+no recruiter-identifying content may ever be committed. Any future contributor
+convenience that would place candidate data inside the working tree is
+prohibited.
+
+---
+
+## ADR-015 — Adversarial verification runs at phase gates only
+
+**Date:** 2026-08-12 · **Status:** Accepted
+
+The Opus verifier falsified the Phase 0 gate three times, including two
+regressions introduced by the lead — one of which repeated a trap already
+recorded in `HONESTY_LOG.md`. It also exhausted the account's monthly spend
+limit mid-run.
+
+**Decision:** keep the Opus verifier, but invoke it once per completed phase
+rather than per iteration.
+
+**Consequence to track:** verification cannot run while the spend limit is
+reached. Any phase completed during such a period is **not** independently
+verified, and that must be stated in `HONESTY_LOG.md` at the time rather than
+assumed to be fine.
