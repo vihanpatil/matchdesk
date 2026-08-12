@@ -149,3 +149,25 @@ Two Section 11 budgets look optimistic and have **not** been measured:
 
 Both were mine, both surfaced by actually running the tooling rather than
 assuming it worked.
+
+### H-010 · Git hooks ran against the wrong Node runtime
+
+**Severity:** fixed, but it would have silently degraded the Section 0.2.9
+guarantee.
+
+Git hooks do not inherit an interactive shell. Verified in a stripped
+environment: `node -v` resolved to the machine's Homebrew **22.9.0** rather than
+the pinned 24.19.0, and `pnpm` did not resolve at all.
+
+The hooks would therefore have failed for a reason unrelated to the code being
+committed, producing a confusing error — or, worse, on a machine where an older
+pnpm happened to resolve, they would have run the checks against the wrong
+runtime while appearing to work.
+
+Found by testing hook behaviour in a clean shell instead of trusting the passing
+run in my own already-configured session. Fixed in `.husky/common.sh`: load
+`.nvmrc` via nvm when present, then **verify** the resulting Node major and fail
+loudly with a remediation message. It does not silently fall back.
+
+Re-verified end to end from a stripped environment: a good commit succeeds and a
+commit containing `any` is rejected with the ESLint output shown.
