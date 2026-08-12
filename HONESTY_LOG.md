@@ -441,3 +441,71 @@ byte-identical identities.
 2. **The manifest guard worked correctly.** It was the identity derivation that
    was broken, and the guard refused to pass rather than shrugging. A guard that
    fails loudly when its own inputs are wrong is behaving properly.
+
+---
+
+## 2026-08-12 — Thin slice, first engineer round
+
+### H-022 · Education extraction silently ignored British degree abbreviations
+
+**Severity:** was high — wrong numbers attached to real candidates. Fix in
+progress.
+
+Found by my own spot-check after both engineers reported green, not by their
+tests:
+
+```
+"Education: BSc Computer Science, Stanford University, graduated 2011" -> 0 attributes
+"MSc Data Science"                                                     -> 0 attributes
+"Bachelor's in Computer Science, State University, 2015."              -> 1 (bachelor)
+"B.S. in Computer Science"                                             -> 1 (bachelor)
+```
+
+`BSc` and `MSc` extracted as nothing. Every test the engineer wrote used
+American conventions, so **93% branch coverage passed straight over it** — the
+branches were covered, the input space was not.
+
+Consequence, which is why this is not cosmetic: under ADR-005 a dimension is
+active when the _job_ requires it, independent of the candidate. So a candidate
+holding a BSc extracted no education attribute and scored **zero on education
+despite holding the degree**. A wrong number, attached to a real person, in a
+tool that affects hiring.
+
+Being fixed with the full abbreviation table plus false-positive guards
+("MS Azure", "Baltimore, MD"). The engineer has also been asked to report other
+gaps of the same shape rather than have them surface one at a time.
+
+**The generalisable lesson, and it is the same one as H-004 and H-013:** a
+coverage percentage measures which lines ran, never whether the inputs were
+representative. Three separate times this project has now had a green number
+over an inadequate measurement.
+
+### H-023 · Language detection is calibrated against two documents
+
+**Severity:** open, not fixed, load-bearing.
+
+The platform engineer disclosed this honestly: the English-detection heuristic
+is a stopword-ratio cut tuned against exactly two fixtures (English 0.35 versus
+French 0.026, threshold 0.08). Described in their own words as coarse and
+uncalibrated.
+
+This is load-bearing. ADR-006 routes non-English CVs to "needs attention" and
+refuses to score them, precisely so the tool never emits a confident meaningless
+number. A **false negative** — non-English text classified as English — defeats
+that and produces exactly the C7 failure the rule exists to prevent.
+
+Not signed off. Needs real calibration against a corpus before it can be trusted,
+and until then the threshold is a guess with two data points behind it.
+
+### H-024 · Two engineer test-first deviations, disclosed by them
+
+**Severity:** process; recorded because the log is supposed to record it.
+
+The platform engineer wrote `pdfExtractor.ts` and `generateId.ts`
+implementation-first, and said so unprompted rather than presenting them as
+red-green. For `generateId` they retroactively forced a red run by moving the
+file aside. Everything else on both sides was genuinely test-first with observed
+failures.
+
+Recording it because a log that only contains the lead's own mistakes would be a
+misleading log.

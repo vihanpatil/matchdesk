@@ -377,3 +377,39 @@ license nobody has read, which is precisely what Section 3.4 exists to prevent.
 `better-sqlite3` ships no bundled type declarations, so without it `tsc` raises
 `TS7016` on every import and the Section 0.2.3 no-`any` rule becomes
 unsatisfiable.
+
+---
+
+## ADR-017 — Must-haves both score and partition (amends ADR-007)
+
+**Date:** 2026-08-12 · **Status:** Accepted · **Amends ADR-007**
+
+ADR-007 removed must-have requirements from the weighted sum entirely, so that
+eligibility could partition results without any risk of weight-tuning. Correct
+in ordering, but a live probe showed the consequence:
+
+```
+eligible  : weak=0        (meets the hard requirement, no preferred matches)
+ineligible: strong=100    (perfect on preferred, fails the hard requirement)
+```
+
+The score reflected preferred requirements only. A recruiter would see 0% beside
+the one candidate they are allowed to hire — and Section 8.1 is explicit that a
+recruiter nine hours into a day must not be able to misread the screen.
+
+**Decision:** must-have requirements now do both jobs. They contribute to the
+weighted sum exactly like any other requirement, **and** they form the
+eligibility predicate that partitions results.
+
+**What this does not change:** the partition is still structural. Eligible and
+ineligible are separate groups and an ineligible candidate can never appear
+above an eligible one, regardless of score. That guarantee never depended on
+excluding must-haves from the sum — it comes from the grouping.
+
+**What this does not weaken:** ADR-007's proxy protections are untouched. Work
+authorization still contributes zero to any score, institution is still never
+scored, and graduation year is still never extracted. Those are separate from
+whether a _skill_ requirement marked must-have is allowed to count.
+
+Monotonicity (Section 9.3) still holds, because the active dimension set remains
+job-side only (ADR-005).

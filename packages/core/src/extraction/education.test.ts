@@ -112,4 +112,151 @@ describe('extractEducation', () => {
   it('returns an empty array when no degree is mentioned', () => {
     expect(extractEducation('Worked at a bakery for five years.')).toEqual([]);
   });
+
+  describe('British-convention and other degree abbreviations (regression)', () => {
+    it('detects "BSc" as bachelor', () => {
+      const attrs = extractEducation(
+        'Education: BSc Computer Science, Stanford University, graduated 2011',
+      );
+      expect(attrs).toHaveLength(1);
+      expect(attrs[0]?.degreeLevel).toBe('bachelor');
+    });
+
+    it('detects "MSc" as master', () => {
+      const attrs = extractEducation('MSc Data Science');
+      expect(attrs).toHaveLength(1);
+      expect(attrs[0]?.degreeLevel).toBe('master');
+    });
+
+    it.each(['BSc', 'B.Sc', 'B.Sc.', 'BEng', 'B.Eng', 'BBA', 'BCom', 'LLB', 'BTech', 'B.Tech'])(
+      'detects "%s" as bachelor',
+      (form) => {
+        const attrs = extractEducation(`${form} in Computer Science, State University.`);
+        expect(attrs.some((a) => a.degreeLevel === 'bachelor')).toBe(true);
+      },
+    );
+
+    it.each(['MSc', 'M.Sc', 'M.Sc.', 'MEng', 'M.Eng', 'MBA', 'MPhil', 'LLM', 'MTech'])(
+      'detects "%s" as master',
+      (form) => {
+        const attrs = extractEducation(`${form} in Computer Science, State University.`);
+        expect(attrs.some((a) => a.degreeLevel === 'master')).toBe(true);
+      },
+    );
+
+    it.each(['PhD', 'Ph.D.', 'Ph.D', 'DPhil', 'EdD', 'DSc'])(
+      'detects "%s" as doctorate',
+      (form) => {
+        const attrs = extractEducation(`${form} in Computer Science, State University.`);
+        expect(attrs.some((a) => a.degreeLevel === 'doctorate')).toBe(true);
+      },
+    );
+
+    it.each(['MD', 'JD'])('detects "%s" degree, with degree context, as professional', (form) => {
+      const attrs = extractEducation(`Earned a ${form} degree from State University.`);
+      expect(attrs.some((a) => a.degreeLevel === 'professional')).toBe(true);
+    });
+
+    it.each(['AA', 'AS', 'A.A.', 'A.S.'])(
+      'detects "%s" degree, with degree context, as associate',
+      (form) => {
+        const attrs = extractEducation(`${form} degree, State College.`);
+        expect(attrs.some((a) => a.degreeLevel === 'associate')).toBe(true);
+      },
+    );
+
+    it('detects bare "BS" as bachelor when followed by a stated field', () => {
+      const attrs = extractEducation('BS in Computer Science, State University, 2015.');
+      expect(attrs.some((a) => a.degreeLevel === 'bachelor')).toBe(true);
+    });
+
+    it('detects bare "BA" as bachelor when followed by a stated field', () => {
+      const attrs = extractEducation('BA in Psychology from State University.');
+      expect(attrs.some((a) => a.degreeLevel === 'bachelor')).toBe(true);
+    });
+
+    it('detects bare "MS" as master when followed by a stated field', () => {
+      const attrs = extractEducation('MS in Data Science, State University.');
+      expect(attrs.some((a) => a.degreeLevel === 'master')).toBe(true);
+    });
+
+    it('detects bare "MA" as master when followed by a stated field', () => {
+      const attrs = extractEducation('MA in Economics, State University.');
+      expect(attrs.some((a) => a.degreeLevel === 'master')).toBe(true);
+    });
+
+    it('detects bare "BS" as bachelor when a field follows directly, with no "in"/"of"', () => {
+      const attrs = extractEducation('BS Computer Science, State University, 2015.');
+      expect(attrs.some((a) => a.degreeLevel === 'bachelor')).toBe(true);
+    });
+
+    it('scopes the degree-context guard window to the current line when the ambiguous form sits between other lines', () => {
+      const text = 'Header\nBS in Computer Science, more text\nFooter line here.';
+      const attrs = extractEducation(text);
+      expect(attrs.some((a) => a.degreeLevel === 'bachelor')).toBe(true);
+    });
+  });
+
+  describe('false-positive guards on ambiguous bare abbreviations', () => {
+    it('does not treat "MS" in "Worked at MS Azure" as a degree', () => {
+      const attrs = extractEducation('Worked at MS Azure for five years.');
+      expect(attrs).toEqual([]);
+    });
+
+    it('does not treat "MS" in "MS Office" as a degree', () => {
+      const attrs = extractEducation('Proficient in MS Office and email.');
+      expect(attrs).toEqual([]);
+    });
+
+    it('does not treat "MD" in "Located in Baltimore, MD" as a degree', () => {
+      const attrs = extractEducation('Located in Baltimore, MD near the office.');
+      expect(attrs).toEqual([]);
+    });
+
+    it('does not treat "md" in "README.md" as a degree', () => {
+      const attrs = extractEducation('See README.md for setup instructions.');
+      expect(attrs).toEqual([]);
+    });
+
+    it('does not treat bare "AS" as a degree when it is the ordinary word "as"', () => {
+      const attrs = extractEducation('Familiar with tools such as Python and Git.');
+      expect(attrs).toEqual([]);
+    });
+
+    it('does not treat "BA" in "BA testing" (business-analyst context) as a degree', () => {
+      // Documented call: "BA" with no supporting degree context (no "degree"
+      // keyword, no recognized field of study) is treated as NOT a degree.
+      // This favors avoiding a false positive over catching a bare "BA" used
+      // as shorthand for Bachelor of Arts with zero surrounding context -
+      // see the education.ts guard comment and the final report for the
+      // false-positive/false-negative tradeoff this encodes.
+      const attrs = extractEducation('Responsibilities included BA testing and sign-off.');
+      expect(attrs).toEqual([]);
+    });
+  });
+
+  describe('ADR-007 still holds for the newly added abbreviation forms', () => {
+    it('extracting "BSc ... graduated 2011" yields degree level and field ONLY, never a year', () => {
+      const attrs = extractEducation(
+        'Education: BSc Computer Science, Stanford University, graduated 2011',
+      );
+      for (const attr of attrs) {
+        expect(attr.value).not.toMatch(/\b(19|20)\d{2}\b/);
+        expect(attr.normalizedValue).not.toMatch(/\b(19|20)\d{2}\b/);
+        expect(String(attr.field)).not.toMatch(/\b(19|20)\d{2}\b/);
+        expect(attr.value.toLowerCase()).not.toContain('stanford');
+        expect(String(attr.field).toLowerCase()).not.toContain('stanford');
+      }
+    });
+
+    it('every newly matched abbreviation still carries a valid, matching span', () => {
+      const text = 'BSc Computer Science, Stanford University, graduated 2011';
+      const attrs = extractEducation(text);
+      for (const attr of attrs) {
+        expect(() => {
+          assertValidSpan(text, attr.sourceSpan, attr.value);
+        }).not.toThrow();
+      }
+    });
+  });
 });
