@@ -20,6 +20,9 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
 
+    /* A failing compile must not leave usable output behind. */
+    "noEmitOnError": true,
+
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "esModuleInterop": true,

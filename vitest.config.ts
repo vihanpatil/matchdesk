@@ -17,15 +17,26 @@ export default defineConfig({
   test: {
     globals: false,
     include: ['{apps,packages}/*/src/**/*.test.ts'],
+
+    /* Section 0.2.2, first line of defence: a `.only` anywhere fails the run
+       outright rather than quietly narrowing it. Enforced by the runner, so
+       aliasing `describe` does not evade it. The second line of defence is
+       scripts/assert-no-skipped-tests.mjs, which inspects the result. */
+    allowOnly: false,
+
+    reporters: ['default', ['json', { outputFile: './coverage/test-results.json' }]],
+
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary', 'lcov'],
       reportsDirectory: './coverage',
       include: ['{apps,packages}/*/src/**/*.ts'],
-      /* Exclude barrels by explicit path, never by `**./index.ts` glob — a glob
-         would silently exempt any future index.ts that contains real logic. */
-      exclude: ['**/*.test.ts', '**/dist/**', 'packages/core/src/index.ts'],
-      all: true,
+      /* Barrels are NOT excluded. An earlier config exempted them by name,
+         which left a path where real logic could live unmeasured. */
+      exclude: ['**/*.test.ts', '**/dist/**'],
+      /* Vitest 4 removed `coverage.all` — files matching `include` are always
+         measured whether or not a test imported them. Typechecking this file
+         is what surfaced the dead option; it had been silently ignored. */
       thresholds: {
         // Section 9.1. These fail the build, they do not warn.
         lines: 75,

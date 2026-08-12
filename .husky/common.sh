@@ -20,8 +20,14 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-node_major=$(node -p "process.versions.node.split('.')[0]")
-if [ "$node_major" -lt 24 ]; then
+# Compare the full version, not just the major — v24.0.0 satisfies a major-only
+# check but violates engines >= 24.15.0.
+node_ok=$(node -p "
+  const [a,b,c] = process.versions.node.split('.').map(Number);
+  const [x,y,z] = [24,15,0];
+  (a>x || (a===x && (b>y || (b===y && c>=z)))) ? 'yes' : 'no';
+")
+if [ "$node_ok" != "yes" ]; then
   echo "✖ hook: Node $(node -v) is too old — this project requires >= 24.15.0 (.nvmrc)."
   echo "  Run:  nvm use"
   echo "  Why:  better-sqlite3 requires Node >= 22 and pnpm 11 requires >= 22.22.2 / 24.15.0."

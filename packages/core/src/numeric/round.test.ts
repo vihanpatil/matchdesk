@@ -68,6 +68,37 @@ describe('roundHalfUp', () => {
     expect(roundHalfUp(1e14, 2)).toBe(1e14);
   });
 
+  it('pins the precision correction at exactly 15 significant digits', () => {
+    // Kills a mutant lowering toPrecision(15) to toPrecision(12): these values
+    // need all 15 digits to survive, and fewer would silently truncate them.
+    expect(roundHalfUp(0.123456789012345, 15)).toBe(0.123456789012345);
+    expect(roundHalfUp(0.999999999999999, 15)).toBe(0.999999999999999);
+  });
+
+  it('applies the large-magnitude cutoff at exactly 1e15, from both sides', () => {
+    // Kills mutants moving the cutoff to 1e16 or 1e13. Just below the cutoff
+    // the value is still rounded; at or above it, it passes through untouched.
+    expect(roundHalfUp(999999999999999.5, 0)).toBe(1e15);
+    expect(roundHalfUp(123456789012345.6, 1)).toBe(123456789012345.6);
+  });
+
+  it('applies the cutoff to magnitude, not to signed value', () => {
+    // Kills a mutant replacing `Math.abs(scaled) >= 1e15` with `scaled >= 1e15`,
+    // which would let large NEGATIVE values fall through to the correction path
+    // and be corrupted.
+    expect(roundHalfUp(-123456789012345.6, 1)).toBe(-123456789012345.6);
+    expect(roundHalfUp(-1e17, 0)).toBe(-1e17);
+  });
+
+  it('does not overflow to Infinity when scaling an extreme value', () => {
+    // Kills a mutant returning `scaled / factor` instead of `value` on the
+    // large-magnitude path: 1e300 * 1e15 overflows to Infinity, and
+    // Infinity / 1e15 stays Infinity.
+    expect(roundHalfUp(1e300, 15)).toBe(1e300);
+    expect(roundHalfUp(-1e300, 15)).toBe(-1e300);
+    expect(Number.isFinite(roundHalfUp(Number.MAX_VALUE, 10))).toBe(true);
+  });
+
   it('throws on non-finite input instead of returning NaN', () => {
     expect(() => roundHalfUp(Number.NaN)).toThrow(RangeError);
     expect(() => roundHalfUp(Number.POSITIVE_INFINITY)).toThrow(RangeError);
