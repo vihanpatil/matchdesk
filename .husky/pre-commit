@@ -1,0 +1,12 @@
+#!/bin/sh
+# Section 0.2.9: cannot commit broken code. Do not bypass with --no-verify.
+set -e
+
+echo "▸ pre-commit: staged lint + format"
+pnpm exec lint-staged
+
+echo "▸ pre-commit: typecheck"
+pnpm typecheck
+
+echo "▸ pre-commit: license audit"
+pnpm license:audit

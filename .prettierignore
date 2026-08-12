@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+.models/
+fixtures/**/*.pdf
+fixtures/**/*.docx
+playwright-report/
+test-results/

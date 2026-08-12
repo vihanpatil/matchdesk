@@ -1,0 +1,26 @@
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Local runtime data — never commit candidate PII (C3).
+data/
+files/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Cached embedding model (downloaded on first run, ~90MB).
+.models/
+
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+test-results/
+playwright-report/
+.playwright/

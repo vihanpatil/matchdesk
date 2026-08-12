@@ -1,0 +1,22 @@
+{
+  "name": "@matchdesk/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Pure scoring, extraction and normalization logic. Zero I/O, zero runtime deps on server or web.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "typecheck": "tsc --build"
+  },
+  "dependencies": {
+    "@matchdesk/shared": "workspace:*"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  /* Type information for ESLint only — covers test files and config files that
+     the emitting build configs deliberately exclude. Never used to emit. */
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["node"]
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "apps/*/src/**/*.ts",
+    "*.config.ts",
+    "scripts/**/*.ts",
+    "e2e/**/*.ts"
+  ]
+}

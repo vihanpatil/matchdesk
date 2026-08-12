@@ -1,0 +1,46 @@
+{
+  "name": "matchdesk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first recruiter CV/job matching with explainable, evidence-backed scores.",
+  "license": "MIT",
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --build --force",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage",
+    "license:audit": "node scripts/license-audit.mjs",
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm license:audit && pnpm test:cov",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.2.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^10.8.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0",
+    "prettier": "^3.9.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^4.1.10"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,mts,cts}": [
+      "eslint --max-warnings=0",
+      "prettier --check"
+    ],
+    "*.{json,md,yml,yaml,css}": [
+      "prettier --check"
+    ]
+  }
+}
