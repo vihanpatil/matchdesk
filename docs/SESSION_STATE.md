@@ -50,13 +50,22 @@ verified. CI green on ubuntu.
 | Embeddings (cascade step 4) | Deliberately deferred, typed seam exists                                             |
 | OCR                         | Deliberately deferred                                                                |
 
-**364 tests.** `packages/core` 99.81% lines / 94.48% branches (bar 90/90).
-`apps/server` ~96% / ~88% (bar 75).
+**369 tests.** `packages/core` 99.80% lines / 94.13% branches (bar 90/90).
+`apps/server` ~96% / ~88% (bar 75). CI green. HEAD `7fda53f`.
 
-**IN FLIGHT at time of writing:** ADR-017 implementation (must-haves must both
-score and partition). See H-025 — this was falsely claimed as done in commit
-`6524826` and is being genuinely implemented now. **Verify its real behaviour
-before trusting any claim that it is finished.**
+**ADR-017 is implemented and verified against live behaviour** (H-027):
+
+```
+before:  eligible weak=0     ineligible strong=100
+after:   eligible weak=50    ineligible strong=50
+partition holds: eligible lo=100 sits above ineligible hi=50
+```
+
+**IN FLIGHT:** the Opus adversarial verifier is running its first pass over the
+whole slice (ADR-015). It has NOT yet reported. Nothing in the slice has been
+independently falsified. Treat every claim here as lead-verified only until that
+pass lands — and note that on Phase 0 the verifier falsified the lead's gate
+claim three times running.
 
 ---
 
