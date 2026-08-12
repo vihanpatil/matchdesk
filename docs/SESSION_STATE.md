@@ -175,19 +175,34 @@ conventions and adversarial cases, is load-bearing rather than ceremony.
 
 ---
 
-## 8. Next steps, in order
+## 8. Next steps, in order — REVISED after slice verification FAILED
 
-1. **Finish ADR-017** and verify against live behaviour, not against the
-   document (H-025).
-2. **Run the Opus adversarial verifier** over the whole slice — per ADR-015 this
-   is a gate, and the slice has never been independently falsified.
-3. **Build `apps/web`**: Jobs, Candidates, Shortlist (the three screens chosen
-   for the slice). React 19 + Vite + Tailwind 4 + Radix, TanStack Query/Table.
-4. **Fastify API** wiring core to web.
-5. **Launcher script** per ADR-013.
-6. Then loop back for rigour: fixture corpus, OCR, embeddings, remaining screens.
+**The slice failed adversarial verification (H-028). Do not build UI yet.**
+Seven defect classes produce wrong numbers for real candidates, with a green
+suite. Per ADR-018, extraction hardening and the fixture corpus come first.
 
----
+1. **Section 9.2 fixture corpus, pulled forward** (ADR-018). It is the mechanism
+   that would have caught D1, D2, D3, D4 and D6. Everything below is verified
+   against it, not against hand-written examples.
+2. **D3 — single-letter skill false positives.** `Rémi`, `Résumé`, `R&D` all
+   yield an exact `r` match that passes a must-have gate. Correlates with
+   non-English names. Fix the boundary guard to be unicode-aware; consider
+   requiring corroborating context for single-letter skills.
+3. **D1 — section detection.** 8 of 14 realistic experience headers unrecognised,
+   including `Experience:` with a colon. Adding a degree costs 53 points.
+4. **D2 — gazetteer character claiming.** "Ruby on Rails" must still yield `ruby`.
+   Emit both the specific and the general skill.
+5. **D5 — schooling dates scored as employment.** Age proxy reaching the score.
+   De-duplicate overlapping ranges; ignore ranges before first employment.
+6. **D4 — phantom `associate` degrees** from job titles and cert levels.
+7. **D6 — language detection.** Rewrite (n-gram or character-frequency), and
+   **wire an enforcement point** — currently nothing reads the flag, so ADR-006
+   and C7 are unenforced.
+8. **D7 — `PRAGMA recursive_triggers = ON`**, plus re-test the audit log across
+   every statement form, not just UPDATE.
+9. **H-029 — pin the seniority ladder and confidence constants.** 22 of 46
+   mutants survive; the whole ladder can be moved with a green suite.
+10. Re-run the Opus verifier. Only then: `apps/web`.
 
 ## 9. Team
 

@@ -610,3 +610,215 @@ rather than no-ops that fall through to a neutral default. No other test needed
 changing, confirmed by diffing the failure set before and after.
 
 369 tests. `packages/core` 99.80% lines / 94.13% branches.
+
+---
+
+## 2026-08-12 — Slice adversarial verification: SLICE FAILED
+
+### H-028 · The slice is not fit to put in front of a recruiter
+
+**Severity:** highest in this log. Seven defect classes, each producing a wrong
+number for a real person. **All independently reproduced by the lead.**
+
+The verifier's verdict, quoted because softening it would be dishonest:
+
+> "Do not put this in front of a recruiter... the slice proves the _pipeline_
+> end-to-end but not the _extraction_, and the extraction is the entire product."
+
+That framing is correct and I am adopting it. What we built and tested is the
+arithmetic. What a recruiter actually experiences is the regex layer feeding it,
+and that layer is wrong in ways the suite cannot see.
+
+#### D1 — Adding a degree to a CV costs 53 points. ADR-005 monotonicity is false in practice.
+
+```
+c-no-degree     score = 93   experience_relevance:1  seniority:0.75
+c-with-degree   score = 40   experience_relevance:0  seniority:0
+```
+
+Identical CV, once with an `Education` section added. `extractYearsExperience`
+skips date ranges inside education sections, and a section runs until the next
+**recognised** header — but only 4 experience synonyms are recognised. Verified
+by the lead: a CV with `Education` above `Work History` yields
+**`years_experience attrs: 0`** — zero experience for someone with a job.
+
+8 of 14 realistic headers fail, including `Work History`, `Employment`,
+`Career History`, and `Experience:` **with a trailing colon**.
+
+**ADR-005's monotonicity claim must be downgraded.** It was proven for weight
+renormalisation only. Extraction is where a candidate actually experiences
+monotonicity, and there it is demonstrably violated. See ADR-018.
+
+#### D2 — Writing the fuller, truer skill name makes you ineligible
+
+```
+says "Ruby"           score=100  eligible=true
+says "Ruby on Rails"  score= 70  eligible=FALSE  unmet=["Must-have skill \"Ruby\" was not found"]
+```
+
+Longest-first gazetteer with character claiming: the longer term consumes the
+shorter, so `ruby` is never emitted. Same for `sql`/`sql server`,
+`spring`/`spring boot`, `github`/`github actions`, `c`/`c sharp`.
+
+**A Rails developer is rejected from a Ruby job for describing themselves more
+precisely.**
+
+#### D3 — A candidate's name manufactures a skill, and it passes the must-have gate
+
+```
+"Résumé"                -> r (exact, evidence span = "R")
+"Rémi Dubois"           -> r (exact, evidence span = "R")
+"Led R&D for payments"  -> r (exact)
+"Go-to-market strategy" -> go (exact)
+"C'est la vie"          -> c (exact)
+```
+
+The word-boundary guard is `(?<![A-Za-z0-9])…(?![A-Za-z0-9])`, so **every
+non-ASCII letter and every punctuation mark counts as a word boundary.**
+Single-letter taxonomy entries (`r`, `c`, `go`) fire constantly.
+
+A candidate named Rémi scores **100 and ranks eligible for a job requiring R**,
+indistinguishable from someone who knows R. The "evidence" shown to the
+recruiter is the letter R sliced out of their own name.
+
+**This error path correlates with protected characteristics.** It fires on
+accented names — disproportionately non-English names. ADR-007 protects against
+extracting protected data; it never anticipated _fabricating a qualification_
+from a name's spelling. That is arguably worse, because it is invisible.
+
+Also: `Java​Script` (zero-width space) extracts as `java`, not
+`javascript`. `Kuber­netes` (soft hyphen, routine in PDF extraction)
+extracts as nothing.
+
+#### D4 — Phantom degrees from job titles, certification levels, and the word "as"
+
+```
+"AWS Certified Solutions Architect - Associate"   -> associate
+"Associate Software Engineer, Acme Corp"          -> associate
+"...subjects such as Mathematics, Physics."       -> associate
+```
+
+Confirmed effect: **+50 points** for a candidate with no degree, and a hard
+eligibility gate flipped from false to true. The evidence highlight points at
+the word "Associate" inside a job title, presented as proof of a degree — an
+in-bounds span that is a semantic lie.
+
+`associate` has no ambiguity guard at all, and `hasDegreeContext` accepts any
+FIELD_VOCAB word after `as`.
+
+Also missing entirely: `Diploma in Computer Science`, `Postgraduate Diploma`,
+`PgDip`, `Graduate Certificate`, `M.S.E.E.`
+
+#### D5 — Schooling dates are scored as employment, putting an age proxy into the number
+
+```
+"1996 - 2003"=7y  "2003 - 2007"=4y  "Jan 2024 - Present"=2.6y
+total = 13.6y  ->  inferred seniority = PRINCIPAL
+```
+
+A candidate 2.6 years into their career is scored **principal**. Also double
+counts an explicit "10 years of experience" alongside the date ranges it
+describes (24.5y for a ~14.6y career), and parses `"budget of 2000 - 2024 USD"`
+as 24 years of employment.
+
+**ADR-007 says graduation year is "never extracted at all".** True as an
+_attribute_ — but the year range containing it becomes a scored
+`years_experience` attribute whenever no recognised Education header precedes
+it. Age information is reaching the score by an indirect path the ADR did not
+anticipate.
+
+#### D6 — Language detection ranks a French CV as more English than an English CV, and nothing enforces it anyway
+
+```
+FR French (plain)                 ENGLISH -> WILL BE SCORED   ratio=0.0889
+DE German (plain)                 ENGLISH -> WILL BE SCORED   ratio=0.0857
+DA Danish / NO Norwegian / SV Swedish   all -> WILL BE SCORED
+EN real CV, prose-light (control) NOT-ENGLISH -> REFUSED      ratio=0.0588
+EN skills-list CV (common shape)  NOT-ENGLISH -> REFUSED      ratio=0.0000
+```
+
+Scandinavian `i`/`for`, German `in`/`an` and French `on`/`a` are English
+stopwords. The English control sits **below** the French, German and
+Scandinavian samples. The two classes are not separated at all; the threshold
+sits inside the overlap.
+
+**And there is no enforcement point.** `packages/core` has no notion of
+language; `apps/server` stores the flag and nothing reads it. **ADR-006's "never
+scored" and constraint C7 are, at this commit, a database column with no
+consumer.** H-023 called the threshold "a guess with two data points"; the real
+finding is worse — the guess is wrong _and_ unwired.
+
+#### D7 — `audit_log` is not append-only: `INSERT OR REPLACE` rewrites history
+
+```
+blocked : plain UPDATE / plain DELETE / UPDATE in transaction / ON CONFLICT DO UPDATE
+*** BYPASS SUCCEEDED: INSERT OR REPLACE on existing PK
+    after: {"action":"REWRITTEN","details":"tampered via REPLACE","created_at":"1999-01-01"}
+```
+
+SQLite's REPLACE conflict resolution does not fire `BEFORE DELETE` triggers
+unless `PRAGMA recursive_triggers` is on, and `connection.ts` sets only
+`journal_mode` and `foreign_keys`.
+
+**ADR-010's gate was worded "proof that UPDATE on audit_log fails" — and that is
+exactly and only what was proven.** A gate that tests the statement form you
+thought of is not a gate. `REPLACE` is the natural shape of an upsert; an
+engineer would write it without a second thought.
+
+#### D8 — Lower severity, still real
+
+- Negative dimension weights are unvalidated and break monotonicity outright
+  (adding python: score 75 → 25).
+- Extraction `confidence` is computed on every attribute and **read by nothing**.
+- Evidence spans for non-skill dimensions depend on attribute array order —
+  59/100 shuffles changed the reported evidence. Stable only by DB `ORDER BY`
+  accident; no contract in core.
+- A job whose requirements failed to parse scores every candidate 0 **and marks
+  them all eligible** — indistinguishable from "nobody matches".
+- Certification identity wrong for level variants: `"…Architect – Professional"`
+  maps to `aws-saa`, the _Associate_ id.
+- `migrate.ts` uses `localeCompare(b,'en')` — locale-sensitive, in a project that
+  bans `toLocaleLowerCase` for exactly that reason.
+
+### H-029 · 22 of 46 mutants survived: every seniority threshold is unpinned
+
+`dimensions.ts` and `skills.ts`: 24 killed, **22 survived**, 19 proven genuine
+behavioural differences.
+
+The entire seniority ladder (0/2/5/8/12) can be moved arbitrarily with a green
+suite — `mid: 2→3`, `senior: 5→6`, `lead: 8→7`, `principal: 12→11`, and `>=`→`>`
+all survive. So does dropping `quantize` from `skillsSubscore`, which is the
+ADR-009 C-5 drift mitigation. So does `hasCertification` dropping its `kind`
+check — after which **a skill named `python` satisfies a required
+certification**.
+
+`cascade.ts`'s 1.00/0.95/0.70 constants were all killed, so the cascade is
+genuinely pinned. The gap is thresholds and confidences.
+
+**This is the H-013 pattern again: the tests cover the lines, not the
+boundaries.**
+
+### H-030 · Fifth instance of the recurring pattern
+
+| Entry     | Green signal               | What it hid                                                         |
+| --------- | -------------------------- | ------------------------------------------------------------------- |
+| H-004     | 100% coverage              | Measured file set too small                                         |
+| H-013     | 100% branch coverage       | Four untested behaviours in one guard                               |
+| H-022     | 93% branch coverage        | Every test used American degree forms                               |
+| H-025     | All tests + CI green       | A commit claiming work never done                                   |
+| **H-028** | **369 tests, 99.8%/94.1%** | **Seven defect classes producing wrong scores for real candidates** |
+
+The suite is green for every one of these. **Coverage measures which lines ran,
+never whether the inputs were representative.** The Section 9.2 fixture corpus —
+deferred under ADR-011 — is the mechanism that would have caught most of this,
+which is now an argument for pulling it forward rather than continuing to defer.
+
+**What the verifier cleared, stated fairly:** ADR-007's direct proxy protections
+survived a deliberately hostile CV (DOB, nationality, "Mrs.", religion,
+disability, MIT, Oxford, visa status) with **zero leaks** across attributes,
+scores and the full Explanation object. Span integrity held across 12 hostile
+documents including CJK, emoji and astral-plane glyphs — `text.slice(start,end)`
+matched the claimed value **every time**. Determinism held over 200 runs and all
+24 input permutations. Dedup is race-safe via a UNIQUE constraint. The
+eligibility partition is structurally unbreakable. The architecture is sound;
+the extraction layer is not.

@@ -108,7 +108,13 @@ code that introduced it.
 
 ## ADR-005 — When a scoring dimension is N/A
 
-**Date:** 2026-08-12 · **Status:** Accepted
+**Date:** 2026-08-12 · **Status:** Accepted, **CLAIM NARROWED — see ADR-018**
+
+> **The monotonicity guarantee below holds only for the weighted sum.** Slice
+> verification demonstrated it is **false end-to-end**: adding an Education
+> section to a CV cost a candidate 53 points, because extraction silently
+> dropped their entire employment history (H-028 D1). Monotonicity of the
+> arithmetic does not imply monotonicity of the product.
 
 Section 6.4 renormalizes weights when a dimension is N/A. Section 9.3 requires
 that adding a matched requirement never lowers a score. **These conflict if N/A
@@ -128,7 +134,13 @@ comparable within a role.
 
 ## ADR-006 — Non-English CVs are not scored
 
-**Date:** 2026-08-12 · **Status:** Accepted
+**Date:** 2026-08-12 · **Status:** Accepted, **NOT IMPLEMENTED — see ADR-018**
+
+> **This decision is currently unenforced.** `packages/core` has no notion of
+> language and nothing in `apps/server` reads the stored `language` column. The
+> detection heuristic also does not separate the classes — it scores a French CV
+> as more English than a real English CV (H-028 D6). Until both are fixed, the
+> C7 guarantee this ADR provides does not exist.
 
 `all-MiniLM-L6-v2` is English-trained; the skills taxonomy, date parsing and
 section-header detection are English. Section 9.2 nonetheless requires a
@@ -419,3 +431,49 @@ whether a _skill_ requirement marked must-have is allowed to count.
 
 Monotonicity (Section 9.3) still holds, because the active dimension set remains
 job-side only (ADR-005).
+
+---
+
+## ADR-018 — Extraction hardening precedes the UI (corrects ADR-005, ADR-006, ADR-011)
+
+**Date:** 2026-08-12 · **Status:** Accepted
+
+Adversarial verification of the thin slice found seven defect classes, each
+producing a wrong number for a real candidate, with a fully green suite
+(H-028). The verifier's summary is adopted verbatim as the finding:
+
+> The slice proves the _pipeline_ end-to-end but not the _extraction_, and the
+> extraction is the entire product.
+
+**Decision 1 — ADR-005's monotonicity claim is narrowed.** It is proven for
+weight renormalisation and **false end-to-end**. Adding an Education section
+cost a candidate 53 points because extraction dropped their employment history.
+The invariant must be re-stated and re-tested at the level a candidate actually
+experiences: _text in → score out_, not _attributes in → score out_.
+
+**Decision 2 — ADR-006 is marked unimplemented.** Language detection neither
+separates the classes nor has any enforcement point. C7's "never score a
+document you could not read" is not currently true for non-English documents.
+
+**Decision 3 — ADR-011's sequencing is corrected.** The thin slice was meant to
+front-load feedback and defer rigour. It succeeded at proving the architecture
+and failed to reveal that the extraction layer was unsound, because the deferred
+item — the Section 9.2 fixture corpus — is precisely the mechanism that would
+have caught D1, D2, D3, D4 and D6.
+
+**The fixture corpus is therefore pulled forward, ahead of `apps/web`.** No UI
+work begins until extraction is hardened against a representative corpus. A
+clickable demo over wrong numbers is worse than no demo: it invites trust the
+tool has not earned.
+
+**Decision 4 — gates must be written adversarially.** ADR-010's audit-log gate
+said "proof that UPDATE on `audit_log` fails". That was proven, and `INSERT OR
+REPLACE` still rewrites history (H-028 D7), because SQLite's REPLACE does not
+fire BEFORE DELETE triggers without `PRAGMA recursive_triggers`. A gate phrased
+as "the statement form I thought of fails" is not a gate. Gates are re-worded to
+state the _property_ — "no statement of any form may alter or remove a committed
+audit row" — and tested across statement forms.
+
+**Cost:** the clickable app is further away than ADR-011 implied. Accepted. The
+alternative is shipping a tool that tells a recruiter a candidate named Rémi
+knows R.
