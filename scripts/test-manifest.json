@@ -34,9 +34,11 @@
     "scripts/lib/analyze-test-report.test.mjs :: analyzeTestReport rejects a test count below the committed floor",
     "scripts/lib/analyze-test-report.test.mjs :: analyzeTestReport rejects todo and pending statuses, not only \"skipped\"",
     "scripts/lib/analyze-test-report.test.mjs :: analyzeTestReport still rejects a skip even when the manifest is satisfied",
+    "scripts/lib/analyze-test-report.test.mjs :: test identities accepts a root with or without a trailing slash",
     "scripts/lib/analyze-test-report.test.mjs :: test identities builds a stable id from repo-relative path and full name",
     "scripts/lib/analyze-test-report.test.mjs :: test identities collects every id, sorted and deterministic",
     "scripts/lib/analyze-test-report.test.mjs :: test identities leaves paths outside the repo root intact",
+    "scripts/lib/analyze-test-report.test.mjs :: test identities produces the same id regardless of where the repo lives on disk",
     "scripts/lib/analyze-test-report.test.mjs :: test identities returns nothing for a structurally invalid report rather than throwing"
   ]
 }

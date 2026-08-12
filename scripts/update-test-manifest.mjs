@@ -10,11 +10,13 @@
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { collectTestIds } from './lib/analyze-test-report.mjs';
 
 const REPORT = new URL('../coverage/test-results.json', import.meta.url);
 const MANIFEST = new URL('./test-manifest.json', import.meta.url);
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 /** @type {unknown} */
 let report;
@@ -27,7 +29,7 @@ try {
   process.exit(2);
 }
 
-const tests = collectTestIds(report);
+const tests = collectTestIds(report, ROOT);
 if (tests.length === 0) {
   console.error('❌ The report contains no tests. Refusing to write an empty manifest.');
   process.exit(2);

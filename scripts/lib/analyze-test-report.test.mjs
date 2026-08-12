@@ -127,12 +127,37 @@ describe('analyzeTestReport', () => {
 
 describe('test identities', () => {
   it('builds a stable id from repo-relative path and full name', () => {
-    expect(testId('/x/matchdesk/packages/core/a.test.ts', 'suite does thing')).toBe(
+    expect(testId('/x/matchdesk/packages/core/a.test.ts', 'suite does thing', '/x/matchdesk')).toBe(
       'packages/core/a.test.ts :: suite does thing',
     );
   });
 
+  it('produces the same id regardless of where the repo lives on disk', () => {
+    // The CI regression: GitHub checks out to /home/runner/work/<repo>/<repo>,
+    // so the directory name appears TWICE. Deriving the relative path by
+    // searching for the directory name found the wrong occurrence and every
+    // identity in the manifest failed to match.
+    const onLaptop = testId(
+      '/Users/x/projects/Resume-Match/matchdesk/packages/core/a.test.ts',
+      'n',
+      '/Users/x/projects/Resume-Match/matchdesk',
+    );
+    const onCi = testId(
+      '/home/runner/work/matchdesk/matchdesk/packages/core/a.test.ts',
+      'n',
+      '/home/runner/work/matchdesk/matchdesk',
+    );
+    expect(onCi).toBe(onLaptop);
+    expect(onCi).toBe('packages/core/a.test.ts :: n');
+  });
+
+  it('accepts a root with or without a trailing slash', () => {
+    expect(testId('/r/a.test.ts', 'n', '/r')).toBe('a.test.ts :: n');
+    expect(testId('/r/a.test.ts', 'n', '/r/')).toBe('a.test.ts :: n');
+  });
+
   it('leaves paths outside the repo root intact', () => {
+    expect(testId('/elsewhere/a.test.ts', 'n', '/repo')).toBe('/elsewhere/a.test.ts :: n');
     expect(testId('/elsewhere/a.test.ts', 'n')).toBe('/elsewhere/a.test.ts :: n');
   });
 
@@ -144,7 +169,7 @@ describe('test identities', () => {
         { name: '/x/matchdesk/a.test.ts', assertionResults: [{ status: 'passed', fullName: 'y' }] },
       ],
     };
-    expect(collectTestIds(r)).toEqual(['a.test.ts :: y', 'b.test.ts :: z']);
+    expect(collectTestIds(r, '/x/matchdesk')).toEqual(['a.test.ts :: y', 'b.test.ts :: z']);
   });
 
   it('returns nothing for a structurally invalid report rather than throwing', () => {

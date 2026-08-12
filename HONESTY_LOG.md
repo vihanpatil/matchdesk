@@ -401,3 +401,43 @@ the tooling block.
    **This becomes live the moment `apps/server` imports `@matchdesk/core`,**
    because `package.json` still points `main`/`exports` at `./dist/index.js`.
    Flagged here so Phase 6 does not meet it by surprise.
+
+---
+
+## 2026-08-12 — CI comes online
+
+### H-021 · First real CI run FAILED — test identities were machine-path-dependent
+
+**Severity:** was high; fixed. Vindicates H-003.
+
+The first GitHub Actions run failed, and it failed on something no amount of
+local testing would have caught:
+
+```
+Tests  37 passed (37)
+❌ 37 test(s) in the committed manifest no longer exist
+```
+
+Every test ran and passed. Every identity failed to match.
+
+`testId()` derived the repo-relative path by slicing at the first occurrence of
+`/matchdesk/`. GitHub checks out to `/home/runner/work/matchdesk/matchdesk/…`,
+where the directory name appears **twice**, so the slice landed on the wrong
+occurrence and produced `matchdesk/packages/…` instead of `packages/…`.
+
+Test identities were therefore a function of where the repository happened to
+sit on disk. On my machine the path contains `/matchdesk/` once and it worked by
+coincidence.
+
+Fixed by passing the repository root in explicitly rather than guessing it from
+the path. Regression test added that asserts a laptop path and a CI path produce
+byte-identical identities.
+
+**Two things worth recording beyond the fix:**
+
+1. **This is exactly what H-003 predicted** — "CI would run on ubuntu against a
+   frozen lockfile, which can expose platform-specific failures a local macOS
+   run cannot". It found a real one on the very first run.
+2. **The manifest guard worked correctly.** It was the identity derivation that
+   was broken, and the guard refused to pass rather than shrugging. A guard that
+   fails loudly when its own inputs are wrong is behaving properly.

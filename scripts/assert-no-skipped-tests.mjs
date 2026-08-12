@@ -22,6 +22,7 @@
  */
 
 import { existsSync, readFileSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { analyzeTestReport } from './lib/analyze-test-report.mjs';
 
@@ -29,6 +30,7 @@ const REPORT = new URL('../coverage/test-results.json', import.meta.url);
 const MARKER = new URL('../coverage/.run-marker', import.meta.url);
 const FLOOR = new URL('./test-floor.json', import.meta.url);
 const MANIFEST = new URL('./test-manifest.json', import.meta.url);
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 /**
  * @param {URL} url
@@ -99,6 +101,7 @@ if (!Array.isArray(manifestTests) || !manifestTests.every((t) => typeof t === 's
 const { code, messages, total } = analyzeTestReport(report, {
   floor,
   manifest: /** @type {string[]} */ (manifestTests),
+  root: ROOT,
 });
 
 if (code === 2) {

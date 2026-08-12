@@ -29,21 +29,35 @@ function asText(value) {
 
 /**
  * Stable identity for a single test: repo-relative file + full test name.
- * @param {string} file
- * @param {string} name
+ *
+ * The root is passed in explicitly rather than guessed from the path. An
+ * earlier version sliced at the first occurrence of `/matchdesk/`, which broke
+ * on CI, where the checkout lives at `/home/runner/work/matchdesk/matchdesk/…`
+ * and the directory name appears twice — every identity was then prefixed
+ * differently and the whole manifest failed to match. Identities must not
+ * depend on where the repository happens to sit on disk.
+ *
+ * @param {string} file Absolute path from the test report.
+ * @param {string} name Full test name.
+ * @param {string} [root] Repository root to strip, with or without a trailing slash.
  * @returns {string}
  */
-export function testId(file, name) {
-  const rel = file.includes('/matchdesk/') ? file.slice(file.indexOf('/matchdesk/') + 11) : file;
+export function testId(file, name, root = '') {
+  let rel = file;
+  if (root !== '') {
+    const prefix = root.endsWith('/') ? root : `${root}/`;
+    if (file.startsWith(prefix)) rel = file.slice(prefix.length);
+  }
   return `${rel} :: ${name}`;
 }
 
 /**
  * Every test identity present in a report, sorted.
  * @param {unknown} report
+ * @param {string} [root] Repository root to strip from file paths.
  * @returns {string[]}
  */
-export function collectTestIds(report) {
+export function collectTestIds(report, root = '') {
   if (!isRecord(report)) return [];
   const suites = report['testResults'];
   if (!Array.isArray(suites)) return [];
@@ -56,7 +70,7 @@ export function collectTestIds(report) {
     for (const rawAssertion of assertions) {
       const assertion = /** @type {Assertion} */ (isRecord(rawAssertion) ? rawAssertion : {});
       const name = asText(assertion.fullName) || asText(assertion.title) || '(unnamed test)';
-      ids.push(testId(file, name));
+      ids.push(testId(file, name, root));
     }
   }
   return ids.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
@@ -64,7 +78,7 @@ export function collectTestIds(report) {
 
 /**
  * @param {unknown} report Parsed contents of Vitest's JSON reporter output.
- * @param {{ floor: number, manifest?: string[] }} options
+ * @param {{ floor: number, manifest?: string[], root?: string }} options
  *        `floor` is a cheap lower bound; `manifest` is the authoritative list of
  *        test identities that must still exist. A count can be padded with
  *        filler tests to mask a deletion — Phase 0 verification demonstrated
@@ -74,7 +88,7 @@ export function collectTestIds(report) {
  * @returns {Analysis} code 0 = every test ran; 1 = a real violation;
  *          2 = the check itself could not be trusted.
  */
-export function analyzeTestReport(report, { floor, manifest }) {
+export function analyzeTestReport(report, { floor, manifest, root = '' }) {
   if (!isRecord(report)) {
     return { code: 2, messages: ['Report is not an object.'], total: 0 };
   }
@@ -152,7 +166,7 @@ export function analyzeTestReport(report, { floor, manifest }) {
 
   // Identity check. Additions are fine; disappearances are not.
   if (manifest !== undefined) {
-    const present = new Set(collectTestIds(report));
+    const present = new Set(collectTestIds(report, root));
     const missing = manifest.filter((id) => !present.has(id));
     if (missing.length > 0) {
       return {
