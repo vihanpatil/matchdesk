@@ -33,26 +33,72 @@ const PRODUCTION_ALLOWED = new Set([
   'Python-2.0',
   'Unlicense',
   'WTFPL',
+  // OSI-approved and permissive, in the same family as MIT/BSD/ISC. Omitted
+  // from the original list by oversight, not by policy; `pako` declares
+  // "(MIT AND Zlib)" and its LICENSE text is plain MIT.
+  'Zlib',
 ]);
 
 /** Permitted for devDependencies only. See ADR-003. */
 const DEVELOPMENT_EXTRA = new Set(['MPL-2.0', 'CC-BY-4.0', 'CC-BY-3.0']);
 
 /**
- * Splits an SPDX expression into its constituent license identifiers.
- * `(MIT OR Apache-2.0)` is acceptable if *any* branch is allowed; `A AND B`
- * requires all. We conservatively require every atom to be allowed, which can
- * only ever be stricter than the true SPDX semantics.
+ * Per-package waivers for packages whose declared license string is not a valid
+ * SPDX identifier, but whose actual LICENSE text was read and identified.
+ *
+ * **Pinned to an exact version on purpose.** A new version of a waived package
+ * fails the audit again and must be re-inspected — a waiver is a statement
+ * about a file someone actually read, not about a package name forever.
+ *
+ * Never add an entry here without opening the LICENSE file and recording what
+ * it says. "Probably fine" is not evidence. See ADR-016.
+ */
+const METADATA_WAIVERS = new Map([
+  [
+    'duck@0.1.12',
+    {
+      declared: 'BSD',
+      actual: 'BSD-2-Clause',
+      evidence:
+        'LICENSE inspected 2026-08-12: exactly 2 clauses, no "neither the name"/endorsement clause and no advertising clause, so neither BSD-3-Clause nor BSD-4-Clause. Copyright (c) 2013 Michael Williamson. Reaches us transitively via mammoth.',
+    },
+  ],
+]);
+
+/**
+ * Evaluates an SPDX expression against an allowlist, with correct semantics.
+ *
+ * `A OR B` — a genuine choice, so the expression is acceptable if **any**
+ * branch is acceptable. `A AND B` — both obligations apply, so **every** term
+ * must be acceptable.
+ *
+ * The first version of this function collapsed both operators and required
+ * every atom to be allowed. That was described in its own comment as "only ever
+ * stricter", which was wrong: it is not stricter, it is **incorrect**, and it
+ * rejected `jszip@3.10.1` — `(MIT OR GPL-3.0-or-later)` — whose LICENSE reads
+ * "At your choice you may use it under the MIT license *or* the GPLv3". Taking
+ * the MIT branch is exactly what the dual license exists to permit.
+ *
+ * Parenthesised sub-expressions are not parsed recursively; nesting deeper than
+ * one level returns false rather than guessing, so an unparseable expression
+ * fails the audit instead of slipping through.
  *
  * @param {string} expression
- * @returns {string[]}
+ * @param {Set<string>} allowed
+ * @returns {boolean}
  */
-function atomsOf(expression) {
-  return expression
-    .replace(/[()]/g, ' ')
-    .split(/\s+(?:AND|OR|WITH)\s+/i)
-    .map((atom) => atom.trim())
-    .filter(Boolean);
+function isAllowedExpression(expression, allowed) {
+  const cleaned = expression.replace(/[()]/g, ' ').trim();
+  if (cleaned === '') return false;
+
+  // Top level is a disjunction of conjunctions: any acceptable branch wins.
+  return cleaned.split(/\s+OR\s+/i).some((branch) =>
+    branch
+      .split(/\s+(?:AND|WITH)\s+/i)
+      .map((atom) => atom.trim())
+      .filter(Boolean)
+      .every((atom) => allowed.has(atom)),
+  );
 }
 
 /**
@@ -129,11 +175,18 @@ function collect(scope) {
  */
 function audit(scope, allowed) {
   const packages = collect(scope);
+  /** @type {AuditedPackage[]} */
+  const waived = [];
   const violations = packages.filter((pkg) => {
-    const atoms = atomsOf(pkg.license);
-    return atoms.length === 0 || !atoms.every((atom) => allowed.has(atom));
+    if (isAllowedExpression(pkg.license, allowed)) return false;
+    const waiver = METADATA_WAIVERS.get(`${pkg.name}@${pkg.version}`);
+    if (waiver !== undefined && waiver.declared === pkg.license) {
+      waived.push(pkg);
+      return false;
+    }
+    return true;
   });
-  return { packages, violations };
+  return { packages, violations, waived };
 }
 
 function main() {
@@ -145,6 +198,15 @@ function main() {
   console.log(`License audit (ADR-003)`);
   console.log(`  production deps audited: ${prod.packages.length} (strict allowlist)`);
   console.log(`  development deps audited: ${dev.packages.length} (strict + MPL-2.0)`);
+
+  // Waivers are printed every run. A silent waiver is indistinguishable from a
+  // hole in the gate.
+  for (const pkg of [...prod.waived, ...dev.waived]) {
+    const waiver = METADATA_WAIVERS.get(`${pkg.name}@${pkg.version}`);
+    console.log(
+      `  ⚠ waived: ${pkg.name}@${pkg.version} declares "${pkg.license}", verified as ${String(waiver?.actual)} (ADR-016)`,
+    );
+  }
 
   const failures = [
     ...prod.violations.map((v) => ({ ...v, scope: 'production' })),

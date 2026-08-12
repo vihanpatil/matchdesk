@@ -1,0 +1,178 @@
+import type {
+  CertificationAttribute,
+  DegreeLevel,
+  ExtractedAttribute,
+  SkillAttribute,
+} from '../extraction/types.js';
+import { quantize } from '../numeric/round.js';
+import type { SemanticMatcher, SkillMatchResult } from './cascade.js';
+import { matchSkillRequirement } from './cascade.js';
+import {
+  DEGREE_LADDER,
+  SENIORITY_LADDER,
+  type EducationRequirement,
+  type ExperienceRequirement,
+  type SeniorityLevel,
+  type SeniorityRequirement,
+  type SkillRequirement,
+  type SkillsDimensionSpec,
+} from './types.js';
+
+// -------------------------------------------------------------------------
+// skills
+// -------------------------------------------------------------------------
+
+export interface SkillRequirementMatch {
+  readonly requirement: SkillRequirement;
+  readonly match: SkillMatchResult;
+}
+
+/** Runs the cascade for every requirement in a job's skills dimension. */
+export function matchAllSkillRequirements(
+  spec: SkillsDimensionSpec,
+  candidateSkills: readonly SkillAttribute[],
+  semanticMatcher?: SemanticMatcher,
+): readonly SkillRequirementMatch[] {
+  return spec.requirements.map((requirement) => ({
+    requirement,
+    match: matchSkillRequirement(requirement.canonicalSkillId, candidateSkills, semanticMatcher),
+  }));
+}
+
+/**
+ * Skills dimension subscore. ADR-007 is binding: must-have requirements are
+ * evaluated ONLY as the separate eligibility predicate (see `./eligibility.js`)
+ * and NEVER enter this average. When there are no preferred (non-must-have)
+ * requirements to average, the dimension is neutrally 1.0 for every
+ * candidate under this job — a constant, so it cannot violate monotonicity.
+ */
+export function skillsSubscore(matches: readonly SkillRequirementMatch[]): number {
+  const preferred = matches.filter((m) => !m.requirement.mustHave);
+  if (preferred.length === 0) return 1;
+  const sum = preferred.reduce((acc, m) => acc + m.match.subscore, 0);
+  return quantize(sum / preferred.length);
+}
+
+// -------------------------------------------------------------------------
+// experience_relevance
+//
+// HONEST CAVEAT: this is a rule-based proxy. It measures the cumulative
+// number of years found across explicit "X years of experience" statements
+// and parsed employment date ranges ANYWHERE in the candidate's attributes.
+// It does NOT assess whether that time was spent on relevant work, does not
+// weight it by which skills it overlapped with, and can double-count
+// concurrent roles. See docs caveats surfaced through `./explain.ts`.
+// -------------------------------------------------------------------------
+
+export function totalYearsExperience(attributes: readonly ExtractedAttribute[]): number {
+  const sum = attributes
+    .filter(
+      (a): a is Extract<ExtractedAttribute, { kind: 'years_experience' }> =>
+        a.kind === 'years_experience',
+    )
+    .reduce((acc, a) => acc + a.years, 0);
+  return quantize(sum);
+}
+
+export function experienceRelevanceSubscore(
+  requirement: ExperienceRequirement,
+  totalYears: number,
+): number {
+  if (requirement.minYears <= 0) return 1;
+  return quantize(Math.max(0, Math.min(1, totalYears / requirement.minYears)));
+}
+
+// -------------------------------------------------------------------------
+// seniority
+//
+// HONEST CAVEAT: no job-title attribute exists in this slice's extraction
+// vocabulary, so seniority is inferred SOLELY from total years of experience
+// against fixed thresholds below. It is a coarse proxy, not a read of actual
+// scope, reports, or title.
+// -------------------------------------------------------------------------
+
+export const SENIORITY_YEAR_THRESHOLDS: Readonly<Record<SeniorityLevel, number>> = {
+  junior: 0,
+  mid: 2,
+  senior: 5,
+  lead: 8,
+  principal: 12,
+};
+
+export function inferSeniorityLevel(totalYears: number): SeniorityLevel {
+  let best: SeniorityLevel = 'junior';
+  for (const level of SENIORITY_LADDER) {
+    if (totalYears >= SENIORITY_YEAR_THRESHOLDS[level]) best = level;
+  }
+  return best;
+}
+
+function ladderIndex<T>(ladder: readonly T[], value: T): number {
+  return ladder.indexOf(value);
+}
+
+export function senioritySubscore(requirement: SeniorityRequirement, totalYears: number): number {
+  const requiredIndex = ladderIndex(SENIORITY_LADDER, requirement.level);
+  if (requiredIndex <= 0) return 1;
+  const candidateIndex = ladderIndex(SENIORITY_LADDER, inferSeniorityLevel(totalYears));
+  return quantize(Math.max(0, Math.min(1, candidateIndex / requiredIndex)));
+}
+
+// -------------------------------------------------------------------------
+// education_certs
+// -------------------------------------------------------------------------
+
+export function bestDegreeLevel(attributes: readonly ExtractedAttribute[]): DegreeLevel | null {
+  let best: DegreeLevel | null = null;
+  let bestIndex = -1;
+  for (const attr of attributes) {
+    if (attr.kind !== 'education') continue;
+    const idx = ladderIndex(DEGREE_LADDER, attr.degreeLevel);
+    if (idx > bestIndex) {
+      bestIndex = idx;
+      best = attr.degreeLevel;
+    }
+  }
+  return best;
+}
+
+export function hasCertification(
+  canonicalId: string,
+  attributes: readonly ExtractedAttribute[],
+): boolean {
+  return attributes.some(
+    (a): a is CertificationAttribute => a.kind === 'certification' && a.canonicalId === canonicalId,
+  );
+}
+
+function degreeSubscore(
+  requirement: EducationRequirement,
+  attributes: readonly ExtractedAttribute[],
+): number {
+  const candidate = bestDegreeLevel(attributes);
+  if (candidate === null) return 0;
+  const requiredIndex = ladderIndex(DEGREE_LADDER, requirement.minDegreeLevel);
+  if (requiredIndex <= 0) return 1;
+  const candidateIndex = ladderIndex(DEGREE_LADDER, candidate);
+  return Math.max(0, Math.min(1, candidateIndex / requiredIndex));
+}
+
+function certificationsSubscore(
+  requiredCertifications: readonly string[],
+  attributes: readonly ExtractedAttribute[],
+): number {
+  if (requiredCertifications.length === 0) return 1;
+  const met = requiredCertifications.filter((id) => hasCertification(id, attributes)).length;
+  return met / requiredCertifications.length;
+}
+
+export function educationCertsSubscore(
+  requirement: EducationRequirement,
+  attributes: readonly ExtractedAttribute[],
+): number {
+  const degree = degreeSubscore(requirement, attributes);
+  const requiredCertifications = requirement.requiredCertifications ?? [];
+  if (requiredCertifications.length === 0) return quantize(degree);
+  const certs = certificationsSubscore(requiredCertifications, attributes);
+  return quantize((degree + certs) / 2);
+}

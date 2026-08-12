@@ -1,0 +1,22 @@
+{
+  "name": "@matchdesk/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "typecheck": "tsc --build"
+  },
+  "dependencies": {
+    "@matchdesk/core": "workspace:*",
+    "@matchdesk/shared": "workspace:*",
+    "better-sqlite3": "13.0.3",
+    "mammoth": "1.12.1",
+    "pdfjs-dist": "6.2.108",
+    "ulid": "3.0.2",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "9.6.0"
+  }
+}

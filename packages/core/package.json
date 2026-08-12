@@ -18,5 +18,8 @@
   },
   "dependencies": {
     "@matchdesk/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "fast-check": "^4.9.0"
   }
 }

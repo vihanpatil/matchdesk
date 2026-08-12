@@ -334,3 +334,46 @@ rather than per iteration.
 reached. Any phase completed during such a period is **not** independently
 verified, and that must be stated in `HONESTY_LOG.md` at the time rather than
 assumed to be fine.
+
+---
+
+## ADR-016 — SPDX evaluation corrected; narrow per-package metadata waivers
+
+**Date:** 2026-08-12 · **Status:** Accepted
+
+Adding `mammoth` (the Section 3.2-locked DOCX library) failed the production
+license gate on three transitive dependencies. Investigation found **two were
+bugs in our own audit script, not licensing problems**:
+
+1. **`jszip@3.10.1` — `(MIT OR GPL-3.0-or-later)`.** `atomsOf()` collapsed `OR`
+   and `AND` and required every atom to be allowed. Its own comment called this
+   "only ever stricter"; that was wrong. It is not stricter, it is **incorrect**
+   — `OR` denotes a genuine choice, and jszip's LICENSE says so explicitly:
+   "At your choice you may use it under the MIT license _or_ the GPLv3."
+   Replaced with `isAllowedExpression()`, which treats the expression as a
+   disjunction of conjunctions: any acceptable branch passes, every term within
+   a branch must pass. Unparseable nesting returns false rather than guessing.
+2. **`pako@1.0.11` — `(MIT AND Zlib)`.** `Zlib` is OSI-approved and permissive,
+   in the same family as MIT/BSD/ISC. Its omission from the allowlist was an
+   oversight, not a policy position. Added.
+
+3. **`duck@0.1.12` — bare `"BSD"`.** Not a valid SPDX identifier, and the
+   ambiguity is material: BSD-4-Clause carries an advertising obligation that
+   BSD-2-Clause does not. The gate correctly refused to guess.
+
+**Decision:** a `METADATA_WAIVERS` map holds per-package waivers, **pinned to an
+exact version**, each carrying the evidence from reading the actual LICENSE
+file. `duck@0.1.12` is waived as BSD-2-Clause on this evidence: exactly two
+clauses, no endorsement clause, no advertising clause.
+
+A new version of a waived package fails again and must be re-inspected —
+verified by negative control. Waivers print on every run, because a silent
+waiver is indistinguishable from a hole in the gate.
+
+**Rejected:** adding bare `"BSD"` to the allowlist. It would wave through a
+license nobody has read, which is precisely what Section 3.4 exists to prevent.
+
+**Also approved:** `@types/better-sqlite3` (MIT, devDependency, type-only).
+`better-sqlite3` ships no bundled type declarations, so without it `tsc` raises
+`TS7016` on every import and the Section 0.2.3 no-`any` rule becomes
+unsatisfiable.
