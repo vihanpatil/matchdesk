@@ -185,22 +185,25 @@ accident:
 | H-036 | 378 mutation survivors (was 607)              | `explain.ts` 28.93% → 73.68%; 55 survivors left, still the largest block |
 | H-040 | Tenure understated when ranges don't parse    | A 3-year parsed role beats a 20-year claim. Needs an `explain.ts` caveat |
 | H-041 | Mixed-language veto abstains on terse CVs     | A terse BILINGUAL CV is still scored. 4 of 10 held-out CVs are silent    |
-| H-051 | **E2 FAILS — 9 of 12 defects unpinned**       | R6c/R7/R8/R9 and R-L1/R-L2 are LOOPS, not relations, despite the names   |
-| H-052 | **Stored evidence drifts from the score**     | Ingest-time attributes vs re-derived scoring: 7 years shown, 21 scored   |
+| H-051 | ~~E2 FAILS — 9 of 12 defects unpinned~~       | **CLOSED** — R10/R17-R20, R-L1-R-L3 and 9 new properties (H-055)         |
+| H-052 | ~~Stored evidence drifts from the score~~     | **CLOSED** — attributes never persisted; scores reproducible (ADR-024)   |
+| H-053 | `<degree> of <field>` is ambiguous            | "Associate of Engineering" has the same shape as a real degree           |
+| H-056 | `roundHalfUp` bound breaks above ~1e9         | Outside the scoring domain; do NOT reuse this function elsewhere         |
+| D7    | audit_log `INSERT OR REPLACE` bypass          | Integrity defect, not wrong-score — E2 does not apply. Still open        |
 | H-044 | Manifest completeness is unverifiable         | Floor guard blocks the accident; a hand-edited manifest still passes     |
 
 **From H-028, still open:** D7 audit-log `REPLACE` bypass; D8 (negative weights
 unvalidated, `confidence` computed but never read, evidence spans
 order-dependent, empty-requirement job marks everyone eligible, cert
 level-variant identity, `migrate.ts` `localeCompare`). **D5b/D5c and D6 are
-landed and verified** — but neither has been through the ADR-015 adversarial
-verifier, which has falsified three gate claims so far.
+landed and verified**, and have now been through an ADR-015 adversarial round
+(2026-08-13), which found five further defects — H-048 through H-052.
 
-**Also unverified by anything automated:** `experience.ts` branch coverage is
-**84%** and `invisible.ts` is **70%**, both below the 90% bar their package is
-held to — absorbed by the `packages/core/src/**` aggregate at 92.53%, so no
-gate fired (H-040). An aggregate hiding a per-file regression is H-004's
-pattern; these two are named so they are known numbers, not discoveries.
+**Per-file coverage below the package bar** (measured 2026-08-13):
+`invisible.ts` 75% branches and `experience.ts` 88% branches, against the 90%
+the `packages/core/src/**` glob is held to — absorbed by that glob's 93.98%
+aggregate, so no gate fires. An aggregate hiding a per-file number is H-004's
+pattern; named here so they stay known rather than discovered.
 
 **Known extraction gaps, reported not fixed:** UK vocational (A-Level, GCSE,
 HND, BTEC, NVQ); PGDip/PGCE; non-English degree names; `FIELD_VOCAB` is 14
