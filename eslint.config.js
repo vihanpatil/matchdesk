@@ -162,6 +162,13 @@ export default tseslint.config(
       '**/*.d.ts',
       '**/playwright-report/**',
       '**/test-results/**',
+      // Stryker's sandbox is a machine-generated copy of the whole repo with
+      // `@ts-nocheck` stamped on every file (ADR-020). Left behind by any
+      // `pnpm mutate` run, it is gitignored but was still being linted — so
+      // one mutation run permanently failed `pnpm lint` with ~1300 errors in
+      // code nobody wrote. A gate must not be breakable by another gate.
+      '**/.stryker-tmp/**',
+      '**/reports/**',
     ],
   },
 
