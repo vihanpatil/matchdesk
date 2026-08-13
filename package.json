@@ -10,7 +10,7 @@
     "node": ">=24.15.0"
   },
   "scripts": {
-    "typecheck": "tsc --build --force && pnpm typecheck:tests && pnpm typecheck:scripts",
+    "typecheck": "tsc --build --clean && tsc --build --force && pnpm typecheck:tests && pnpm typecheck:scripts",
     "typecheck:tests": "tsc -p tsconfig.eslint.json --noEmit",
     "typecheck:scripts": "tsc -p tsconfig.scripts.json --noEmit",
     "lint": "eslint . --max-warnings=0",
