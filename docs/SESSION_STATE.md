@@ -4,34 +4,38 @@
 the end of every working session. If this file disagrees with the code, **the
 code is right and this file is a bug** — fix it.
 
-**Last updated:** 2026-08-12 · **HEAD at last update:** `e778837`
+**Last updated:** 2026-08-12 · **HEAD at last update:** `ab7e4d5` (the commit
+recording this file follows it). Working tree clean, `pnpm verify` exit 0.
 
 ---
 
 ## 1. What this project is
 
-**MatchDesk** — a local-first tool a professional recruiter runs on their own
-machine. They upload job descriptions and CVs (PDF/DOCX), both persist locally,
-and they see explainable, evidence-backed match scores. Built for one specific
-recruiter, but any recruiter should be able to use it. Nothing leaves the
+**MatchDesk** — a loopback-only local browser app an individual recruiter runs
+on their own machine. They upload English text-based job descriptions and CVs
+(PDF/DOCX), both persist locally, and they inspect explainable,
+evidence-backed match scores. CV and job-document content never leave the
 machine.
 
-Governed by a build directive (pasted in the originating session, not in the
-repo) whose section numbers are cited throughout the code and both logs. Its
-non-negotiables:
+`docs/PRODUCT_DECISIONS.md` is the current v1 product source of truth. It
+supersedes any unconfirmed product assumption in the originating build
+directive. The root-level `resume-checker*.html` files are historical API/LLM
+prototypes, not MatchDesk requirements.
+
+Historical directive constraints still visible in the codebase are:
 
 | ID  | Constraint                                                                 |
 | --- | -------------------------------------------------------------------------- |
-| C1  | Free forever — no paid services, no expiring tiers                         |
-| C2  | Offline after first run                                                    |
+| C1  | Free forever — **not a current v1 release commitment**                     |
+| C2  | Offline after first run — **not a current v1 release commitment**          |
 | C3  | Local data sovereignty — candidate PII never leaves the machine            |
 | C4  | Deterministic scoring                                                      |
 | C5  | Hallucination-impossible scoring — no generative model in the scoring path |
 | C6  | Durable persistence                                                        |
 | C7  | No silent failure — never score a document you could not fully read        |
 
-**The guiding principle:** every number the recruiter sees must be traceable, in
-two clicks, to a highlighted span in the source document.
+**The guiding principle:** every number the recruiter sees must be traceable to
+highlighted source evidence.
 
 ---
 
@@ -53,24 +57,47 @@ work until it is done** (ADR-018).
 | Embeddings (cascade step 4) | Deferred; typed seam exists                                   |
 | OCR                         | Deferred                                                      |
 
-**428 tests.** `packages/core` 98.78% statements / 95.22% branches.
-**Mutation score 65.03%** — see section 6; that gap is the most important
-number in this document.
+**Measured baseline — `pnpm verify` run 2026-08-12, exit 0, tree gate-clean:**
 
-### IN FLIGHT at last update — VERIFY BEFORE TRUSTING
+| Gate                 | Result                                                     |
+| -------------------- | ---------------------------------------------------------- |
+| `pnpm typecheck`     | pass                                                       |
+| `pnpm lint`          | pass                                                       |
+| `pnpm format:check`  | pass                                                       |
+| `pnpm license:audit` | pass (1 waiver: `duck@0.1.12`, ADR-016)                    |
+| `pnpm test:cov`      | **454 passed / 40 files**, none skipped, manifest complete |
 
-Two agents were dispatched and had **not** reported:
+Coverage: **98.14% statements, 92.5% branches, 100% functions** repo-wide.
+Mutation score **65.03%** is from the last `pnpm mutate` at `e778837` and has
+**not** been re-run since the D5/D6 work landed — treat it as stale, not as
+evidence. That gap is still the most important number in this document (§6).
 
-1. **Platform (`apps/server`)** — D6 language detector rewrite + **the
-   enforcement gate** (nothing currently reads the language flag, so ADR-006
-   and C7 are unenforced), and D7 `PRAGMA recursive_triggers` + a
-   property-based audit-log test across every mutating statement form.
-2. **Core (`packages/core`)** — D5b/D5c experience de-duplication, and killing
-   `explain.ts` mutation survivors (28.93%, target >75%).
+**An earlier revision of this section claimed the tree did not typecheck and
+that D6's refusal gate was unimplemented. Both were false — see H-037.** Never
+copy a gate result forward; run it.
 
-**If resuming cold: run `git status` and `git log` first.** Their work may sit
-uncommitted in the working tree. Run `pnpm verify` before trusting anything, and
-re-verify their claims against live behaviour rather than reading their reports.
+### Landed since `e778837` — verified against live behaviour, not reports
+
+1. **Platform (`apps/server`)** — D6 language detector **replaced**: the
+   stopword-ratio heuristic is gone, superseded by Cavnar & Trenkle character
+   n-gram profiling against nine hand-authored reference corpora, plus a
+   held-out eval corpus asserting a confusion matrix with **zero false
+   positives** (no non-English document classified English — the C7-critical
+   direction). The refusal gate was **already implemented** at `e778837` in
+   `extractText.ts` `judgeLanguage()`, refusing on both `isEnglish === null`
+   and `isEnglish === false`.
+2. **Core (`packages/core`)** — D5b/D5c experience de-duplication landed:
+   overlapping roles merged by interval union, bare `YYYY - YYYY` ranges near
+   quantity words rejected, future-dated ranges rejected, and explicit
+   "N years" claims no longer summed with the ranges that describe them
+   (**H-040** records what that rule costs).
+
+**Still absent:** D7 `PRAGMA recursive_triggers` and audit-log mutation
+coverage; the `explain.ts` mutation-survivor backlog; a _consumer_ of the
+language verdict (no scoring pipeline or API exists yet to act on it).
+
+**If resuming cold: run `git status` and `git log` first, then `pnpm verify`.**
+Re-verify any claim in this file against live behaviour rather than trusting it.
 
 ## 3. How to run anything
 
@@ -130,22 +157,28 @@ accident:
 
 ## 5. Open items — nothing here is signed off
 
-| ID    | Item                                          | Why it matters                                                      |
-| ----- | --------------------------------------------- | ------------------------------------------------------------------- |
-| H-002 | Cross-machine determinism not guaranteed      | Limits C4; mitigated by 6dp quantization, not solved                |
-| H-007 | Section 7 LLM validator can't do what's asked | Catches fabricated entities, not fabricated relations               |
-| H-008 | OCR + matrix budgets unmeasured               | Section 11 numbers may be unachievable                              |
-| H-015 | `--no-verify` bypasses hooks                  | Unfixable client-side; CI is the backstop                           |
-| H-020 | Stale `dist/` survives a failing compile      | **Goes live when `apps/server` imports `@matchdesk/core`**          |
-| H-033 | Degree guard is context-window dependent      | Bare fragment "such as Mathematics" still yields a degree           |
-| H-034 | Invisible characters                          | ZWSP/soft-hyphen break extraction; routine in PDFs. No relation yet |
-| H-036 | **607 mutation survivors**                    | `explain.ts` 28.93% — the recruiter-facing reasoning is unverified  |
+| ID    | Item                                          | Why it matters                                                           |
+| ----- | --------------------------------------------- | ------------------------------------------------------------------------ |
+| H-002 | Cross-machine determinism not guaranteed      | Limits C4; mitigated by 6dp quantization, not solved                     |
+| H-007 | Section 7 LLM validator can't do what's asked | Catches fabricated entities, not fabricated relations                    |
+| H-008 | OCR + matrix budgets unmeasured               | Section 11 numbers may be unachievable                                   |
+| H-015 | `--no-verify` bypasses hooks                  | Unfixable client-side; CI is the backstop                                |
+| H-020 | Stale `dist/` survives a failing compile      | **Goes live when `apps/server` imports `@matchdesk/core`**               |
+| H-033 | Degree guard is context-window dependent      | Bare fragment "such as Mathematics" still yields a degree                |
+| H-034 | Invisible characters                          | ZWSP/soft-hyphen break extraction; routine in PDFs. No relation yet      |
+| H-036 | **607 mutation survivors**                    | `explain.ts` 28.93% — the recruiter-facing reasoning is unverified       |
+| H-040 | Tenure understated when ranges don't parse    | A 3-year parsed role beats a 20-year claim. Needs an `explain.ts` caveat |
 
-**From H-028, open at last update** (dispatched, unconfirmed): D5b/D5c
-experience double-counting; D6 language detection + enforcement; D7 audit-log
-`REPLACE` bypass; D8 (negative weights unvalidated, `confidence` computed but
-never read, evidence spans order-dependent, empty-requirement job marks everyone
-eligible, cert level-variant identity, `migrate.ts` `localeCompare`).
+**From H-028, still open:** D7 audit-log `REPLACE` bypass; D8 (negative weights
+unvalidated, `confidence` computed but never read, evidence spans
+order-dependent, empty-requirement job marks everyone eligible, cert
+level-variant identity, `migrate.ts` `localeCompare`). **D5b/D5c and D6 are
+landed and verified** — but neither has been through the ADR-015 adversarial
+verifier, which has falsified three gate claims so far.
+
+**Also unverified by anything automated:** `experience.ts` branch coverage is
+**84%**, below the 90% bar its package is held to — absorbed by the
+`packages/core/src/**` aggregate, so no gate fired (H-040).
 
 **Known extraction gaps, reported not fixed:** UK vocational (A-Level, GCSE,
 HND, BTEC, NVQ); PGDip/PGCE; non-English degree names; `FIELD_VOCAB` is 14
@@ -196,17 +229,21 @@ an adversary beat tests written against the author's own expectations.
 **No UI work until extraction is hardened** (ADR-018). A clickable demo over
 wrong numbers invites trust the tool has not earned.
 
-1. **Land the two in-flight agents** (section 2). Verify against LIVE BEHAVIOUR,
-   not their reports. Then `pnpm test:manifest`, bump `minTests`, commit.
+1. ~~Land the two in-flight agents.~~ **Done** — verified against live
+   behaviour, manifest reconciled, floor 428 → 454, `pnpm verify` exit 0
+   (H-037, H-038).
 2. **Add metamorphic relations for the gaps that have none:** invisible
    characters (H-034), bare-fragment degree guard (H-033), and experience
-   de-duplication once D5 lands. Each of these is currently a defect no
-   automated check would catch.
+   de-duplication now that D5 has landed. Each of these is currently a defect
+   no automated check would catch. Start here — D5b/D5c shipped with example
+   tests but **no stable relation**, which is how H-028 got through.
 3. **Re-run the Opus adversarial verifier** over the hardened slice (ADR-015).
    It falsified the previous two gate claims and produced H-028. Do not skip it.
-4. **Kill mutation survivors, ratcheting the threshold up as they fall.** Order
-   by human impact: `explain.ts` (28.93%, in flight) → `certifications.ts`
-   (49.66%) → `skills.ts` (55.60%) → `education.ts` (65.47%).
+4. **Re-run `pnpm mutate`** — the 65.03% baseline predates D5/D6 and is stale.
+   Then **kill survivors, ratcheting the threshold up as they fall.** Order by
+   human impact: `explain.ts` (28.93%) → `certifications.ts` (49.66%) →
+   `skills.ts` (55.60%) → `education.ts` (65.47%). Note `experience.ts` also
+   regressed to 84% branch coverage when D5 landed (H-040).
 5. **Section 9.2 fixture corpus**, ~12 focused fixtures (ADR-018): one per known
    defect class plus clean baselines.
 6. **Then** `apps/web`: Jobs, Candidates, Shortlist. React 19 + Vite +

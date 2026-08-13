@@ -579,3 +579,33 @@ achievable ceiling so that a _drop_ is the signal, not an absolute number.
 **Scoped to `packages/core` only,** because that is where the scoring logic
 lives, where the ≥90% coverage bar applies, and where a surviving mutant means a
 wrong score for a real person.
+
+---
+
+## ADR-021 — V1 product charter supersedes unconfirmed legacy constraints
+
+**Date:** 2026-08-12 · **Status:** Accepted
+
+The original build directive and ADRs 001–020 record the project history and
+many still-binding safety decisions, but they do not describe the product the
+owner chose after reviewing the working repository. Treating unstated legacy
+assumptions as current product commitments would make future work look decided
+when it is not.
+
+**Decision:** `docs/PRODUCT_DECISIONS.md` is the authoritative product-decision
+record for MatchDesk v1. It records the agreed individual-recruiter workflow,
+privacy boundary, English-only document policy, deterministic evidence-based
+matching, recruiter review of requirements, 200 × 200 local matrix, result
+presentation, correction authority, lifecycle, delivery target, and required
+quality standard.
+
+**Amendment to the historical directive:** local document sovereignty remains
+mandatory. Deterministic scoring, explicit refusal of unsupported/uncertain
+documents, evidence-backed explanations, and proxy exclusions are also current
+v1 choices. "Free forever" and "offline after first run" are _not_ accepted v1
+release promises and must not be claimed or implicitly relied on until a later
+decision explicitly restores them.
+
+**Cost:** product decisions now live in a dedicated compact document alongside
+the append-only technical ADRs. Accepted: it makes the source of truth usable
+without rewriting or erasing the history that explains existing code.

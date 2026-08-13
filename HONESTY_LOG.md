@@ -991,3 +991,137 @@ not sit in front of every commit.
 `node_modules` defeats Stryker's plugin auto-discovery. Fixed by naming plugins
 explicitly in the config. Noted because "the tool is installed" and "the tool
 runs" are different claims, and only the second one counts.
+
+---
+
+## 2026-08-12 — Product charter, and the baseline repair that followed
+
+### H-037 · SESSION_STATE described a broken tree. The tree was less broken than that.
+
+**Severity:** documentation drift, in the pessimistic direction.
+
+`docs/SESSION_STATE.md` was updated alongside ADR-021 with a "Live baseline
+check" section. Four of its claims did not survive being run:
+
+| Claim in the file                                        | Measured                                                   |
+| -------------------------------------------------------- | ---------------------------------------------------------- |
+| "`pnpm verify` fails TypeScript compilation"             | `pnpm typecheck` **passed**                                |
+| D6's "refusal/enforcement gate has not been implemented" | **It is implemented** — `extractText.ts` `judgeLanguage()` |
+| `pnpm test` fails the manifest identity check            | Correct — 2 renamed tests                                  |
+| (not mentioned at all)                                   | `pnpm lint` **and** `pnpm format:check` were both failing  |
+
+The enforcement claim is the one that mattered. `judgeLanguage()` in
+`apps/server/src/ingestion/extractText.ts` refuses on **both** branches —
+`isEnglish === null` → `language_undetermined`, `isEnglish === false` →
+`non_english_language_not_supported`, both `needs_attention`, both with
+`language: null` so nothing downstream can read them as scoreable. A reader
+acting on the file would have re-implemented a gate that already existed. What
+is genuinely absent is a _consumer_ of that verdict, because no scoring
+pipeline or API exists yet to consume it — a real gap, but not the one written
+down.
+
+**Why this is logged rather than quietly corrected.** Section 6 of
+SESSION_STATE catalogues six times a green number concealed a defect. This is
+the mirror image: a red claim concealing working code. It is the same failure —
+a document asserting a state of the world that nobody re-ran — and H-025 was
+logged for exactly this class of drift. Pessimistic drift is not automatically
+the safe direction: it spends the next session's time re-verifying settled work,
+and it teaches the reader that the file's warnings are noise.
+
+The file's own rule — "if this file disagrees with the code, the code is right
+and this file is a bug" — was applied. Section 2 now records measured gate
+output with the date it was measured.
+
+### H-038 · Test manifest reconciled: two renamed tests, floor 428 → 454
+
+**Severity:** routine, recorded because the manifest gate requires it.
+
+`pnpm test` failed the identity check with two tests missing:
+
+```
+- languageDetection.test.ts :: does not classify French prose as English
+- languageDetection.test.ts :: reports a stopword ratio that clearly separates
+  the English and French fixtures
+```
+
+Both removals are intentional and neither hides a deleted assertion:
+
+- The first was **renamed**, not deleted — to `...as English (accented)`, split
+  from a new accent-stripped sibling, because the accent-stripped French
+  fixture is the strictly harder case and the two now assert separately.
+- The second was **retired with the thing it measured**. It asserted
+  `english.ratio > french.ratio * 3` against a `ratio` field that no longer
+  exists: the stopword-ratio detector was replaced by n-gram profiling (H-028
+  D6), so there is no ratio to compare. Its replacement asserts the property
+  the new method actually has — distance to the English profile strictly below
+  distance to the nearest non-English profile.
+
+Manifest regenerated (454 identities); `minTests` raised 428 → 454. **The floor
+was raised, never lowered.**
+
+### H-039 · ADR-020's mutation sandbox permanently broke `pnpm lint`
+
+**Severity:** real, self-inflicted, and it had already fired.
+
+`pnpm mutate` leaves `.stryker-tmp/sandbox-*/` on disk: a machine-generated copy
+of the entire repo with `@ts-nocheck` stamped on every file. It is in
+`.gitignore`, but it was in neither `eslint.config.js`'s `ignores` nor
+`.prettierignore`. So `pnpm lint` walked into it and reported:
+
+```
+✖ 1325 problems (1325 errors, 0 warnings)
+```
+
+**1323 of those 1325 came from the sandbox.** Only 2 were real code. Once a
+developer ran the mutation gate a single time, the lint gate failed forever
+afterwards, in files nobody wrote, drowning genuine findings at a ratio of
+660:1. That is the H-030 pattern inverted: not a green number hiding a defect,
+but a wall of red hiding two.
+
+Fixed by ignoring `.stryker-tmp/**` and `reports/**` in both tools. **A quality
+gate must not be breakable by another quality gate**, and a gate whose output is
+99.8% noise is not a gate.
+
+The 2 real errors were in `languageDetection.test.ts`: `as number` narrowing
+banned by `non-nullable-type-assertion-style`, and its obvious fix (`!`) banned
+by `no-non-null-assertion`. Both bans are correct; the test now narrows by
+throwing, which also fails with a readable message rather than a null
+comparison.
+
+### H-040 · `totalYearsExperience` prefers date ranges, and will understate tenure
+
+**Severity:** known behaviour, accepted deliberately, not a defect to fix quietly.
+
+The H-028 D5b fix stops an explicit "N years of experience" claim and the date
+ranges describing it from both being summed (which roughly doubled tenure). The
+rule implemented: **if any date range parses, the merged range coverage is the
+total and every explicit statement is discarded as corroboration.** Explicit
+statements are used only when no range parses at all, and then the MAX is taken,
+not the sum.
+
+**The cost, stated plainly:** a CV that says "20 years of experience" but whose
+roles mostly fail to parse into date ranges — undated positions, an unsupported
+date locale (see the open `experience.ts` date-format gap), a range swallowed by
+a section-exclusion — now totals whatever little did parse. **One 3-year role
+that parses beats a 20-year claim that does not.** The candidate is understated,
+silently, with no warning surfaced.
+
+**Accepted anyway,** because the alternative is worse under this product's
+stated principles: `docs/PRODUCT_DECISIONS.md` requires every score
+contribution to link to evidence in the source document, and a date range is a
+verifiable span while a self-reported total is an assertion. Letting
+`max(rangeTotal, explicitClaim)` win would let an inflated or stale claim
+override the verifiable evidence — a worse failure for the person on the other
+end of the shortlist.
+
+**What would close it properly** is not a formula change: it is surfacing the
+disagreement. When an explicit claim materially exceeds computed tenure, that is
+a signal the extractor missed roles, and it belongs in `explain.ts` as a
+recruiter-visible caveat rather than being resolved silently in arithmetic.
+Recorded as open, not as done.
+
+**Also recorded:** `experience.ts` branch coverage fell to **84%** as the D5b/D5c
+branches landed. The `packages/core/src/**` aggregate still clears its 90% bar,
+so no gate fired — which is precisely the concealment described in H-004 and
+H-030, an aggregate absorbing a per-file regression. Named here so it is a known
+number rather than a discovered one.
