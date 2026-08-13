@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import { extractAttributes, extractEducation, extractSkills } from '../index.js';
+import { totalYearsExperience } from '../scoring/dimensions.js';
 import { TAXONOMY } from '../taxonomy/data.js';
 import {
   cvSpecArbitrary,
@@ -236,5 +237,241 @@ describe('metamorphic: non-fabrication — things that must NOT be invented', ()
         `prose "${prose}" must not yield a degree`,
       ).toEqual([]);
     }
+  });
+
+  it('R10 · a field of study with no degree word never produces a degree, at any fragment length (H-033)', () => {
+    // R9 covers full sentences. H-033 is narrower and nastier: the degree
+    // guard looks back over an 80-character context window, so the SAME field
+    // name yields a degree or not depending on how much text precedes it.
+    // A PDF that extracts one line per text run — routine — produces exactly
+    // these short fragments.
+    const FIELDS = [
+      'Mathematics',
+      'Computer Science',
+      'Physics',
+      'Economics',
+      'Psychology',
+      'Biology',
+      'Chemistry',
+      'Finance',
+      'Marketing',
+      'Data Science',
+    ];
+    // Same fragment, progressively less preceding context.
+    const FRAMES: readonly ((field: string) => string)[] = [
+      (f) => `Tutored school students in subjects such as ${f} and related areas.`,
+      (f) => `Tutored students in subjects such as ${f}.`,
+      (f) => `subjects such as ${f}`,
+      (f) => `such as ${f}`,
+      (f) => `Interested in ${f}`,
+      (f) => `Courses in ${f}`,
+    ];
+
+    for (const field of FIELDS) {
+      for (const frame of FRAMES) {
+        const text = frame(field);
+        expect(
+          extractEducation(text).map((d) => d.normalizedValue),
+          `"${text}" states no qualification, so it must not yield a degree`,
+        ).toEqual([]);
+      }
+    }
+  });
+});
+
+/**
+ * Characters that render as nothing but are real code points in extracted
+ * text. Word, InDesign and most PDF producers emit them routinely — soft
+ * hyphens at justified line breaks, zero-width spaces inside ligatures, a BOM
+ * at the head of the stream. A recruiter cannot see them and would have no
+ * idea why a CV scored differently (H-034).
+ */
+const INVISIBLE_CHARS: readonly string[] = [
+  '\u200B', // zero-width space
+  '\u00AD', // soft hyphen
+  '\u200C', // zero-width non-joiner
+  '\u200D', // zero-width joiner
+  '\u2060', // word joiner
+  '\uFEFF', // zero-width no-break space / BOM
+];
+
+describe('metamorphic: invisible characters must not change the result (H-034)', () => {
+  it('R11 · inserting one invisible character anywhere does not change what is extracted', () => {
+    fc.assert(
+      fc.property(
+        cvSpecArbitrary(SKILL_POOL),
+        fc.constantFrom(...INVISIBLE_CHARS),
+        fc.double({ min: 0, max: 1, noNaN: true }),
+        (spec, invisible, position) => {
+          const clean = renderCv(spec);
+          const at = Math.floor(position * clean.length);
+          const polluted = `${clean.slice(0, at)}${invisible}${clean.slice(at)}`;
+
+          expect(
+            summarize(extractAttributes(polluted, REF)),
+            `inserting ${JSON.stringify(invisible)} at offset ${String(at)} changed extraction`,
+          ).toEqual(summarize(extractAttributes(clean, REF)));
+        },
+      ),
+      RUNS,
+    );
+  });
+
+  it('R12 · invisible characters between every character do not change which skills are found', () => {
+    // The pathological version of R11: a PDF that emits a soft hyphen at
+    // every ligature boundary. If extraction is invisible-blind this is
+    // identical to the clean text; if it is not, every term is destroyed.
+    fc.assert(
+      fc.property(
+        fc.uniqueArray(fc.constantFrom(...SKILL_POOL), { minLength: 1, maxLength: 4 }),
+        fc.constantFrom(...INVISIBLE_CHARS),
+        (skills, invisible) => {
+          const clean = `Skills: ${skills.join(', ')}`;
+          const polluted = Array.from(clean).join(invisible);
+
+          expect(summarizeSkills(extractSkills(polluted))).toEqual(
+            summarizeSkills(extractSkills(clean)),
+          );
+        },
+      ),
+      RUNS,
+    );
+  });
+});
+
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+interface GeneratedRange {
+  readonly startYear: number;
+  readonly startMonth: number;
+  readonly months: number;
+}
+
+/** Ranges that always end on or before the reference date, so a range is
+ *  never discarded as future-dated and the relation stays about merging. */
+const rangeArbitrary = fc
+  .record({
+    startYear: fc.integer({ min: 1996, max: 2020 }),
+    startMonth: fc.integer({ min: 1, max: 12 }),
+    months: fc.integer({ min: 1, max: 60 }),
+  })
+  .map((r): GeneratedRange => r);
+
+function absoluteMonth(year: number, month: number): number {
+  return year * 12 + month;
+}
+
+function renderRange(range: GeneratedRange): string {
+  const startAbs = absoluteMonth(range.startYear, range.startMonth);
+  const endAbs = startAbs + range.months;
+  const endYear = Math.floor((endAbs - 1) / 12);
+  const endMonth = ((endAbs - 1) % 12) + 1;
+  const start = `${MONTHS[range.startMonth - 1] ?? 'Jan'} ${String(range.startYear)}`;
+  const end = `${MONTHS[endMonth - 1] ?? 'Jan'} ${String(endYear)}`;
+  return `Software Engineer, Acme Corporation\n${start} - ${end}`;
+}
+
+function calendarSpanYears(ranges: readonly GeneratedRange[]): number {
+  const starts = ranges.map((r) => absoluteMonth(r.startYear, r.startMonth));
+  const ends = ranges.map((r) => absoluteMonth(r.startYear, r.startMonth) + r.months);
+  return (Math.max(...ends) - Math.min(...starts)) / 12;
+}
+
+describe('metamorphic: years of experience cannot exceed elapsed time (H-028 D5)', () => {
+  it('R13 · total experience never exceeds the calendar span from earliest start to latest end', () => {
+    // The relation that would have caught D5b directly, with no expected
+    // value authored: a person cannot accumulate more years of experience
+    // than have elapsed between their first job starting and their last one
+    // ending, no matter how many concurrent roles they list.
+    fc.assert(
+      fc.property(fc.array(rangeArbitrary, { minLength: 1, maxLength: 4 }), (ranges) => {
+        const text = ['Work History', ...ranges.map(renderRange)].join('\n');
+        const total = totalYearsExperience(extractAttributes(text, REF));
+
+        // Each emitted piece is rounded to 1dp independently, so the sum can
+        // exceed the true union by up to 0.05 per piece. The tolerance covers
+        // rounding only — it is far below the ~2x error D5b produced.
+        const tolerance = 0.05 * ranges.length;
+        expect(total).toBeLessThanOrEqual(calendarSpanYears(ranges) + tolerance);
+      }),
+      RUNS,
+    );
+  });
+
+  it('R14 · listing a role twice does not increase total experience', () => {
+    fc.assert(
+      fc.property(rangeArbitrary, (range) => {
+        const once = ['Work History', renderRange(range)].join('\n');
+        const twice = ['Work History', renderRange(range), renderRange(range)].join('\n');
+
+        expect(totalYearsExperience(extractAttributes(twice, REF))).toBeCloseTo(
+          totalYearsExperience(extractAttributes(once, REF)),
+          5,
+        );
+      }),
+      RUNS,
+    );
+  });
+
+  it('R15 · the ORDER roles are listed in does not change total experience', () => {
+    fc.assert(
+      fc.property(fc.array(rangeArbitrary, { minLength: 2, maxLength: 4 }), (ranges) => {
+        const forward = ['Work History', ...ranges.map(renderRange)].join('\n');
+        const reversed = ['Work History', ...[...ranges].reverse().map(renderRange)].join('\n');
+
+        expect(totalYearsExperience(extractAttributes(reversed, REF))).toBeCloseTo(
+          totalYearsExperience(extractAttributes(forward, REF)),
+          5,
+        );
+      }),
+      RUNS,
+    );
+  });
+
+  it('R16 · a quantity that looks like a year range never adds experience (H-028 D5c)', () => {
+    // "Managed a budget of 2000 - 2024 USD" parsed as 24 years of employment.
+    // Stated as a relation: appending a sentence about a QUANTITY must never
+    // increase the total, whatever the numbers in it happen to be.
+    const QUANTITY_FRAMES: readonly ((a: number, b: number) => string)[] = [
+      (a, b) => `Managed a budget of ${String(a)} - ${String(b)} USD.`,
+      (a, b) => `Grew active users from ${String(a)} - ${String(b)}.`,
+      (a, b) => `Handled ${String(a)} - ${String(b)} transactions per day.`,
+      (a, b) => `Supported ${String(a)} - ${String(b)} customers across the region.`,
+    ];
+
+    fc.assert(
+      fc.property(
+        rangeArbitrary,
+        fc.integer({ min: 1000, max: 2000 }),
+        fc.integer({ min: 2001, max: 2024 }),
+        fc.nat({ max: QUANTITY_FRAMES.length - 1 }),
+        (range, low, high, frameIndex) => {
+          const frame = QUANTITY_FRAMES[frameIndex] ?? QUANTITY_FRAMES[0];
+          if (frame === undefined) return;
+
+          const base = ['Work History', renderRange(range)].join('\n');
+          const withQuantity = [base, frame(low, high)].join('\n');
+
+          expect(totalYearsExperience(extractAttributes(withQuantity, REF))).toBeCloseTo(
+            totalYearsExperience(extractAttributes(base, REF)),
+            5,
+          );
+        },
+      ),
+      RUNS,
+    );
   });
 });
