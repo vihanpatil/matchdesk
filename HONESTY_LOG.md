@@ -1856,3 +1856,87 @@ which confirms this was test work: no source was altered to move the number.
 adversarial round found five defects, so the two-clean-round counter stands at
 zero. **E3 NOT MET** — the Section 9.2 fixture corpus does not exist. The UI
 stays blocked on those two.
+
+---
+
+## 2026-08-13 — Phase 1: E1 contingency and the fixture-generation dependencies
+
+### H-058 · Branch coverage is not reproducible run to run: 618/664, then 619/664
+
+Found by accident, doing the one thing this log keeps saying to do: running the
+gate twice instead of once.
+
+```
+pnpm verify, run 1   Branches 93.07%  (618/664)
+pnpm verify, run 2   Branches 93.22%  (619/664)
+same commit, same tree, no source change between runs
+```
+
+**Cause:** `fast-check` seeds itself randomly on every run and no seed is
+pinned anywhere — not in `vitest.config.ts`, not via `fc.configureGlobal`. The
+property and metamorphic tests therefore generate different inputs each run and
+reach a slightly different set of branches. One branch, in this instance.
+
+**Why it is being recorded rather than fixed on the spot.**
+
+1. **It is not currently a gate risk, and I checked rather than assuming.** The
+   `packages/core/src/**` glob is held to 90% branches and aggregates ~93.98%.
+   A one-branch oscillation has roughly four points of headroom. No threshold
+   sits near the boundary today.
+2. **The randomness is not a bug — it is the entire value of the technique.** A
+   pinned seed makes coverage reproducible and simultaneously makes every run
+   test the _same_ inputs forever, which is precisely the blind spot ADR-019
+   exists to escape. R3 rediscovered the `Rémi Dubois → skill r` defect because
+   the generator was free to wander. Pinning the global seed would buy a stable
+   number at the cost of the property that found that defect.
+
+**What is actually wrong here is narrower than "coverage fluctuates":** a
+number that appears in `SESSION_STATE.md`, `PROJECT_STATUS.md` and now this log
+as though it were a fixed property of the tree is in fact a sample from a
+distribution. Every branch-coverage figure this project has ever recorded is
+"whatever the seed did that day", and none of them said so.
+
+**Consequences, stated:**
+
+- **Any recorded branch-coverage figure is ±1 branch at minimum.** The observed
+  spread is small, but it has never been characterised, so "at minimum" is the
+  honest phrasing — nobody has run this enough times to know the real range.
+- **A property test that fails intermittently will not reproduce from the
+  command alone.** `fast-check` prints the failing seed, so it is recoverable —
+  but only if whoever sees the failure copies the seed before re-running.
+  Re-running first, which is the natural reflex, can make the evidence vanish.
+- **This is a mild instance of the recurring pattern**, entry ten. Not a
+  concealed defect — a number treated as more solid than it is. Same family as
+  H-004 (a coverage figure measuring a quietly different thing than assumed).
+
+**Not fixed. Options for later, none taken now:** pin a seed only for the
+coverage-reporting run while leaving the normal run free; record a range in the
+docs instead of a point figure; or characterise the actual spread over ~20 runs
+and state it. The cheapest correct action today is to stop writing branch
+coverage down as if it were exact, and that is what this entry does.
+
+### Phase 1 record: two decisions, no code
+
+**ADR-025** pre-commits what happens if E1 never fires: two further rounds each
+producing a wrong-score finding makes re-examination of the bar mandatory, with
+three permitted outcomes, none of which is a silent relaxation. Written now
+specifically because the gate is not currently blocking anything.
+
+**ADR-026** approves `pdf-lib@1.17.1` and `docx@9.7.1` as root dev
+dependencies for fixture generation. All 26 packages in the resolved tree were
+checked and **no new `METADATA_WAIVERS` entry is required** — the first
+dependency addition since ADR-016 that needs none.
+
+**LICENSE files were opened and read, not inferred from metadata**, per
+ADR-016: `pdf-lib` and `docx` are both verbatim MIT; the two `@pdf-lib/*`
+packages are verbatim MIT; `sax@1.6.1` is a genuine Blue Oak Model License
+1.0.0 whose only obligation is a notices clause that does not attach to a
+dev-only dependency. `jszip` and `pako` already reach the tree via `mammoth`
+and were vetted in ADR-016.
+
+**What is NOT proven by this commit.** The packages are not installed. The
+claim that `pnpm license:audit` passes with them present is a **prediction**,
+and it stays a prediction until the Phase 2 commit runs the audit with them in
+the tree. An ADR is a decision, never evidence of implementation (H-025). If
+the audit fails in Phase 2, ADR-026 was wrong and the failure gets recorded
+here rather than quietly corrected.

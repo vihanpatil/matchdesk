@@ -840,3 +840,160 @@ the next implementer to invent a fragile one:
   the same — so this is a limitation being made explicit, not one introduced.
   Reconstructing a past view would need versioned engine outputs, which is a
   separate decision nobody has taken.
+
+---
+
+## ADR-025 — What happens if E1 never fires
+
+**Date:** 2026-08-13 · **Status:** Accepted
+
+ADR-023 gave "extraction hardened" five measurable exit criteria. E1 requires
+**two consecutive** adversarial rounds with no new wrong-score defect class, and
+any wrong-score finding resets the counter to zero.
+
+**The counter is at zero and has never been higher.** Every ADR-015 round run so
+far has found wrong-score defects; the 2026-08-13 round found five. The
+mechanism that makes E1 a real gate — a reset on any finding — is also the
+mechanism by which it can fail to terminate. ADR-023 fixed ADR-018's "harden
+indefinitely" problem by making the criteria measurable. It did not remove the
+possibility that a measurable criterion is never met.
+
+This is the only E-criterion whose completion is not under our control. E3 is
+work; E1 is a result.
+
+**The decision is made now, while the gate is not blocking anything, because
+the moment it blocks is the worst possible moment to decide it.** This project's
+recorded history is of checks that were absent, vacuous, or removed (H-004,
+H-013, H-028, H-051). A bar re-litigated by someone who is stuck and frustrated
+is a bar that gets lowered, and the reasoning will read as sound at the time.
+
+### Decision
+
+**If two further adversarial rounds each produce at least one wrong-score
+finding, a re-examination of E1 becomes mandatory before a third round is
+commissioned.**
+
+Mandatory means it must happen and its outcome must be written down. It does
+**not** mean the bar is lowered. The permitted outcomes are exactly:
+
+1. **The bar is right and the work continues.** The rounds are finding real
+   defects in a system that is genuinely not ready. Recorded, and rounds resume.
+2. **The bar is right but the rounds are miscalibrated.** If findings are
+   clustering in one area, or successive verifiers are re-finding variants of
+   one root cause, the fault is in the probe design rather than the threshold.
+   Recorded, round design changed, counter continues unaffected.
+3. **The bar is wrong and is changed.** Only via a new ADR that states the new
+   criterion, what evidence changed the judgement, and **which specific residual
+   risk to a real candidate is being accepted.** A change recorded without
+   naming that risk does not satisfy this ADR.
+
+**What is explicitly not permitted:** letting the counter quietly continue past
+the trigger without the re-examination happening; reclassifying a wrong-score
+finding as false-refusal or coverage-gap to protect the counter; or relaxing E1
+inside a commit whose stated purpose is something else.
+
+### The trigger is a prompt, not a verdict
+
+Two failing rounds is not evidence that the bar is wrong. It is the point at
+which continuing without asking stops being a decision and starts being a habit.
+Outcome 1 — "the bar is right, keep going" — is a perfectly good answer and is
+expected to be the common one.
+
+### Cost, accepted
+
+A wrong-score defect that is real and unfixed keeps the UI blocked, and this
+ADR does not change that. It cannot: the entire premise of ADR-018 is that a
+clickable demo over wrong numbers invites trust the tool has not earned. What
+this buys is that the project cannot drift into an unbounded gate without
+noticing, and cannot exit one without saying out loud whose risk it accepted.
+
+**Related, and deliberately out of scope:** E1–E5 measure soundness only.
+Nothing in the gate tests whether this product, in this shape, is what the
+recruiter wants — and the tool has still never been used by the recruiter it is
+for. That is a real gap in what "ready" means, but it is not what E1 is for and
+this ADR does not conflate them.
+
+---
+
+## ADR-026 — `pdf-lib` and `docx` as fixture-generation dev dependencies
+
+**Date:** 2026-08-13 · **Status:** Accepted
+
+E3 requires a fixture corpus, and the corpus must include real PDF and DOCX
+files. The repo has readers — `pdfjs-dist` and `mammoth` — and no writer.
+
+**Why binaries at all, when text fixtures are cheaper.** The text tier feeds
+`packages/core` directly and cannot reach `apps/server/src/ingestion` at all.
+Scan detection, the Cavnar & Trenkle language classifier and the ADR-022
+mixed-language veto are only exercised by real bytes arriving in a real
+container. D6 — the detector ranking a French CV as more English than an English
+CV — lived entirely in that layer. A corpus that cannot fail the way D6 failed
+is not a corpus for this project.
+
+**Why generated rather than committed.** A committed binary cannot be reviewed
+in a diff, and when an extraction result changes it is then impossible to tell
+whether the fixture moved or the code moved. That ambiguity is the H-037 failure
+shape: a stale artifact treated as ground truth. Fixture _definitions_ are
+committed as readable source; the binaries are produced from them
+deterministically by `scripts/build-fixtures.mjs`, and regeneration must be
+byte-identical or the build fails.
+
+### License evaluation (ADR-016 standard)
+
+Every LICENSE file below was opened and read on 2026-08-13. Declared metadata
+was **not** treated as evidence.
+
+| Package                   | Declared                    | LICENSE file says                                      |
+| ------------------------- | --------------------------- | ------------------------------------------------------ |
+| `pdf-lib@1.17.1`          | `MIT`                       | Verbatim MIT, © 2019 Andrew Dillon                     |
+| `docx@9.7.1`              | `MIT`                       | Verbatim MIT, © 2016 Dolan                             |
+| `@pdf-lib/standard-fonts` | `MIT`                       | Verbatim MIT, © 2018 Andrew Dillon                     |
+| `@pdf-lib/upng`           | `MIT`                       | Verbatim MIT, © 2017 Photopea                          |
+| `sax@1.6.1`               | `BlueOak-1.0.0`             | Genuine Blue Oak Model License 1.0.0 (see note below)  |
+| `jszip@3.10.1`            | `(MIT OR GPL-3.0-or-later)` | Already vetted in ADR-016; arrives today via `mammoth` |
+| `pako@1.0.11`             | `(MIT AND Zlib)`            | Already vetted in ADR-016; arrives today via `mammoth` |
+
+The full resolved tree is 26 packages. The remainder declare `MIT`, `ISC` or
+`0BSD`, all already on the production allowlist, and the majority
+(`jszip`, `pako`, `nanoid`, `tslib`, `readable-stream`, `immediate`, `lie`,
+`setimmediate`) are **already in `pnpm-lock.yaml`** via `mammoth` and
+`pdfjs-dist`. Genuinely new to the tree: `pdf-lib`, `docx`, the two `@pdf-lib/*`
+packages, `sax`, `xml-js`, `hash.js` and a small set of `readable-stream`
+helpers.
+
+**On `sax`'s Blue Oak 1.0.0.** It is on `PRODUCTION_ALLOWED` already, but it was
+read rather than assumed because it is the one non-MIT-family license in the
+set. It is permissive, includes an explicit patent grant, and its only
+obligation is a Notices clause requiring the license text to travel with any
+copy distributed. Nothing here is distributed: these are dev dependencies used
+to generate test fixtures at build time and they do not enter any artifact a
+recruiter receives. The obligation does not attach.
+
+### Decision
+
+Add `pdf-lib` and `docx` as **root `devDependencies`**, pinned to exact
+versions. They generate fixtures and are never imported by `packages/core`,
+`apps/server`, or anything that ships.
+
+**No new `METADATA_WAIVERS` entry is required.** Every package in the resolved
+tree evaluates to an allowlisted SPDX expression under `isAllowedExpression`.
+This is the first dependency addition since ADR-016 that needs no waiver, which
+is a property of these packages and not a relaxation of the gate.
+
+**This ADR is a decision, not evidence (H-025).** The claim that the audit
+passes is a prediction until `pnpm license:audit` has been run with both
+packages installed. That run belongs to the commit that installs them, and its
+output is the evidence.
+
+### Costs, accepted
+
+- **Three new supply-chain entries with no prior presence in the tree** (`sax`,
+  `xml-js`, `hash.js`), reaching us via `docx`. Dev-only, so they never reach a
+  recruiter, but they are new code on the build machine.
+- **`pdf-lib@1.17.1` was last published some time ago.** For deterministic
+  generation of simple text PDFs this is close to irrelevant — the PDF text
+  operators involved have not changed — but it is noted rather than discovered
+  later.
+- **Both libraries embed creation timestamps by default**, which would make
+  every regeneration look like a change and destroy the byte-identical check.
+  Suppressing that is a hard requirement on the generator, not a nicety.
