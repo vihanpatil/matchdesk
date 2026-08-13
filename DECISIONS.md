@@ -669,3 +669,88 @@ document with a legitimate short foreign-language quotation may also be
 refused; a false refusal costs the recruiter one manual review, while a false
 acceptance costs a candidate a wrong score, and that asymmetry is the whole
 argument for erring here.
+
+---
+
+## ADR-023 — "Extraction hardened" gets a definition, and the slice gets connected
+
+**Date:** 2026-08-12 · **Status:** Accepted
+
+ADR-018 says no UI work begins "until extraction is hardened against a
+representative corpus." **Hardened was never defined.** Every adversarial round
+finds more defects — that is what adversarial rounds are for — so as written
+the gate has no exit and the project can harden indefinitely. Measured on this
+session alone: six H-028 defects fixed, then four more found (H-042, H-043,
+H-044), with more certainly available.
+
+A second problem, found while re-assessing scope. ADR-018 records the
+verifier's summary that "the slice proves the _pipeline_ end-to-end but not the
+_extraction_." **The first half is not true.** `apps/server` declares
+`@matchdesk/core` as a dependency and has never imported it. Nothing in
+`apps/` calls `scoreCandidate`. There is no HTTP server, no entry point and no
+launcher. What was proven end-to-end was `packages/core` in isolation and
+`apps/server` in isolation — never a document becoming a score.
+
+ADR-018's own Decision 1 demands the invariant be tested at "the level a
+candidate actually experiences: _text in → score out_". That level did not
+exist to test.
+
+### Decision 1 — exit criteria for extraction hardening
+
+Hardening is complete when all of the following hold, and none of them is a
+matter of judgement:
+
+| ID  | Criterion                                                                                                           |
+| --- | ------------------------------------------------------------------------------------------------------------------- |
+| E1  | **Two consecutive** adversarial verification rounds produce no new WRONG-SCORE defect class                         |
+| E2  | Every wrong-score defect ever found is pinned by a metamorphic or property test, not only an example test           |
+| E3  | The Section 9.2 fixture corpus exists and passes: at least one fixture per known defect class, plus clean baselines |
+| E4  | Mutation ratchet ≥ 75 on `packages/core`, with no extraction or scoring module below 60                             |
+| E5  | Zero open HONESTY_LOG entries classified **wrong-score** (see the classification below)                             |
+
+**The classification that makes this terminate.** Every open finding is exactly
+one of:
+
+- **wrong-score** — the tool reports a number that is wrong, or fabricates
+  evidence for it. Invisible characters inventing skill `r`; "as" yielding an
+  associate degree; a half-French CV scored on its English half. **These block.**
+- **false-refusal** — the tool declines to score something it could have read.
+  The terse-CV blind spot; a foreign-language quotation triggering the veto.
+  **These do not block:** the recruiter sees the refusal and the document in
+  front of them, so the failure is visible and recoverable.
+- **coverage-gap** — a real-world input the tool does not yet understand. UK
+  vocational qualifications, non-English degree names, `FIELD_VOCAB` being 14
+  US-skewed entries. **These do not block**, and are properly product scope
+  rather than soundness.
+
+Only the first class can harm a candidate silently, and only the first class
+gates the UI. Without this split, every gap blocks forever and E1 never fires.
+
+### Decision 2 — the slice is connected before further hardening
+
+The next unit of work is `packages/core` and `apps/server` actually meeting:
+document bytes → extracted text → stored candidate → extracted attributes →
+score → persisted match. No UI, no HTTP server, no launcher — a callable
+pipeline plus a runnable script, which is the smallest thing that makes "text
+in → score out" testable at all.
+
+**Why before more hardening, not after.** Three risks are currently unmeasured
+and unmeasurable, and every additional extraction fix is stacked on top of
+them:
+
+- **H-020 goes live on the first import.** `@matchdesk/core` resolves through
+  `main`/`exports` to `./dist/index.js`, and a failing compile leaves the
+  previous `dist` in place. Until something imports it, that is theoretical.
+- **H-008's matrix budget has never been measured.** 200 × 200 is 40,000 score
+  computations; Section 11 budgets the matrix at < 5 s from cache and says
+  nothing about the first fill. If the real number is minutes, that is an
+  architectural finding, and it is cheaper to learn now than after the UI is
+  built against the assumption.
+- **ADR-018 Decision 1's restated invariant** — monotonicity at text-in →
+  score-out — cannot be tested until the two halves are connected.
+
+**Cost, accepted:** this is product code written before hardening finishes,
+which is precisely what ADR-018 pushed back. The distinction is that this is
+not UI. It shows nothing to a recruiter and invites no trust; it exists to make
+the existing rigour reach a level it currently cannot see, and to convert three
+unmeasured risks into numbers.

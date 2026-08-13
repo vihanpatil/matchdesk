@@ -47,15 +47,16 @@ highlighted source evidence.
 Six of seven defect classes now fixed. Extraction hardening continues; **no UI
 work until it is done** (ADR-018).
 
-| Area                        | State                                                         |
-| --------------------------- | ------------------------------------------------------------- |
-| `packages/core`             | Taxonomy, extraction, cascade 1-3, eligibility, explanation   |
-| `apps/server`               | SQLite, migrations, repositories, dedup, file store, PDF/DOCX |
-| Metamorphic relations       | 18 in core + 2 language relations, all green (ADR-019)        |
-| Mutation testing            | Configured, baseline measured, ratchet at 64 (ADR-020)        |
-| `apps/web`                  | **NOT STARTED** — blocked behind extraction hardening         |
-| Embeddings (cascade step 4) | Deferred; typed seam exists                                   |
-| OCR                         | Deferred                                                      |
+| Area                        | State                                                          |
+| --------------------------- | -------------------------------------------------------------- |
+| `packages/core`             | Taxonomy, extraction, cascade 1-3, eligibility, explanation    |
+| `apps/server`               | SQLite, migrations, repositories, dedup, file store, PDF/DOCX  |
+| Metamorphic relations       | 18 in core + 2 language relations, all green (ADR-019)         |
+| Mutation testing            | Configured, baseline measured, ratchet at 64 (ADR-020)         |
+| Pipeline (core ↔ server)    | **Connected (ADR-023)** — document → score, 9 end-to-end tests |
+| `apps/web`                  | **NOT STARTED** — blocked behind extraction hardening          |
+| Embeddings (cascade step 4) | Deferred; typed seam exists                                    |
+| OCR                         | Deferred                                                       |
 
 **Measured baseline — `pnpm verify` run 2026-08-12, exit 0, tree gate-clean:**
 
@@ -65,9 +66,9 @@ work until it is done** (ADR-018).
 | `pnpm lint`          | pass                                                       |
 | `pnpm format:check`  | pass                                                       |
 | `pnpm license:audit` | pass (1 waiver: `duck@0.1.12`, ADR-016)                    |
-| `pnpm test:cov`      | **493 passed / 41 files**, none skipped, manifest complete |
+| `pnpm test:cov`      | **502 passed / 42 files**, none skipped, manifest complete |
 
-Coverage: **98.26% statements, 92.06% branches, 100% functions** repo-wide.
+Coverage: **98.14% statements, 92.12% branches, 100% functions** repo-wide.
 Mutation score **65.03%** is from the last `pnpm mutate` at `e778837` and has
 **not** been re-run since the D5/D6 work landed — treat it as stale, not as
 evidence. That gap is still the most important number in this document (§6).
@@ -159,6 +160,10 @@ accident:
   has explicitly chosen to keep Opus for this role.
 - **ADR-016** — license waivers are pinned to exact versions and require reading
   the actual LICENSE file. "Probably fine" is not evidence.
+- **ADR-023** — "extraction hardened" now has **measurable exit criteria
+  (E1-E5)** and a three-way severity split: only **wrong-score** findings block
+  the UI. **false-refusal** and **coverage-gap** findings do not. Without that
+  split every gap blocks forever and the gate never opens.
 
 ---
 
@@ -168,9 +173,9 @@ accident:
 | ----- | --------------------------------------------- | ------------------------------------------------------------------------ |
 | H-002 | Cross-machine determinism not guaranteed      | Limits C4; mitigated by 6dp quantization, not solved                     |
 | H-007 | Section 7 LLM validator can't do what's asked | Catches fabricated entities, not fabricated relations                    |
-| H-008 | OCR + matrix budgets unmeasured               | Section 11 numbers may be unachievable                                   |
+| H-008 | OCR budget unmeasured (matrix half CLOSED)    | Matrix first fill measured at 0.34 s (H-046). OCR + embeddings untouched |
 | H-015 | `--no-verify` bypasses hooks                  | Unfixable client-side; CI is the backstop                                |
-| H-020 | Stale `dist/` survives a failing compile      | **Goes live when `apps/server` imports `@matchdesk/core`**               |
+| H-020 | ~~Stale `dist/` survives a failing compile~~  | **CLOSED** — went live on the first import, mitigated + verified (H-047) |
 | H-033 | ~~Degree guard context-window dependent~~     | **CLOSED** — lower-case "as" rejected; pinned by R10 (H-042)             |
 | H-034 | ~~Invisible characters~~                      | **CLOSED** — they FABRICATED skills, not just broke extraction (H-042)   |
 | H-036 | **607 mutation survivors**                    | `explain.ts` 28.93% — the recruiter-facing reasoning is unverified       |
@@ -250,18 +255,23 @@ wrong numbers invites trust the tool has not earned.
    characters FABRICATE skills rather than merely breaking extraction, the
    lower-case word "as" yields an associate degree, and the ADR-022 veto
    missed Danish/Norwegian/Swedish. All three fixed (H-042, H-043).
-3. **Re-run the Opus adversarial verifier** over the hardened slice (ADR-015).
-   It falsified the previous two gate claims and produced H-028. Do not skip it.
-4. **Re-run `pnpm mutate`** — the 65.03% baseline predates D5/D6 and is stale.
+3. ~~Wire `core` ↔ `apps/server`.~~ **Done (ADR-023)** — there had never been a
+   path from a document to a score (H-045). Also closed H-020 (H-047) and the
+   matrix half of H-008 (H-046).
+4. **Re-run the Opus adversarial verifier** over the hardened slice (ADR-015),
+   now judged against **ADR-023's exit criteria E1-E5** rather than against an
+   undefined notion of "hardened". Only wrong-score findings block the UI;
+   false-refusals and coverage-gaps do not.
+5. **Re-run `pnpm mutate`** — the 65.03% baseline predates D5/D6 and is stale.
    Then **kill survivors, ratcheting the threshold up as they fall.** Order by
    human impact: `explain.ts` (28.93%) → `certifications.ts` (49.66%) →
    `skills.ts` (55.60%) → `education.ts` (65.47%). Note `experience.ts` also
    regressed to 84% branch coverage when D5 landed (H-040).
-5. **Section 9.2 fixture corpus**, ~12 focused fixtures (ADR-018): one per known
-   defect class plus clean baselines.
-6. **Then** `apps/web`: Jobs, Candidates, Shortlist. React 19 + Vite +
+6. **Section 9.2 fixture corpus**, ~12 focused fixtures (ADR-018/E3): one per
+   known defect class plus clean baselines.
+7. **Then** `apps/web`: Jobs, Candidates, Shortlist. React 19 + Vite +
    Tailwind 4 + Radix, TanStack Query/Table.
-7. Fastify API wiring core to web; launcher script (ADR-013); then the remaining
+8. Fastify API over the pipeline; launcher script (ADR-013); then the remaining
    directive phases (matrix, PDF report, optional LLM narrative, hardening).
 
 ---

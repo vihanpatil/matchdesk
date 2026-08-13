@@ -1327,3 +1327,110 @@ was left untouched at 493.
 that what is listed still exists. The floor guard blocks the accident that
 actually happened; a manifest deliberately edited down by hand would still
 pass.
+
+---
+
+## 2026-08-12 — The slice was never end-to-end
+
+### H-045 · `apps/server` had never imported `@matchdesk/core`
+
+**Severity:** the central claim about the slice was false, and nothing in the
+repo contradicted it.
+
+Found by re-assessing scope rather than by a failing test. ADR-018 adopts the
+verifier's summary verbatim: _"The slice proves the pipeline end-to-end but not
+the extraction."_ Checked:
+
+```
+apps/web                        does not exist
+apps/server HTTP server         none, no entry point
+start script / bin              none
+apps/ calling scoreCandidate    nothing, ever
+```
+
+`@matchdesk/core` is declared in `apps/server/package.json` and was never
+imported. **There was no path from a document to a score, and there never had
+been.** What was verified end-to-end was `packages/core` alone and
+`apps/server` alone.
+
+This is a different failure from the recurring one. H-004, H-013, H-028 and
+H-036 are all _a green measurement over too small a set_. This is **a claim
+nobody measured at all** — carried forward through an ADR, a verification
+round, and 44 log entries, because every test that could have contradicted it
+tested one half of the system.
+
+Fixed by `apps/server/src/pipeline/pipeline.ts` and nine end-to-end tests that
+run a real fixture document through extraction, storage, attribute extraction,
+scoring and persistence.
+
+**What connecting it immediately exposed**, none of which was visible before:
+
+1. **`matches` has a foreign key to `jobs(id)`, and the core `Job` is a
+   different type from the stored job** that happens to share a name. Scoring
+   against a spec whose id is not a real job row fails at insert. Correct
+   behaviour — a score referencing no job is traceable to nothing — but it
+   means the two `Job`s must never be confused, which no test could previously
+   have shown.
+2. **ADR-006 was enforceable at last.** It is marked NOT IMPLEMENTED with the
+   reason "nothing in `apps/server` reads the stored `language` column". Now
+   something does, and the refusal has effect on a _score_ rather than only on
+   a parse status.
+3. **A skip is not a zero.** `scoreJobAgainstCandidates` omits unreadable
+   candidates rather than scoring them 0. A zero is a claim about a person; a
+   skip says we could not read their document.
+
+### H-046 · H-008's matrix fear was wrong by four orders of magnitude — for the path that exists
+
+**Severity:** open risk closed, with an explicit boundary on the claim.
+
+H-008 estimated the 200 × 200 first fill at "roughly 6–7 minutes" and flagged
+that it had never been measured. Measured (`scripts/measure-matrix.mjs`):
+
+```
+Extraction   200 documents, once each   152 ms    (0.76 ms/document)
+Scoring      40,000 pairs, reused       0.18 s    (0.005 ms/pair)
+FIRST FILL                              0.34 s
+```
+
+**0.34 seconds, not 6–7 minutes.**
+
+**The boundary on that number, which matters more than the number.** This is
+the RULE-BASED cascade only. H-008's estimate was derived from the directive's
+"1 job × 200 candidates < 2 s" budget, which assumes embeddings — cascade step
+4, deferred, not built. When embeddings land, per-pair cost is dominated by
+model inference and this measurement tells you nothing about it. **OCR remains
+entirely unmeasured** and is the other half of H-008. The matrix half of H-008
+is closed; the OCR half is not, and neither is the embedding case.
+
+**A real design constraint fell out of it.** Re-extracting per pair — exactly
+what a loop over `scoreStoredPair` does — costs 0.133 ms/pair versus 0.005,
+extrapolating to 5.3 s: **15.8× slower**. Extraction dominates scoring by
+~150× per operation. Both are fast enough today; the ratio is the finding,
+because it only grows once inference joins the cascade. Hence
+`scoreJobAgainstCandidates`, plus a test asserting the batch path and the
+single path produce identical results, so the fast path cannot quietly become
+a second engine.
+
+### H-047 · H-020 went live as predicted, and is now mitigated
+
+**Severity:** was dormant, became real on the first import, closed.
+
+H-020 recorded that a stale `dist/` survives a failing compile, and that it
+"becomes live the moment `apps/server` imports `@matchdesk/core`". That import
+now exists. `package.json` resolves the package to `./dist/index.js`, so a
+failing compile leaving the previous build in place means a running system
+silently executing superseded scoring code — a C4 determinism hazard with no
+symptom.
+
+`pnpm typecheck` now runs `tsc --build --clean` before building, so a failed
+compile leaves NO output rather than stale output. Verified by breaking the
+build on purpose:
+
+```
+introduce a type error in packages/core/src/numeric/round.ts
+$ pnpm typecheck        -> exit 2
+$ ls packages/core/dist/index.js -> absent
+```
+
+An import then fails loudly instead of succeeding against last week's code.
+Prediction recorded in H-020, fired exactly as written, closed with evidence.
