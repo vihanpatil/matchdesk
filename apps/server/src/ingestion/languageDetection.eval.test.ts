@@ -260,6 +260,19 @@ const HELD_OUT_NON_ENGLISH_CVS: Record<string, string> = {
  *  description left in the candidate's first language. */
 const FRENCH_PARAGRAPH = `Elle a travaillé pendant six ans dans un service de cardiologie où elle encadrait les infirmières nouvellement diplômées. Son expérience comprend la gestion des soins postopératoires et la coordination avec les médecins consultants du service.`;
 
+/** One paragraph per covered language, each long enough to clear the segment
+ *  floor, for the metamorphic relation below. */
+const NON_ENGLISH_PARAGRAPHS: Record<string, string> = {
+  fr: FRENCH_PARAGRAPH,
+  de: `Sie arbeitete sechs Jahre lang in einer kardiologischen Abteilung und betreute dort neu ausgebildete Pflegekräfte. Ihre Erfahrung umfasst die postoperative Versorgung und die Zusammenarbeit mit den behandelnden Ärzten der Station.`,
+  es: `Trabajó durante seis años en un servicio de cardiología donde supervisaba a las enfermeras recién tituladas. Su experiencia incluye la gestión de los cuidados postoperatorios y la coordinación con los médicos consultores del servicio.`,
+  it: `Ha lavorato per sei anni in un reparto di cardiologia dove seguiva le infermiere appena diplomate. La sua esperienza comprende la gestione delle cure postoperatorie e il coordinamento con i medici consulenti del reparto.`,
+  nl: `Zij werkte zes jaar op een afdeling cardiologie waar zij pas afgestudeerde verpleegkundigen begeleidde. Haar ervaring omvat het beheer van de postoperatieve zorg en de samenwerking met de behandelend artsen van de afdeling.`,
+  da: `Hun arbejdede i seks år på en kardiologisk afdeling, hvor hun vejledte nyuddannede sygeplejersker. Hendes erfaring omfatter håndtering af postoperativ pleje og samarbejde med afdelingens behandlende læger.`,
+  no: `Hun arbeidet i seks år ved en kardiologisk avdeling der hun veiledet nyutdannede sykepleiere. Hennes erfaring omfatter håndtering av postoperativ pleie og samarbeid med avdelingens behandlende leger.`,
+  sv: `Hon arbetade i sex år på en kardiologisk avdelning där hon handledde nyutexaminerade sjuksköterskor. Hennes erfarenhet omfattar hantering av postoperativ vård och samarbete med avdelningens behandlande läkare.`,
+};
+
 describe('held-out corpus — the detector outside the domain it was built on', () => {
   it('classifies all ten held-out English CVs as English, across ten unrelated professions', () => {
     const misclassified = Object.entries(HELD_OUT_ENGLISH_CVS)
@@ -307,11 +320,52 @@ describe('mixed-language veto — held-out validation of the 15-word floor (ADR-
     expect(findNonEnglishSegments(oneFrenchParagraph).hasNonEnglishSegment).toBe(true);
   });
 
+  it('R-L1 · appending ANY non-English paragraph to ANY English CV leaves it unscoreable', () => {
+    // A metamorphic relation, not an example: across every combination of the
+    // ten held-out English CVs and eight non-English paragraphs, adding text
+    // we cannot read must never leave the document in a scoreable state. No
+    // expected value is authored anywhere — the relation is "adding
+    // unreadable text cannot make a document readable".
+    //
+    // "Unscoreable" is the disjunction extractText acts on: either the
+    // whole-document verdict is already not-English, or the segment veto
+    // fires. Either one refuses; only both failing lets the document score.
+    const failures: string[] = [];
+
+    for (const [cvLabel, cv] of Object.entries(HELD_OUT_ENGLISH_CVS)) {
+      for (const [langLabel, paragraph] of Object.entries(NON_ENGLISH_PARAGRAPHS)) {
+        const mixed = `${cv}\n${paragraph}`;
+        const refusedOutright = detectLanguageHeuristic(mixed).isEnglish === false;
+        const vetoed = findNonEnglishSegments(mixed).hasNonEnglishSegment;
+        if (!refusedOutright && !vetoed) failures.push(`${cvLabel} + ${langLabel}`);
+      }
+    }
+
+    expect(failures).toEqual([]);
+  });
+
+  it('R-L2 · the veto is monotone: removing the non-English passage makes the document scoreable again', () => {
+    // The other direction, which stops the relation above from being
+    // satisfied by a detector that simply refuses everything.
+    const failures: string[] = [];
+
+    for (const [cvLabel, cv] of Object.entries(HELD_OUT_ENGLISH_CVS)) {
+      const scoreable =
+        detectLanguageHeuristic(cv).isEnglish === true &&
+        !findNonEnglishSegments(cv).hasNonEnglishSegment;
+      if (!scoreable) failures.push(cvLabel);
+    }
+
+    expect(failures).toEqual([]);
+  });
+
   it('KNOWN BLIND SPOT: abstains entirely on terse CVs, so a terse bilingual CV still passes', () => {
-    // Five of the ten held-out CVs are terse enough that no segment reaches
-    // the floor. The veto narrows the C7 gap; it does not close it. Asserted
-    // as current behaviour so the limit is a known number, not a discovery
-    // (HONESTY_LOG H-041).
+    // FOUR of the ten held-out CVs are terse enough that no segment reaches
+    // the floor — down from five once paragraph granularity was added
+    // (`paralegal_mixed_shape` has one line of two short sentences, which is
+    // judgeable as a paragraph and was not as sentences). The veto narrows
+    // the C7 gap; it does not close it. Asserted as current behaviour so the
+    // limit is a known number, not a discovery (HONESTY_LOG H-041).
     const silent = Object.entries(HELD_OUT_ENGLISH_CVS)
       .filter(([, cv]) => findNonEnglishSegments(cv).judgedSegmentCount === 0)
       .map(([label]) => label);
@@ -319,7 +373,6 @@ describe('mixed-language veto — held-out validation of the 15-word floor (ADR-
       'chef_terse',
       'electrician_terse',
       'logistics_headers',
-      'paralegal_mixed_shape',
       'driver_very_terse',
     ]);
   });

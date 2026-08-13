@@ -296,10 +296,24 @@ export function detectLanguageHeuristic(text: string): LanguageDetectionResult {
  */
 const MIN_WORDS_FOR_SEGMENT_JUDGEMENT = 15;
 
-/** Segment boundaries: blank/new lines, or sentence-ending punctuation. CV
- *  structure is line-oriented, and a code-switched block is a paragraph or a
- *  run of sentences — never half a sentence. */
-const SEGMENT_BOUNDARY = /\n+|(?<=[.!?])\s+/;
+/**
+ * Segments are taken at TWO granularities and both are judged.
+ *
+ * Sentence granularity alone is too fine, and the relation `R-L1` in the eval
+ * file caught it: a two-sentence Danish, Norwegian or Swedish paragraph
+ * splits into 13- and 14-word sentences, both of which fall *below* the word
+ * floor and are therefore never judged — even though each is correctly
+ * classified non-English when asked, and the 27-word paragraph they form is
+ * caught easily. Fragmenting the evidence below the floor discarded it.
+ *
+ * Paragraph granularity alone is too coarse: a single foreign sentence inside
+ * an otherwise-English paragraph is diluted by its neighbours.
+ *
+ * Judging both and vetoing on either is strictly more sensitive than either
+ * one, and stays veto-only, so it cannot introduce a false English verdict.
+ */
+const PARAGRAPH_BOUNDARY = /\n+/;
+const SENTENCE_BOUNDARY = /\n+|(?<=[.!?])\s+/;
 
 export interface NonEnglishSegment {
   /** The offending text, trimmed. */
@@ -328,14 +342,14 @@ interface TextSegment {
   readonly end: number;
 }
 
-/** Splits into segments while keeping offsets into the original text valid.
+/** Splits on one boundary while keeping offsets into the original text valid.
  *  Offsets are recovered by scanning forward rather than by summing lengths,
  *  so the separators the split consumed cannot shift them. */
-function segmentsOf(text: string): TextSegment[] {
+function splitWithOffsets(text: string, boundary: RegExp): TextSegment[] {
   const found: TextSegment[] = [];
   let cursor = 0;
 
-  for (const piece of text.split(SEGMENT_BOUNDARY)) {
+  for (const piece of text.split(boundary)) {
     const trimmed = piece.trim();
     if (trimmed.length === 0) continue;
 
@@ -347,6 +361,21 @@ function segmentsOf(text: string): TextSegment[] {
   }
 
   return found;
+}
+
+/** Segments at both granularities, de-duplicated by span so a single-sentence
+ *  paragraph is judged once rather than twice. */
+function segmentsOf(text: string): TextSegment[] {
+  const bySpan = new Map<string, TextSegment>();
+
+  for (const segment of [
+    ...splitWithOffsets(text, PARAGRAPH_BOUNDARY),
+    ...splitWithOffsets(text, SENTENCE_BOUNDARY),
+  ]) {
+    bySpan.set(`${String(segment.start)}:${String(segment.end)}`, segment);
+  }
+
+  return [...bySpan.values()].sort((a, b) => a.start - b.start || a.end - b.end);
 }
 
 /**
