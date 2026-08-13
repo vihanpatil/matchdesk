@@ -8,7 +8,7 @@ code is right and this file is a bug** — fix it.
 recording this file follows it). Working tree clean, `pnpm verify` exit 0,
 re-run twice on this date — see H-058 before quoting any branch-coverage figure.
 
-**Current work: the E3 fixture corpus, Phase 1 of 6 complete.** The phase plan
+**Current work: the E3 fixture corpus, Phases 1-2 of 6 complete.** The phase plan
 lives outside this repo in the user's private notes; the phases are
 (1) ADR-025 + ADR-026, (2) fixture generator, (3) ~12 text fixtures,
 (4) ~5 binary + refusal fixtures → **E3 MET**, (5) adversarial round 1,
@@ -76,17 +76,18 @@ work until it is done** (ADR-018).
 | `pnpm lint`          | pass                                                       |
 | `pnpm format:check`  | pass                                                       |
 | `pnpm license:audit` | pass (1 waiver: `duck@0.1.12`, ADR-016)                    |
-| `pnpm test:cov`      | **729 passed / 42 files**, none skipped, manifest complete |
+| `pnpm test:cov`      | **746 passed / 43 files**, none skipped, manifest complete |
 
-Coverage: **98.77% statements, ~93.1-93.2% branches, 100% functions** repo-wide.
-**The branch figure is a range on purpose (H-058):** no `fast-check` seed is
-pinned, so property tests reach a slightly different branch set each run —
-618/664 and 619/664 were both observed on 2026-08-13 from an unchanged tree.
-Do not quote it as an exact number. Mutation score **80.42%** (re-run
-2026-08-13, ratchet raised 64 → 79); mutation was **not** re-run on 2026-08-13
-after Phase 1, which changed no source. Every extraction and scoring module
-clears the E4 floor of 60; the weakest is `experience.ts` at 68.50%.
-Survivors 629 → 378 (H-057).
+Coverage after Phase 2: **98.90% statements, ~93.1-93.4% branches, 100%
+functions** repo-wide. **The branch figure is a range on purpose (H-058):** no
+`fast-check` seed is pinned, so property tests reach a slightly different branch
+set each run — 638/684 and 639/684 were both observed on 2026-08-13 from an
+unchanged tree. Do not quote it as an exact number. Mutation score **80.42%**
+(measured 2026-08-13, ratchet raised 64 → 79); mutation has **not** been re-run
+since, and Phase 2 added `scripts/lib/fixture-docs.mjs`, which is **outside**
+Stryker's `packages/core` scope and therefore carries no mutation number at all.
+Every extraction and scoring module clears the E4 floor of 60; the weakest is
+`experience.ts` at 68.50%. Survivors 629 → 378 (H-057).
 
 **An earlier revision of this section claimed the tree did not typecheck and
 that D6's refusal gate was unimplemented. Both were false — see H-037.** Never
@@ -205,6 +206,9 @@ accident:
 | H-053 | `<degree> of <field>` is ambiguous            | "Associate of Engineering" has the same shape as a real degree           |
 | H-056 | `roundHalfUp` bound breaks above ~1e9         | Outside the scoring domain; do NOT reuse this function elsewhere         |
 | H-058 | Branch coverage not reproducible run to run   | No `fast-check` seed pinned. Every recorded figure is ±1 branch minimum  |
+| H-059 | Fixture determinism needed 3 fixes, not 1     | `docx` SILENTLY IGNORES `created`/`modified`; only `checkJs` caught it   |
+| H-060 | A negative test that could not fire           | 21-byte buffer never entered the scan it tested. H-052's shape again     |
+| H-061 | `PDFDocument.load` restamps dates on read     | Defaults `updateMetadata: true`. Assert with it OFF, never on raw bytes  |
 | D7    | audit_log `INSERT OR REPLACE` bypass          | Integrity defect, not wrong-score — E2 does not apply. Still open        |
 | H-044 | Manifest completeness is unverifiable         | Floor guard blocks the accident; a hand-edited manifest still passes     |
 
@@ -313,21 +317,35 @@ wrong numbers invites trust the tool has not earned.
    pinning would cost the property that found the `Rémi Dubois` defect.
    **The audit passing with both packages installed is still a PREDICTION**
    until Phase 2 runs it.
-9. **Section 9.2 fixture corpus (E3)** — Phases 2-4. Generator
-   (`scripts/build-fixtures.mjs`, deterministic, byte-identical on
-   regeneration, timestamps suppressed) → ~12 text fixtures, one per known
-   wrong-score defect class plus a clean baseline → ~5 real PDF/DOCX fixtures
-   plus documented-refusal fixtures for known coverage gaps. Every fixture gets
-   **both** targeted per-defect assertions and a committed full snapshot.
-   **E3 is MET at the end of Phase 4.**
-10. **Adversarial rounds (E1)** — Phases 5-6. An independent Opus verifier that
+9. ~~Build the deterministic fixture generator.~~ **Done — Phase 2.**
+   `scripts/lib/fixture-docs.mjs`, 17 tests, **100% statements/branches/
+   functions/lines**. Byte-identical output verified across separate
+   processes. It took **three** fixes, not one (**H-059**): PDF info dates,
+   ZIP per-entry timestamps, and `docProps/core.xml` — where `docx@9.7.1`
+   **silently ignores `created`/`modified`**, caught only because
+   `tsconfig.scripts.json` sets `checkJs`. Also **H-060** (a negative test
+   whose buffer was too short to enter the scan it tested) and **H-061**
+   (`PDFDocument.load` defaults to `updateMetadata: true` and restamps dates
+   during the read). **ADR-026's audit prediction is discharged:** audit
+   passes, production deps still 33, no new waiver. The CLI is deferred to
+   Phase 3 — with no definitions it would be dead code.
+   **Phase 3 must design around this:** the same definition does NOT yield the
+   same text in both formats. Blank lines survive in DOCX and vanish in PDF.
+10. **Section 9.2 fixture corpus (E3)** — Phases 3-4. Generator
+    (`scripts/build-fixtures.mjs`, deterministic, byte-identical on
+    regeneration, timestamps suppressed) → ~12 text fixtures, one per known
+    wrong-score defect class plus a clean baseline → ~5 real PDF/DOCX fixtures
+    plus documented-refusal fixtures for known coverage gaps. Every fixture gets
+    **both** targeted per-defect assertions and a committed full snapshot.
+    **E3 is MET at the end of Phase 4.**
+11. **Adversarial rounds (E1)** — Phases 5-6. An independent Opus verifier that
     did not author the corpus, attacking the engine plus the corpus, triaged by
     ADR-023's three-way severity split. Two consecutive clean rounds meet E1;
     any wrong-score finding resets the counter to zero. If both find defects,
     **ADR-025 fires.**
-11. **Then** `apps/web`: Jobs, Candidates, Shortlist. React 19 + Vite +
+12. **Then** `apps/web`: Jobs, Candidates, Shortlist. React 19 + Vite +
     Tailwind 4 + Radix, TanStack Query/Table.
-12. Fastify API over the pipeline; launcher script (ADR-013); then the
+13. Fastify API over the pipeline; launcher script (ADR-013); then the
     remaining directive phases (matrix, PDF report, LLM narrative, hardening).
 
 ---

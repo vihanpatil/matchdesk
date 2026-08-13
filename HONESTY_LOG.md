@@ -1940,3 +1940,142 @@ and it stays a prediction until the Phase 2 commit runs the audit with them in
 the tree. An ADR is a decision, never evidence of implementation (H-025). If
 the audit fails in Phase 2, ADR-026 was wrong and the failure gets recorded
 here rather than quietly corrected.
+
+---
+
+## 2026-08-13 — Phase 2: the fixture generator
+
+### H-059 · "Generated fixtures are reproducible" was three separate assumptions, and two were wrong
+
+ADR-026 committed to byte-identical regeneration on the reasoning that a
+committed binary cannot be reviewed in a diff. That commitment turned out to
+require substantially more than pinning a date.
+
+Measured, same definition, separate processes 1.1 s apart:
+
+```
+PDF,  naive                        VARIES    (diff at byte 487, inside a compressed stream)
+PDF,  all four info dates pinned   STABLE
+DOCX, naive                        VARIES    (diff at byte 10)
+DOCX, ZIP timestamps pinned        STILL VARIES, and the LENGTH changed: 8633 / 8630 / 8632
+```
+
+**Three sources, and only the first was predicted.**
+
+1. **PDF info-dictionary dates.** Expected. `CreationDate`/`ModDate`, plus
+   `Producer`/`Creator`, which embed the pdf-lib version string and would make
+   a dependency bump look like a fixture change.
+
+2. **ZIP per-entry timestamps.** A .docx is a ZIP; byte 10 is the local file
+   header's DOS mod-time, written from the wall clock per entry by the
+   archiver. Nothing in the document model reaches it.
+
+3. **`docProps/core.xml`, and this is the one worth the entry.**
+   `docx@9.7.1`'s `IPropertiesOptions` has **no `created` or `modified` field
+   at all.** The `Document` constructor accepts them and discards them; the
+   library always writes `new Date()`. The first implementation passed
+   `created: FIXTURE_EPOCH, modified: FIXTURE_EPOCH`, read as obviously
+   correct, and did nothing.
+
+**What caught (3) is worth recording precisely, because it was nearly nothing.**
+`pnpm typecheck` flagged it — `TS2353: 'created' does not exist in type
+'IPropertiesOptions'` — but only because `tsconfig.scripts.json` sets
+`checkJs`. Build tooling is the kind of code that routinely sits untypechecked.
+Had it done so here, the fixtures would have looked deterministic in every test
+that generated twice inside one second, and started failing later for reasons
+that would have looked like flakiness.
+
+The empirical probe caught it independently. **Two detections, and the project
+should not congratulate itself on either** — the reason both existed is that
+the byte-comparison probe was written before the implementation was trusted.
+
+**Consequence:** because fixing (3) changes an entry's content length, patching
+timestamps in place is insufficient and the archive must be rebuilt. Entries
+are now written **STORED (uncompressed)**, which also removes any dependence on
+a compressor emitting identical bytes across zlib versions. Cost: a sample
+DOCX grows 8.6 KB → 26.5 KB. Irrelevant for a handful of fixtures, and stated
+rather than discovered.
+
+### H-060 · A negative test that could not fire, caught by one uncovered branch
+
+`readZipEntries` fails closed on a buffer with no End of Central Directory
+record, and a test asserted exactly that:
+
+```js
+expect(() => readZipEntries(Buffer.from('not a zip file at all'))).toThrow(...)
+```
+
+It passed. It also **never executed the search it was testing.** That string is
+21 bytes; an EOCD record is 22, so the scan's start index is negative and the
+loop body never runs. The function threw for the right reason by accident, and
+the test would have passed identically against a scan that was broken,
+unbounded, or absent.
+
+**This is H-052's lesson recurring in miniature: a negative result from a probe
+that cannot fire is not evidence.** It was found only because branch coverage
+on the new file sat at 95% and the one uncovered branch was chased rather than
+rounded up — an aggregate would have absorbed it silently, which is H-004's
+shape.
+
+Both cases are now tested separately: one buffer too short to scan, one long
+enough to scan and find nothing. `fixture-docs.mjs` is at **100% statements,
+branches, functions and lines** — with the standing caveat that this is
+coverage, not mutation, and the two are different numbers (H-036).
+
+### H-061 · The measuring instrument rewrote the thing it measured
+
+Asserting the PDF carried the fixed epoch failed with:
+
+```
+expected 2026-08-13T21:17:16.000Z to deeply equal 2020-01-01T00:00:00.000Z
+```
+
+against a file whose bytes were provably identical across three separate
+processes. Both facts were true. `PDFDocument.load()` defaults to
+`updateMetadata: true`, so it stamps the document it has just parsed with the
+current time before any caller can inspect it. The file was correct; the reader
+changed it during the read.
+
+An earlier version of the same assertion scanned the raw bytes for `D:2020`
+instead, and that was worse: pdf-lib writes the info dictionary inside an
+object stream (`/Type /ObjStm`), so the date is compressed and **no date string
+of any kind appears in the file.** That assertion would have failed for a
+correct document and passed for a document with no date at all, had it been
+written as a negation.
+
+**Rule this adds:** when asserting on a generated binary, assert through a real
+parse with the parser's mutating options disabled — not on the bytes, and not
+on a parse whose defaults are unexamined.
+
+### Phase 2 record
+
+`scripts/lib/fixture-docs.mjs` — deterministic PDF and DOCX generation, plus a
+minimal ZIP reader/writer, 17 tests, 100% coverage on all four metrics.
+`pnpm verify` exit 0, 746 tests, floor 729 → 746, manifest regenerated after a
+FULL run (a filtered run would have silently shrunk it — H-044).
+
+**ADR-026's prediction is now discharged as fact.** `pnpm license:audit` passes
+with both packages installed: production deps 33 (unchanged — the two are
+genuinely dev-only and do not reach the artifact), development deps 305, one
+pre-existing waiver, no new waiver required.
+
+**Scope not delivered, and why.** `scripts/build-fixtures.mjs` — the CLI that
+writes fixtures to disk for a human to open — is deferred to Phase 3. There
+are no fixture definitions yet, so it would iterate an empty list: untestable
+dead code committed to look complete. The generating library is what Phase 2
+promised and it is done.
+
+**A finding Phase 3 must design around, not a defect.** The same definition
+does NOT produce the same text in both formats:
+
+```
+PDF   "Alex Taylor\nProfessional Experience\nSenior Engineer, ..."
+DOCX  "Alex Taylor\n\n\n\nProfessional Experience\n\n\n\nSenior Engineer, ..."
+```
+
+Blank lines survive as empty paragraphs in DOCX and vanish entirely in PDF,
+because the PDF path draws no text for them and the extractor has no
+vertical-gap heuristic. Section detection reads structure, so a fixture cannot
+assume one expected text across both formats. Whether the PDF extractor
+_should_ infer a break from a vertical gap is a real question about
+`pdfExtractor.ts` and is **not** being answered here.

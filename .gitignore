@@ -28,3 +28,7 @@ playwright-report/
 # Mutation testing (ADR-020)
 .stryker-tmp/
 reports/
+
+# Generated fixture binaries (ADR-026). Derived from scripts/lib/fixture-docs.mjs
+# plus the committed definitions; regenerate rather than commit.
+fixtures/generated/

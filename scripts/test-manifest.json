@@ -729,6 +729,23 @@
     "scripts/lib/analyze-test-report.test.mjs :: test identities collects every id, sorted and deterministic",
     "scripts/lib/analyze-test-report.test.mjs :: test identities leaves paths outside the repo root intact",
     "scripts/lib/analyze-test-report.test.mjs :: test identities produces the same id regardless of where the repo lives on disk",
-    "scripts/lib/analyze-test-report.test.mjs :: test identities returns nothing for a structurally invalid report rather than throwing"
+    "scripts/lib/analyze-test-report.test.mjs :: test identities returns nothing for a structurally invalid report rather than throwing",
+    "scripts/lib/fixture-docs.test.mjs :: deterministic generation paginates rather than running text off the page",
+    "scripts/lib/fixture-docs.test.mjs :: deterministic generation pins every ZIP entry timestamp to 1980-01-01, not the wall clock",
+    "scripts/lib/fixture-docs.test.mjs :: deterministic generation produces byte-identical DOCX files across separate builds",
+    "scripts/lib/fixture-docs.test.mjs :: deterministic generation produces byte-identical PDFs across separate builds",
+    "scripts/lib/fixture-docs.test.mjs :: deterministic generation stamps the DOCX core properties with the fixed epoch",
+    "scripts/lib/fixture-docs.test.mjs :: deterministic generation stamps the PDF with the fixed epoch and not the current date",
+    "scripts/lib/fixture-docs.test.mjs :: readZipEntries fails closed throws after actually scanning a long buffer with no EOCD signature",
+    "scripts/lib/fixture-docs.test.mjs :: readZipEntries fails closed throws on a compression method it cannot decode",
+    "scripts/lib/fixture-docs.test.mjs :: readZipEntries fails closed throws when a central directory entry points at a non-local-header",
+    "scripts/lib/fixture-docs.test.mjs :: readZipEntries fails closed throws when a central directory header signature is wrong",
+    "scripts/lib/fixture-docs.test.mjs :: readZipEntries fails closed throws when the buffer is too short to hold an EOCD record at all",
+    "scripts/lib/fixture-docs.test.mjs :: writeZipDeterministic is insensitive to the order entries are supplied in",
+    "scripts/lib/fixture-docs.test.mjs :: writeZipDeterministic preserves content exactly, including non-ASCII",
+    "scripts/lib/fixture-docs.test.mjs :: writeZipDeterministic reads an archive larger than the maximum ZIP comment",
+    "scripts/lib/fixture-docs.test.mjs :: writeZipDeterministic refuses duplicate entry names",
+    "scripts/lib/fixture-docs.test.mjs :: writeZipDeterministic round-trips entries through readZipEntries",
+    "scripts/lib/fixture-docs.test.mjs :: writeZipDeterministic writes an empty archive without an entry"
   ]
 }
