@@ -162,3 +162,137 @@ describe('extractYearsExperience', () => {
     expect(attrs.every((a) => a.isExplicitStatement !== true)).toBe(true);
   });
 });
+
+/**
+ * BOUNDARY AND VOCABULARY COVERAGE (ADR-023 E4 / H-057).
+ *
+ * Mutation testing left 97 survivors here, clustered in three places: the
+ * NON_EMPLOYMENT_CONTEXT quantity-word list (15 mutants — every word could be
+ * deleted with no test noticing), the date-parsing month/year guards, and the
+ * plausibility bounds. Each one decides how many years of experience a real
+ * candidate is credited with.
+ */
+describe('quantity vocabulary is pinned, word by word (H-028 D5c / H-057)', () => {
+  // Every word in NON_EMPLOYMENT_CONTEXT exists to stop a quantity range being
+  // read as employment ("budget of 2000 - 2024"). A mutant deleting any single
+  // word silently re-opens D5c for CVs that happen to use that word — and
+  // "increased revenue 2015 - 2019" is an utterly ordinary CV line.
+  const QUANTITY_WORDS = [
+    'budget',
+    'users',
+    'revenue',
+    'sales',
+    'population',
+    'customers',
+    'subscribers',
+    'followers',
+    'downloads',
+    'requests',
+    'transactions',
+    'records',
+    'dollars',
+    'USD',
+    'GBP',
+    'EUR',
+    'points',
+    'score',
+    'rating',
+    'impressions',
+    'visitors',
+    'clicks',
+    'views',
+    'installs',
+    'accounts',
+    'licenses',
+    'percent',
+    'shares',
+    'units',
+  ];
+
+  it.each(QUANTITY_WORDS)(
+    '"%s" near a bare year range prevents it counting as employment',
+    (word) => {
+      const attrs = extractYearsExperience(`Grew ${word} from 2000 - 2024.`, REF);
+      expect(attrs.some((a) => a.value.includes('2000'))).toBe(false);
+    },
+  );
+
+  it('applies the quantity guard when the word comes AFTER the range too', () => {
+    const attrs = extractYearsExperience('Handled 2000 - 2024 transactions.', REF);
+    expect(attrs.some((a) => a.value.includes('2000'))).toBe(false);
+  });
+
+  it('does NOT apply the quantity guard to an unambiguous month-qualified range', () => {
+    // "Jan 2019 - Mar 2022" is a date range whatever surrounds it; only a BARE
+    // year range is ambiguous enough to need the guard. A mutant widening the
+    // guard would silently delete real employment.
+    const attrs = extractYearsExperience(
+      'Managed a budget of 5M. Senior Engineer, Jan 2019 - Mar 2022',
+      REF,
+    );
+    expect(attrs.some((a) => a.value.includes('Jan 2019'))).toBe(true);
+  });
+});
+
+describe('date parsing boundaries (H-057)', () => {
+  it('accepts month 1 and month 12, and rejects month 0 and month 13', () => {
+    // Pins `month >= 1 && month <= 12` against every off-by-one mutation.
+    expect(extractYearsExperience('Engineer 1/2015 - 12/2018', REF).length).toBeGreaterThan(0);
+    expect(extractYearsExperience('Engineer 0/2015 - 12/2018', REF)).toEqual([]);
+    expect(extractYearsExperience('Engineer 1/2015 - 13/2018', REF)).toEqual([]);
+  });
+
+  it('KNOWN LIMITATION: a month name is not word-boundary anchored at its start', () => {
+    // `MONTH_PATTERN` has no leading \b, so a word ENDING in a month name and
+    // immediately followed by a year parses as a date: "Smarch 2015" matches
+    // "march 2015". Asserted as CURRENT BEHAVIOUR, not endorsed.
+    //
+    // Impact measured before recording it as low rather than assuming: it
+    // needs the month to be the word's final letters AND a year to follow
+    // immediately. Realistic near-misses do NOT trigger it — "Hollis
+    // Marchetti 2015 - Dec 2018" matches the BARE year "2015", which is
+    // intended behaviour, because "march" there is followed by "etti".
+    // A lost space in PDF extraction ("ProjectMarch 2015") is the plausible
+    // case, and there the match is arguably correct.
+    const attrs = extractYearsExperience('Engineer, Smarch 2015 - Dec 2018', REF);
+    expect(attrs[0]?.value).toBe('march 2015 - Dec 2018');
+  });
+
+  it('a name containing a month does not shift which token starts the range', () => {
+    // The realistic version of the case above: the range starts at the bare
+    // year, not inside the surname.
+    const attrs = extractYearsExperience('Hollis Marchetti 2015 - Dec 2018', REF);
+    expect(attrs[0]?.value).toBe('2015 - Dec 2018');
+  });
+
+  it('rejects a range whose end precedes its start', () => {
+    expect(extractYearsExperience('Engineer, Jan 2020 - Jan 2015', REF)).toEqual([]);
+  });
+
+  it('rejects a zero-length range', () => {
+    expect(extractYearsExperience('Engineer, Jan 2020 - Jan 2020', REF)).toEqual([]);
+  });
+});
+
+describe('plausibility bounds (H-057)', () => {
+  it('rejects a range longer than the maximum plausible career', () => {
+    // Pins `years > MAX_PLAUSIBLE_YEARS` against `>=` and `<` mutations: a
+    // 61-year single role is noise (usually a typo'd year), a 59-year one is
+    // implausible but is not this guard's business to reject.
+    expect(extractYearsExperience('Engineer, Jan 1950 - Jan 2020', REF)).toEqual([]);
+  });
+
+  it('accepts a long but plausible career', () => {
+    const attrs = extractYearsExperience('Engineer, Jan 1980 - Jan 2020', REF);
+    expect(attrs.length).toBeGreaterThan(0);
+  });
+
+  it('rejects an explicit claim beyond the plausible maximum', () => {
+    expect(extractYearsExperience('I have 99 years of experience.', REF)).toEqual([]);
+  });
+
+  it('accepts an explicit claim at the low end', () => {
+    const attrs = extractYearsExperience('1 year of experience.', REF);
+    expect(attrs.length).toBeGreaterThan(0);
+  });
+});

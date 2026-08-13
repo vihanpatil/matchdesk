@@ -15,11 +15,11 @@
     "!packages/core/src/index.ts",
     "!packages/core/src/taxonomy/data.ts"
   ],
-  "_thresholdComment": "RATCHET, not an aspiration. `break` sits just below the measured baseline (65.03% on 2026-08-12), so the score can never get WORSE without failing the build. Raise it as survivors are killed; NEVER lower it without a HONESTY_LOG entry saying why. Setting it to an aspirational 75 would have blocked all work behind a 607-mutant backlog, which buys nothing.",
+  "_thresholdComment": "RATCHET, not an aspiration. `break` sits just below the measured score so it can never get WORSE without failing the build. Measured 65.03% on 2026-08-12 (break 64); re-measured 80.42% on 2026-08-13 after the E4 work, so break is now 79. Raise it as survivors fall; NEVER lower it without a HONESTY_LOG entry saying why. ADR-023 E4 requires >=75 overall with no extraction or scoring module below 60 \u2014 both now hold, the weakest module being experience.ts at 68.50%.",
   "thresholds": {
     "high": 90,
     "low": 70,
-    "break": 64
+    "break": 79
   },
   "timeoutMS": 20000,
   "concurrency": 4,

@@ -18,6 +18,9 @@ import {
   skillsSubscore,
   totalYearsExperience,
 } from './dimensions.js';
+import { ALIAS_SUBSCORE, EXACT_SUBSCORE, NONE_SUBSCORE, RELATED_SUBSCORE } from './cascade.js';
+import { SENIORITY_YEAR_THRESHOLDS } from './dimensions.js';
+import { DEGREE_LADDER, DIMENSION_IDS, SENIORITY_LADDER } from './types.js';
 import type { SkillRequirement } from './types.js';
 
 function skill(canonicalId: string, matchType: 'exact' | 'alias' = 'exact'): SkillAttribute {
@@ -252,5 +255,66 @@ describe('educationCertsSubscore', () => {
     const reqWithCert = { minDegreeLevel: 'bachelor' as const, requiredCertifications: ['pmp'] };
     expect(educationCertsSubscore(reqWithCert, metCerts)).toBe(1);
     expect(educationCertsSubscore(reqWithCert, unmetCerts)).toBeLessThan(1);
+  });
+});
+
+/**
+ * The ladders and the dimension list are DATA, and mutation testing showed
+ * they are unpinned: replacing any member with `""` survived (H-057). These
+ * arrays decide what a dimension is called in every explanation, what order
+ * seniority and degrees rank in, and therefore which candidate outranks which.
+ * A silent edit to one of them reorders people.
+ */
+describe('scoring vocabulary is pinned (H-057)', () => {
+  it('DIMENSION_IDS lists exactly the four scoring dimensions, in order', () => {
+    expect(DIMENSION_IDS).toEqual([
+      'skills',
+      'experience_relevance',
+      'seniority',
+      'education_certs',
+    ]);
+  });
+
+  it('SENIORITY_LADDER is ordered from least to most senior', () => {
+    expect(SENIORITY_LADDER).toEqual(['junior', 'mid', 'senior', 'lead', 'principal']);
+  });
+
+  it('DEGREE_LADDER is ordered from least to most advanced', () => {
+    expect(DEGREE_LADDER).toEqual([
+      'high_school',
+      'associate',
+      'bachelor',
+      'master',
+      'doctorate',
+      'professional',
+    ]);
+  });
+
+  it('SENIORITY_YEAR_THRESHOLDS maps every ladder level, with non-decreasing thresholds', () => {
+    // A moved threshold silently reclassifies a candidate's seniority; a
+    // MISSING one would make inferSeniorityLevel skip a level entirely.
+    let previous = -1;
+    for (const level of SENIORITY_LADDER) {
+      const threshold = SENIORITY_YEAR_THRESHOLDS[level];
+      expect(threshold).toBeGreaterThanOrEqual(previous);
+      previous = threshold;
+    }
+    expect(SENIORITY_YEAR_THRESHOLDS).toEqual({
+      junior: 0,
+      mid: 2,
+      senior: 5,
+      lead: 8,
+      principal: 12,
+    });
+  });
+
+  it('every cascade subscore constant is distinct and correctly ordered', () => {
+    // exact > alias > related > none is the entire premise of the cascade: a
+    // weaker kind of evidence must never score at least as high as a stronger
+    // one, or "exact match" stops meaning anything.
+    expect(EXACT_SUBSCORE).toBeGreaterThan(ALIAS_SUBSCORE);
+    expect(ALIAS_SUBSCORE).toBeGreaterThan(RELATED_SUBSCORE);
+    expect(RELATED_SUBSCORE).toBeGreaterThan(NONE_SUBSCORE);
+    expect(NONE_SUBSCORE).toBe(0);
   });
 });

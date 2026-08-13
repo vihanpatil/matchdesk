@@ -295,3 +295,109 @@ describe('extractEducation', () => {
     });
   });
 });
+
+/**
+ * VOCABULARY COVERAGE (ADR-023 E4 / H-057).
+ *
+ * Mutation testing found the whole `FIELD_VOCAB` alias table and much of the
+ * degree-pattern table unpinned: replacing an alias with `""`, or deleting an
+ * alias list outright, survived every test. These tables decide what degree a
+ * candidate is credited with and in what field — a silent edit to either
+ * changes what a real person is judged to hold, and the recruiter sees only
+ * the changed answer.
+ *
+ * Exhaustive over a FIXED, hand-curated vocabulary. That is not a substitute
+ * for a property test (the relations in ../metamorphic cover the behaviour
+ * that generalises); it is coverage of data whose every entry matters
+ * individually.
+ */
+describe('field vocabulary maps every alias to its canonical id (H-057)', () => {
+  const FIELD_ALIASES: readonly (readonly [string, string])[] = [
+    ['computer science', 'computer-science'],
+    ['cs', 'computer-science'],
+    ['computer engineering', 'computer-science'],
+    ['business administration', 'business-administration'],
+    ['business', 'business-administration'],
+    ['data science', 'data-science'],
+    ['electrical engineering', 'electrical-engineering'],
+    ['mechanical engineering', 'mechanical-engineering'],
+    ['information technology', 'information-technology'],
+    ['mathematics', 'mathematics'],
+    ['math', 'mathematics'],
+    ['economics', 'economics'],
+    ['econ', 'economics'],
+    ['finance', 'finance'],
+    ['marketing', 'marketing'],
+    ['psychology', 'psychology'],
+    ['biology', 'biology'],
+    ['chemistry', 'chemistry'],
+    ['physics', 'physics'],
+  ];
+
+  it.each(FIELD_ALIASES)('"%s" resolves to the field id "%s"', (alias, expectedId) => {
+    const found = extractEducation(`BSc in ${alias}`);
+    expect(found[0]?.field).toBe(expectedId);
+  });
+
+  it('is case-insensitive about the field name', () => {
+    expect(extractEducation('BSc in COMPUTER SCIENCE')[0]?.field).toBe('computer-science');
+    expect(extractEducation('BSc in Computer Science')[0]?.field).toBe('computer-science');
+  });
+
+  it('reports a null field for a subject outside the controlled vocabulary', () => {
+    // The vocabulary is deliberately small (ADR-007 forbids institutions).
+    // An unrecognised subject must yield NO field rather than a guess.
+    expect(extractEducation('BSc in Underwater Basket Weaving')[0]?.field).toBeNull();
+  });
+});
+
+describe('degree ladder is reachable at every level (H-057)', () => {
+  const LEVEL_EXAMPLES: readonly (readonly [string, string])[] = [
+    ['High School Diploma', 'high_school'],
+    ['high school', 'high_school'],
+    ['Associate of Science in Biology', 'associate'],
+    ['BSc Computer Science', 'bachelor'],
+    ['BEng', 'bachelor'],
+    ['BTech', 'bachelor'],
+    ['BCom', 'bachelor'],
+    ['BBA', 'bachelor'],
+    ['LLB Law', 'bachelor'],
+    ['MSc Data Science', 'master'],
+    ['MEng', 'master'],
+    ['MTech', 'master'],
+    ['MBA', 'master'],
+    ['MPhil', 'master'],
+    ['LLM', 'master'],
+    ['PhD Machine Learning', 'doctorate'],
+    ['DPhil', 'doctorate'],
+    ['EdD', 'doctorate'],
+    ['DSc', 'doctorate'],
+  ];
+
+  it.each(LEVEL_EXAMPLES)('"%s" is extracted as %s', (text, expectedLevel) => {
+    expect(extractEducation(text).map((d) => d.normalizedValue)).toContain(expectedLevel);
+  });
+
+  it('"high school" matches with or without the optional "diploma"', () => {
+    // The pattern makes " diploma" optional. A mutant deleting the optionality
+    // silently stops recognising a bare "High School" — the most common form
+    // on a CV that has no further qualification, i.e. exactly the candidates
+    // most affected by getting it wrong.
+    expect(extractEducation('High School').map((d) => d.normalizedValue)).toEqual(['high_school']);
+    expect(extractEducation('High School Diploma').map((d) => d.normalizedValue)).toEqual([
+      'high_school',
+    ]);
+  });
+
+  it('requires whitespace, not any character, between "high school" and "diploma"', () => {
+    // Pins `\s+` against a mutation to `\S+`: "high schoolXdiploma" is not a
+    // qualification.
+    expect(extractEducation('high schoolXdiploma').map((d) => d.normalizedValue)).toEqual([]);
+  });
+
+  it('accepts multiple spaces between the degree word and "degree"', () => {
+    expect(extractEducation("Associate's  degree").map((d) => d.normalizedValue)).toEqual([
+      'associate',
+    ]);
+  });
+});

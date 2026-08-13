@@ -216,3 +216,160 @@ describe('evaluateEligibility', () => {
     expect(evaluateEligibility(job, c)).toEqual(evaluateEligibility(job, c));
   });
 });
+
+/**
+ * UNMET-REASON CONTENT (ADR-023 E4 / H-057).
+ *
+ * Mutation testing showed every `dimension`, `label` and `reason` string in
+ * this module could be replaced with an empty string and no test noticed. An
+ * unmet must-have is the reason a candidate is placed in the ineligible group
+ * — the recruiter is shown that sentence as the justification for not
+ * shortlisting a real person. An empty or wrong one is not a cosmetic defect.
+ */
+describe('unmet requirement reasons are exact (H-057)', () => {
+  const candidateWith = (attributes: readonly ExtractedAttribute[]): Candidate => ({
+    id: 'c',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    attributes,
+  });
+
+  it('names the missing must-have skill, and tags it to the skills dimension', () => {
+    const job: Job = {
+      id: 'j',
+      skills: {
+        weight: 1,
+        requirements: [{ id: 'r', canonicalSkillId: 'rust', label: 'Rust', mustHave: true }],
+      },
+    };
+    const result = evaluateEligibility(job, candidateWith([]));
+
+    expect(result.eligible).toBe(false);
+    expect(result.unmet[0]?.dimension).toBe('skills');
+    expect(result.unmet[0]?.label).toBe('Rust');
+    expect(result.unmet[0]?.reason).toBe('Must-have skill "Rust" was not found.');
+  });
+
+  it('distinguishes "not found" from "only a related skill was found"', () => {
+    // The two sentences send a recruiter to different actions: one candidate
+    // has nothing, the other has adjacent evidence worth a human look. A
+    // mutant collapsing the ternary erases that difference.
+    const job: Job = {
+      id: 'j',
+      skills: {
+        weight: 1,
+        requirements: [
+          { id: 'r', canonicalSkillId: 'typescript', label: 'TypeScript', mustHave: true },
+        ],
+      },
+    };
+    const related = candidateWith(extractSkills('Skills: JavaScript'));
+    const result = evaluateEligibility(job, related);
+
+    expect(result.unmet[0]?.reason).toBe(
+      'Must-have skill "TypeScript" was not found; only a related skill was.',
+    );
+  });
+
+  it('states the required and found years for an unmet experience must-have', () => {
+    const job: Job = {
+      id: 'j',
+      experience: { weight: 1, requirement: { minYears: 10, mustHave: true } },
+    };
+    const years: YearsExperienceAttribute = {
+      kind: 'years_experience',
+      value: '3 years',
+      normalizedValue: '3',
+      confidence: 0.9,
+      sourceSpan: { start: 0, end: 7 },
+      years: 3,
+    };
+    const result = evaluateEligibility(job, candidateWith([years]));
+
+    expect(result.unmet[0]?.dimension).toBe('experience_relevance');
+    expect(result.unmet[0]?.reason).toBe('Requires at least 10 years of experience; found 3.');
+  });
+
+  it('states the required level for an unmet seniority must-have', () => {
+    const job: Job = {
+      id: 'j',
+      seniority: { weight: 1, requirement: { level: 'principal', mustHave: true } },
+    };
+    const result = evaluateEligibility(job, candidateWith([]));
+
+    expect(result.unmet[0]?.dimension).toBe('seniority');
+    expect(result.unmet[0]?.reason).toBe(
+      'Requires principal level or above, inferred from years of experience.',
+    );
+  });
+
+  it('states the required degree for an unmet education must-have', () => {
+    const job: Job = {
+      id: 'j',
+      educationCerts: {
+        weight: 1,
+        requirement: { minDegreeLevel: 'doctorate', mustHave: true },
+      },
+    };
+    const result = evaluateEligibility(job, candidateWith([]));
+
+    expect(result.unmet[0]?.dimension).toBe('education_certs');
+    expect(result.unmet[0]?.reason).toBe('Requires at least a doctorate degree.');
+  });
+
+  it('names the specific missing certification', () => {
+    const job: Job = {
+      id: 'j',
+      educationCerts: {
+        weight: 1,
+        requirement: {
+          minDegreeLevel: 'high_school',
+          requiredCertifications: ['pmp'],
+          mustHave: true,
+        },
+      },
+    };
+    const edu: EducationAttribute = {
+      kind: 'education',
+      value: 'High School',
+      normalizedValue: 'high_school',
+      confidence: 0.85,
+      sourceSpan: { start: 0, end: 11 },
+      degreeLevel: 'high_school',
+      field: null,
+    };
+    const result = evaluateEligibility(job, candidateWith([edu]));
+
+    expect(result.unmet[0]?.label).toBe('pmp');
+    expect(result.unmet[0]?.reason).toBe('Requires the "pmp" certification.');
+  });
+
+  it('treats a candidate with NO degree as below every degree requirement', () => {
+    // Pins `candidateDegree === null ? -1 : ...` — a mutant returning +1 would
+    // rank "no degree at all" above the entire ladder and make every
+    // degree must-have trivially satisfied.
+    const job: Job = {
+      id: 'j',
+      educationCerts: {
+        weight: 1,
+        requirement: { minDegreeLevel: 'high_school', mustHave: true },
+      },
+    };
+    const result = evaluateEligibility(job, candidateWith([]));
+
+    expect(result.eligible).toBe(false);
+    expect(result.unmet.length).toBeGreaterThan(0);
+  });
+
+  it('an alias-level skill match SATISFIES a must-have, a related one does not', () => {
+    // Pins the `>= ALIAS_SUBSCORE` cutoff in both directions.
+    const job: Job = {
+      id: 'j',
+      skills: {
+        weight: 1,
+        requirements: [{ id: 'r', canonicalSkillId: 'javascript', label: 'JS', mustHave: true }],
+      },
+    };
+    const viaAlias = candidateWith(extractSkills('Skills: js'));
+    expect(evaluateEligibility(job, viaAlias).eligible).toBe(true);
+  });
+});

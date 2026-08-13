@@ -1791,3 +1791,68 @@ is that this one is written down with the exact failing input.**
 
 Open: if this function is ever reused outside scoring — a report, a currency
 figure, an export — the bound does not hold and the caller must not assume it.
+
+---
+
+## 2026-08-13 — E4 met
+
+### H-057 · Mutation score 65.03% → 80.42%; every module clears the floor
+
+**Severity:** closes ADR-023 E4. Numbers, not adjectives.
+
+E4 requires ≥75% on `packages/core` with no extraction or scoring module below 60. The baseline was 65.03% (stale since `e778837`); a fresh run before any
+work measured 67.45%, with four modules under the floor. After this round:
+
+| Module              | baseline | before | after      |
+| ------------------- | -------- | ------ | ---------- |
+| `explain.ts`        | 28.93%   | 33.97% | **73.68%** |
+| `scoring/types.ts`  | —        | 44.44% | **100%**   |
+| `certifications.ts` | 49.66%   | 51.35% | **72.97%** |
+| `skills.ts`         | 55.60%   | 59.36% | **83.67%** |
+| `eligibility.ts`    | 75.53%   | 79.79% | **94.68%** |
+| `education.ts`      | 65.47%   | 67.64% | **77.55%** |
+| `experience.ts`     | 64.21%   | 63.74% | **68.50%** |
+| **All files**       | 65.03%   | 67.45% | **80.42%** |
+
+Survivors 629 → 378. Test count 550 → 729. Total mutants unchanged at 1951,
+which confirms this was test work: no source was altered to move the number.
+
+**Ratchet raised 64 → 79**, just under the measured score, per ADR-020's rule.
+
+**What was actually unpinned, since the percentages understate it:**
+
+- **`explain.ts`** had 138 survivors in the module that writes what a recruiter
+  reads to justify a decision. Nothing asserted which evidence span attaches to
+  which dimension — a mutant swapping them would show a highlighted DEGREE as
+  the proof of a candidate's SENIORITY, and every test passed. Nothing asserted
+  the reason strings, the caveats, the ordering, or which gap bucket an unmet
+  must-have lands in.
+- **`eligibility.ts`** allowed every `dimension`, `label` and `reason` to be
+  replaced with `""`. Those sentences are what a recruiter is shown as the
+  reason a real person was not shortlisted. The distinction between
+  `"...was not found"` and `"...only a related skill was"` sends a recruiter to
+  different actions, and a mutant collapsing that ternary erased it silently.
+- **`education.ts`** allowed any `FIELD_VOCAB` alias to be deleted or emptied.
+  That table decides what field a candidate's degree is credited in.
+- **`experience.ts`** allowed any of the 29 quantity words to be deleted, each
+  one silently re-opening H-028 D5c for CVs that happen to use it — and
+  "increased revenue 2015 - 2019" is an ordinary CV line.
+
+**Residuals, stated rather than rounded away:**
+
+- **H-036 is now materially closed but not gone:** `explain.ts` was 140
+  survivors, now 55. It is the largest remaining block.
+- **`experience.ts` at 68.50% is the weakest module.** It clears the floor and
+  nothing more.
+- **An unverified claim I am NOT adopting:** the agent that wrote the skills
+  tests reported that several remaining `skills.ts` mutants are _equivalent_
+  (unkillable) — `text[i]` out of range always yielding `undefined`,
+  `toUpperCase` vs `toLowerCase` in `normalize()` being moot under a
+  case-insensitive regex. Plausible, and I did not verify it. It is recorded as
+  a hypothesis about the module's realistic ceiling, not as fact, and must not
+  be cited as a reason to stop.
+
+**E1-E5 after this round:** E2 MET, E4 MET, E5 MET. **E1 NOT MET** — the last
+adversarial round found five defects, so the two-clean-round counter stands at
+zero. **E3 NOT MET** — the Section 9.2 fixture corpus does not exist. The UI
+stays blocked on those two.

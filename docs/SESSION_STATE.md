@@ -66,12 +66,12 @@ work until it is done** (ADR-018).
 | `pnpm lint`          | pass                                                       |
 | `pnpm format:check`  | pass                                                       |
 | `pnpm license:audit` | pass (1 waiver: `duck@0.1.12`, ADR-016)                    |
-| `pnpm test:cov`      | **550 passed / 42 files**, none skipped, manifest complete |
+| `pnpm test:cov`      | **729 passed / 42 files**, none skipped, manifest complete |
 
-Coverage: **98.42% statements, 92.62% branches, 100% functions** repo-wide.
-Mutation score **65.03%** is from the last `pnpm mutate` at `e778837` and has
-**not** been re-run since the D5/D6 work landed — treat it as stale, not as
-evidence. That gap is still the most important number in this document (§6).
+Coverage: **98.77% statements, 93.22% branches, 100% functions** repo-wide.
+Mutation score **80.42%** (re-run 2026-08-13, ratchet raised 64 → 79). Every
+extraction and scoring module clears the E4 floor of 60; the weakest is
+`experience.ts` at 68.50%. Survivors 629 → 378 (H-057).
 
 **An earlier revision of this section claimed the tree did not typecheck and
 that D6's refusal gate was unimplemented. Both were false — see H-037.** Never
@@ -182,7 +182,7 @@ accident:
 | H-020 | ~~Stale `dist/` survives a failing compile~~  | **CLOSED** — went live on the first import, mitigated + verified (H-047) |
 | H-033 | ~~Degree guard context-window dependent~~     | **CLOSED** — lower-case "as" rejected; pinned by R10 (H-042)             |
 | H-034 | ~~Invisible characters~~                      | **CLOSED** — they FABRICATED skills, not just broke extraction (H-042)   |
-| H-036 | **607 mutation survivors**                    | `explain.ts` 28.93% — the recruiter-facing reasoning is unverified       |
+| H-036 | 378 mutation survivors (was 607)              | `explain.ts` 28.93% → 73.68%; 55 survivors left, still the largest block |
 | H-040 | Tenure understated when ranges don't parse    | A 3-year parsed role beats a 20-year claim. Needs an `explain.ts` caveat |
 | H-041 | Mixed-language veto abstains on terse CVs     | A terse BILINGUAL CV is still scored. 4 of 10 held-out CVs are silent    |
 | H-051 | **E2 FAILS — 9 of 12 defects unpinned**       | R6c/R7/R8/R9 and R-L1/R-L2 are LOOPS, not relations, despite the names   |
@@ -276,7 +276,8 @@ wrong numbers invites trust the tool has not earned.
    R10 converted; R17/R17b/R18/R19/R20 added in core; R-L1/R-L2 converted and
    R-L3 added in the language eval; 9 new properties for H-013, H-029, H-036
    and D8. They found two live defects on their first run (H-054, H-056).
-7. **Re-run `pnpm mutate`** — the 65.03% baseline predates D5/D6 and is stale (E4).
+7. ~~Re-run `pnpm mutate`.~~ **Done — E4 MET.** 80.42%, ratchet 64 → 79, every
+   module above the floor (H-057).
    Then **kill survivors, ratcheting the threshold up as they fall.** Order by
    human impact: `explain.ts` (28.93%) → `certifications.ts` (49.66%) →
    `skills.ts` (55.60%) → `education.ts` (65.47%). Note `experience.ts` also
