@@ -66,9 +66,9 @@ work until it is done** (ADR-018).
 | `pnpm lint`          | pass                                                       |
 | `pnpm format:check`  | pass                                                       |
 | `pnpm license:audit` | pass (1 waiver: `duck@0.1.12`, ADR-016)                    |
-| `pnpm test:cov`      | **527 passed / 42 files**, none skipped, manifest complete |
+| `pnpm test:cov`      | **528 passed / 41 files**, none skipped, manifest complete |
 
-Coverage: **98.34% statements, 92.4% branches, 100% functions** repo-wide.
+Coverage: **98.41% statements, 92.57% branches, 100% functions** repo-wide.
 Mutation score **65.03%** is from the last `pnpm mutate` at `e778837` and has
 **not** been re-run since the D5/D6 work landed — treat it as stale, not as
 evidence. That gap is still the most important number in this document (§6).
@@ -160,6 +160,10 @@ accident:
   has explicitly chosen to keep Opus for this role.
 - **ADR-016** — license waivers are pinned to exact versions and require reading
   the actual LICENSE file. "Probably fine" is not evidence.
+- **ADR-024** — derived attributes are **never persisted**. Anything the
+  engine can recompute from `rawText` must not be stored, or it drifts from the
+  number it justifies. Recruiter DECISIONS (suppressions) are still stored —
+  the distinction is authorship, not convenience.
 - **ADR-023** — "extraction hardened" now has **measurable exit criteria
   (E1-E5)** and a three-way severity split: only **wrong-score** findings block
   the UI. **false-refusal** and **coverage-gap** findings do not. Without that
@@ -264,10 +268,10 @@ wrong numbers invites trust the tool has not earned.
    Five defects (H-048..H-052); four fixed, **H-052 open and blocking**.
    E1-E5 verdict: E1 NOT MET, E2 NOT MET (9 of 12), E3 NOT MET, E4 CANNOT
    ASSESS, E5 NOT MET. **No UI work.**
-5. **Decide H-052** — the data-model question: do persisted attributes carry
-   the `referenceDate` they were derived under and get refreshed, or do they
-   stop being persisted and are always derived on demand? This is the single
-   blocking wrong-score item.
+5. ~~Decide H-052.~~ **Done — derived attributes are never persisted
+   (ADR-024).** `candidate_attributes` dropped; `matches.reference_date` added
+   so every score names all three of its inputs and is reproducible from
+   stored state. **E5 is unblocked.**
 6. **Convert the fake relations into real ones (E2).** R6c/R7/R8/R9 in core and
    R-L1/R-L2 in the language eval are `for` loops named like relations. R10 has
    been converted as the worked example.

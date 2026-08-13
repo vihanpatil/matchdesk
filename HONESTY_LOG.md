@@ -1593,3 +1593,52 @@ no `years_experience` attributes at all, so "no divergence" proved nothing. The
 finding only appeared after rebuilding the probe with a CV containing an
 open-ended range. A negative result from a probe that cannot fire is not
 evidence, and I nearly filed one as such.
+
+---
+
+## 2026-08-13 — H-052 closed
+
+### H-052 CLOSED · Derived attributes are no longer persisted (ADR-024)
+
+The defect: `candidate_attributes` stored the OUTPUT of
+`extractAttributes(rawText, referenceDate)` without either input's identity.
+`rawText` is content-addressed and cannot drift; `referenceDate` was a free
+per-call parameter and did, so stored evidence and computed scores diverged
+permanently for any CV with an open-ended range.
+
+**Fixed by deletion, not by reconciliation.** The table is dropped (migration
+0003). Evidence is derived when needed, so there is no second copy to disagree
+with the number it justifies. The alternative — stamping provenance on the rows
+and refusing to use stale ones — was considered and rejected: it fixes the
+defect but leaves two representations agreeing only because a check forces
+them to, and this project's history is defects that survived because a check
+was absent, vacuous, or removed (H-004, H-013, H-028, H-051).
+
+**What replaces the table.** `matches` gains `reference_date` next to the
+`engine_version` it already carried, so every stored score names all three of
+its inputs. `pipeline.test.ts` asserts the guarantee directly: re-deriving from
+stored state alone reproduces the stored score exactly. A `NULL`
+`reference_date` means a score predates this and is **not** reproducible —
+callers must surface that rather than default it.
+
+**The cost, stated rather than buried.** The database is no longer a complete
+record: rendering evidence requires running the engine. And there is still no
+HISTORY — "what did the recruiter see in August" remains unanswerable once the
+engine changes. That was equally true before, since refreshing rows in place
+would have overwritten the old values, so this is a limitation made explicit
+rather than one introduced. Versioned engine outputs would be a separate
+decision nobody has taken.
+
+**The suppression risk that made this the harder choice is now a written
+constraint, not an open question.** ADR-024 fixes the design before anyone
+implements it: a suppression references the content key
+`(candidateId, attributeKind, normalizedValue)` and deliberately **excludes
+the evidence span**, because spans move when extraction improves and a
+span-keyed suppression would silently stop applying — letting a suppressed bad
+attribute quietly return and inflate a score. An orphaned suppression must be
+surfaced, never silently dropped. Recruiter decisions are still persisted and
+audited; only the extractor's derivable output is not.
+
+**E5 is now unblocked.** H-052 was the only open wrong-score entry. E1-E4
+remain unmet — E2 in particular still fails for 9 of 12 defect lineages
+(H-051), so the UI stays blocked, for stated reasons.

@@ -105,38 +105,6 @@ export const CreateJobRequirementInputSchema = z
   );
 export type CreateJobRequirementInput = z.infer<typeof CreateJobRequirementInputSchema>;
 
-// ---- candidate_attributes ---------------------------------------------------
-
-export const CandidateAttributeSchema = z.object({
-  id: z.string().min(1),
-  candidateId: z.string().min(1),
-  attributeType: z.string().min(1),
-  value: z.string().min(1),
-  evidenceStart: z.number().int().nonnegative().nullable(),
-  evidenceEnd: z.number().int().nonnegative().nullable(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-});
-export type CandidateAttribute = z.infer<typeof CandidateAttributeSchema>;
-
-export const CreateCandidateAttributeInputSchema = z
-  .object({
-    candidateId: z.string().min(1),
-    attributeType: z.string().min(1),
-    value: z.string().min(1),
-    evidenceStart: z.number().int().nonnegative().nullable(),
-    evidenceEnd: z.number().int().nonnegative().nullable(),
-  })
-  .refine(
-    (v) => (v.evidenceStart === null) === (v.evidenceEnd === null),
-    'evidenceStart and evidenceEnd must both be null or both be set',
-  )
-  .refine(
-    (v) => v.evidenceStart === null || v.evidenceEnd === null || v.evidenceStart <= v.evidenceEnd,
-    'evidenceStart must not be greater than evidenceEnd',
-  );
-export type CreateCandidateAttributeInput = z.infer<typeof CreateCandidateAttributeInputSchema>;
-
 // ---- matches ----------------------------------------------------------------
 
 export const MatchSchema = z.object({
@@ -147,6 +115,11 @@ export const MatchSchema = z.object({
   engineVersion: z.string().nullable(),
   embeddingModelRevision: z.string().nullable(),
   computedAt: z.string().nullable(),
+  /** The `referenceDate` extraction ran with, as `YYYY-MM`. Together with
+   *  `engineVersion` this makes a stored score reproducible from stored state
+   *  — which is what replaces the deleted `candidate_attributes` table
+   *  (ADR-024). */
+  referenceDate: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -159,6 +132,7 @@ export const UpsertMatchInputSchema = z.object({
   engineVersion: z.string().nullable(),
   embeddingModelRevision: z.string().nullable(),
   computedAt: z.string().nullable(),
+  referenceDate: z.string().nullable(),
 });
 export type UpsertMatchInput = z.infer<typeof UpsertMatchInputSchema>;
 

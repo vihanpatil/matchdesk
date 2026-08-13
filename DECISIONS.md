@@ -754,3 +754,89 @@ which is precisely what ADR-018 pushed back. The distinction is that this is
 not UI. It shows nothing to a recruiter and invites no trust; it exists to make
 the existing rigour reach a level it currently cannot see, and to convert three
 unmeasured risks into numbers.
+
+---
+
+## ADR-024 — Derived attributes are never persisted (closes H-052)
+
+**Date:** 2026-08-13 · **Status:** Accepted
+
+Extraction is a function of TWO inputs — `extractAttributes(rawText,
+referenceDate)` — and `candidate_attributes` persisted only the OUTPUT.
+`rawText` is content-addressed and cannot drift. `referenceDate` was a free
+per-call parameter and did. Measured:
+
+```
+ingest at referenceDate 2026-01  ->  stored years_experience = 7
+score  at referenceDate 2040-01  ->  scored on years_experience = 21
+stored rows still said 7
+```
+
+The recruiter would be shown evidence reading 7 years beside a score computed
+from 21, in a product whose stated principle is that every number traces to
+highlighted evidence in the source. Not a re-upload edge case: it happens to
+every stored candidate with a current role, purely through time passing.
+
+**Decision: stop persisting derived attributes.** `candidate_attributes` is
+dropped (migration 0003). `rawText` plus `engineVersion` plus `referenceDate`
+fully determine them; extraction is pure and costs 0.76 ms/document (measured,
+`scripts/measure-matrix.mjs`), so evidence is derived at the moment it is
+needed and cannot disagree with the number it justifies.
+
+**Why this over stamping provenance on the rows and refreshing them.** Both fix
+the defect. Stamping keeps a durable evidence store but leaves TWO
+representations that agree only because a check forces them to — and this
+project's entire history is defects that survived because a check was absent,
+vacuous, or removed (H-004, H-013, H-028, H-051). Deletion makes the
+divergence impossible to express rather than merely detectable. **The cost is
+real and is accepted below.**
+
+**What replaces the table: reproducibility.** A score is only explainable if
+you can re-derive exactly what produced it, so `matches` gains
+`reference_date` alongside the `engine_version` it already carried. Every
+stored score now names all three of its inputs, and
+`pipeline.test.ts` asserts that re-deriving from stored state alone reproduces
+the stored number exactly. Provenance moved to where the number lives instead
+of sitting on a copy of the evidence.
+
+A `NULL` `reference_date` means the score predates this decision and is **not
+reproducible**. Callers must surface that rather than assume a default.
+
+### Binding constraint on the suppression feature
+
+`docs/PRODUCT_DECISIONS.md` commits v1 to: _"A recruiter may suppress a bad
+extracted candidate attribute with a reason. The suppression is local,
+auditable, and triggers a rescore."_ That feature was the strongest argument
+for keeping the table, because a suppression needs something stable to point
+at. It is not built yet, so this ADR fixes its design now rather than leaving
+the next implementer to invent a fragile one:
+
+1. **A suppression references a CONTENT KEY, not a row id** — the tuple
+   `(candidateId, attributeKind, normalizedValue)`. Deliberately **excludes the
+   evidence span**: spans move whenever extraction improves, and a suppression
+   keyed on a span would silently stop applying after an engine change,
+   letting a bad attribute quietly return and inflate a score. That is the
+   wrong-score failure this project keeps finding, and it must not be designed
+   in.
+2. **An orphaned suppression is surfaced, never silently dropped.** If a
+   suppressed attribute no longer appears in the derived set, the suppression
+   has no target. The recruiter must be shown that it no longer matches
+   anything — silence would mean an intervention they made simply stopped
+   applying without their knowledge.
+3. **Suppressions are stored and audited; only derived attributes are not.**
+   Nothing in this ADR argues against persisting a recruiter's DECISIONS. It
+   argues against persisting a second copy of something the engine can
+   recompute. The distinction is authorship: the recruiter's judgement is
+   input, the extractor's output is derivable.
+
+**Costs, accepted and stated:**
+
+- **The database is no longer a complete record.** Rendering a candidate's
+  evidence requires running the engine. Acceptable for a local tool where the
+  engine is always present, and 0.76 ms/document is not a budget concern.
+- **No history.** "What did the recruiter see in August" is not answerable
+  from stored state once the engine changes. It was not answerable before
+  either — refreshing rows in place would have overwritten the old values just
+  the same — so this is a limitation being made explicit, not one introduced.
+  Reconstructing a past view would need versioned engine outputs, which is a
+  separate decision nobody has taken.

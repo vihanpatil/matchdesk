@@ -9,11 +9,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { openDatabase } from '../db/connection.js';
 import { getMatch } from '../repositories/matches.js';
-import { listCandidateAttributes } from '../repositories/candidateAttributes.js';
+import { extractAttributes, scoreCandidate } from '@matchdesk/core';
+
 import {
   ENGINE_VERSION,
+  formatReferenceDate,
   ingestCandidateDocument,
   ingestJobDocument,
+  parseReferenceDate,
   scoreJobAgainstCandidates,
   scoreStoredPair,
 } from './pipeline.js';
@@ -96,19 +99,16 @@ describe('pipeline: a document becomes a score', () => {
     expect(ingested.outcome).toBe('scoreable');
     expect(ingested.attributes.length).toBeGreaterThan(0);
 
-    const stored = listCandidateAttributes(db, ingested.candidate.id);
-    expect(stored.length).toBe(ingested.attributes.length);
-
-    // The guiding principle, checked against persisted state rather than
-    // in-process objects: every stored attribute's span must still locate its
-    // evidence in the stored text after a round trip through SQLite.
-    for (const attribute of stored) {
-      expect(attribute.evidenceStart).not.toBeNull();
-      expect(attribute.evidenceEnd).not.toBeNull();
-      const start = attribute.evidenceStart ?? 0;
-      const end = attribute.evidenceEnd ?? 0;
-      expect(end).toBeGreaterThan(start);
-      expect(end).toBeLessThanOrEqual(ingested.candidate.rawText.length);
+    // The guiding principle, checked against the STORED text rather than an
+    // in-process copy: every derived attribute's span must locate its evidence
+    // in the raw text as persisted, so a UI rendering from the database can
+    // highlight it (ADR-024 — attributes are derived, the text is stored).
+    for (const attribute of ingested.attributes) {
+      expect(attribute.sourceSpan.end).toBeGreaterThan(attribute.sourceSpan.start);
+      expect(attribute.sourceSpan.end).toBeLessThanOrEqual(ingested.candidate.rawText.length);
+      expect(
+        ingested.candidate.rawText.slice(attribute.sourceSpan.start, attribute.sourceSpan.end),
+      ).toBe(attribute.value);
     }
 
     const scored = scoreStoredPair(db, JOB, ingested.candidate, REF, COMPUTED_AT);
@@ -137,7 +137,6 @@ describe('pipeline: a document becomes a score', () => {
 
     expect(ingested.outcome).toBe('needs_attention');
     expect(ingested.attributes).toEqual([]);
-    expect(listCandidateAttributes(db, ingested.candidate.id)).toEqual([]);
 
     expect(() => scoreStoredPair(db, JOB, ingested.candidate, REF, COMPUTED_AT)).toThrow(/C7/);
     expect(getMatch(db, JOB.id, ingested.candidate.id)).toBeNull();
@@ -172,16 +171,16 @@ describe('pipeline: a document becomes a score', () => {
     expect(() => scoreStoredPair(db, JOB, ingested.candidate, REF, COMPUTED_AT)).toThrow(/C7/);
   });
 
-  it('re-uploading identical bytes does not duplicate attribute rows', async () => {
+  it('re-uploading identical bytes derives identical attributes and stores no copy', async () => {
     const bytes = readFixture('candidate-english.docx');
     const first = await ingestCandidateDocument(db, filesDir, bytes, 'a.docx', REF);
     const second = await ingestCandidateDocument(db, filesDir, bytes, 'a.docx', REF);
 
     expect(second.alreadyExisted).toBe(true);
     expect(second.candidate.id).toBe(first.candidate.id);
-    expect(listCandidateAttributes(db, first.candidate.id).length).toBe(first.attributes.length);
-    // The caller still gets the attributes, re-derived deterministically.
-    expect(second.attributes.length).toBe(first.attributes.length);
+    // Nothing is stored, so a re-upload cannot duplicate anything. The same
+    // bytes and the same referenceDate derive the same attributes.
+    expect(second.attributes).toEqual(first.attributes);
   });
 
   it('is deterministic: scoring the same pair twice gives the same score and one match row', async () => {
@@ -327,6 +326,84 @@ describe('pipeline: a document becomes a score', () => {
     expect(() =>
       scoreStoredPair(db, specFor('no-such-job'), candidate.candidate, REF, COMPUTED_AT),
     ).toThrow(/no such job row/);
+  });
+
+  it('H-052: a stored score is REPRODUCIBLE from stored state alone (ADR-024)', async () => {
+    // This is the guarantee that replaces the deleted candidate_attributes
+    // table. Evidence is no longer persisted, so it cannot go stale against
+    // the score — but a score is only explainable if you can re-derive exactly
+    // what produced it. The three inputs are rawText (content-addressed on the
+    // candidate row), engineVersion and referenceDate (both on the match row).
+    JOB = await ingestJobAndSpec();
+    const ingested = await ingestCandidateDocument(
+      db,
+      filesDir,
+      readFixture('candidate-open-ended-range.docx'),
+      'cv.docx',
+      REF,
+    );
+
+    const scored = scoreStoredPair(db, JOB, ingested.candidate, REF, COMPUTED_AT);
+    const row = getMatch(db, JOB.id, ingested.candidate.id);
+
+    expect(row?.referenceDate).toBe(formatReferenceDate(REF));
+    expect(row?.engineVersion).toBe(ENGINE_VERSION);
+
+    // Re-derive using ONLY what is stored, as a cold reader would.
+    const recovered = parseReferenceDate(row?.referenceDate ?? null);
+    expect(recovered).not.toBeNull();
+    if (recovered === null) throw new Error('stored reference date must be recoverable');
+
+    const reproduced = scoreCandidate(JOB, {
+      id: ingested.candidate.id,
+      createdAt: ingested.candidate.createdAt,
+      attributes: extractAttributes(ingested.candidate.rawText, { referenceDate: recovered }),
+    });
+
+    expect(reproduced.score).toBe(row?.score);
+    expect(reproduced.score).toBe(scored.result.score);
+  });
+
+  it('H-052: an open-ended range cannot leave stale evidence behind, because none is stored', async () => {
+    // The original defect: "Jan 2019 - Present" extracted 7 years at ingest
+    // (referenceDate 2026-01) and 21 years when scored later (2040-01), while
+    // the stored evidence rows still said 7. The recruiter saw 7 beside a
+    // score computed from 21.
+    JOB = await ingestJobAndSpec();
+    const bytes = readFixture('candidate-open-ended-range.docx');
+
+    const atIngest = await ingestCandidateDocument(db, filesDir, bytes, 'cv.docx', REF);
+    const laterRef = { year: 2040, month: 1 } as const;
+    const atLater = await ingestCandidateDocument(db, filesDir, bytes, 'cv.docx', laterRef);
+
+    const years = (attrs: readonly { kind: string; normalizedValue: string }[]) =>
+      attrs.filter((a) => a.kind === 'years_experience').map((a) => a.normalizedValue);
+
+    // Each derivation reflects the reference date it was asked for — that is
+    // correct behaviour, not drift. What made it a defect was a THIRD copy
+    // sitting in the database agreeing with neither.
+    expect(years(atIngest.attributes)).not.toEqual(years(atLater.attributes));
+
+    // Both scores are recorded with the reference date that produced them, so
+    // neither is silently wrong about which one it is.
+    scoreStoredPair(db, JOB, atIngest.candidate, REF, COMPUTED_AT);
+    expect(getMatch(db, JOB.id, atIngest.candidate.id)?.referenceDate).toBe(
+      formatReferenceDate(REF),
+    );
+
+    scoreStoredPair(db, JOB, atLater.candidate, laterRef, COMPUTED_AT);
+    expect(getMatch(db, JOB.id, atLater.candidate.id)?.referenceDate).toBe(
+      formatReferenceDate(laterRef),
+    );
+  });
+
+  it('parseReferenceDate rejects a malformed or absent stored value rather than guessing', () => {
+    expect(parseReferenceDate(null)).toBeNull();
+    expect(parseReferenceDate('')).toBeNull();
+    expect(parseReferenceDate('2026-13')).toBeNull();
+    expect(parseReferenceDate('2026-1')).toBeNull();
+    expect(parseReferenceDate('not-a-date')).toBeNull();
+    expect(parseReferenceDate('2026-01')).toEqual({ year: 2026, month: 1 });
   });
 
   it('ADR-018 Decision 1: adding a matched requirement never lowers the score, TEXT IN -> SCORE OUT', async () => {

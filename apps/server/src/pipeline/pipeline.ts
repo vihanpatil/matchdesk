@@ -9,7 +9,6 @@ import {
 import type Database from 'better-sqlite3';
 
 import { extractText, type ExtractionResult } from '../ingestion/extractText.js';
-import { addCandidateAttribute } from '../repositories/candidateAttributes.js';
 import { createOrGetCandidate } from '../repositories/candidates.js';
 import { createJob, getJobById } from '../repositories/jobs.js';
 import { upsertMatch } from '../repositories/matches.js';
@@ -38,6 +37,48 @@ import type { Candidate as StoredCandidate, Job as StoredJob } from '../reposito
  *  apart from one produced by a later revision (ADR-002). */
 export const ENGINE_VERSION = 'rules-1';
 
+export interface ReferenceDate {
+  readonly year: number;
+  readonly month: number;
+}
+
+/**
+ * The stored form of a reference date, `YYYY-MM`.
+ *
+ * Persisted with every score because extraction is a function of
+ * `(rawText, referenceDate)` and a score is only explainable if you can
+ * re-derive exactly what produced it (ADR-024, closing H-052). `rawText` is
+ * content-addressed, `engineVersion` is already on the row, and this is the
+ * third and last input.
+ */
+export function formatReferenceDate(referenceDate: ReferenceDate): string {
+  return `${String(referenceDate.year).padStart(4, '0')}-${String(referenceDate.month).padStart(2, '0')}`;
+}
+
+/**
+ * Reads a stored `YYYY-MM` back into a reference date, or `null` if the value
+ * is absent or malformed.
+ *
+ * This is the other half of the guarantee that replaces `candidate_attributes`:
+ * given a stored match, a caller can recover the exact inputs — `rawText` from
+ * the candidate row, `engineVersion` and `referenceDate` from the match row —
+ * and re-derive both the evidence and the number. `null` means the score
+ * predates the column and is NOT reproducible, which callers must surface
+ * rather than paper over.
+ */
+export function parseReferenceDate(stored: string | null): ReferenceDate | null {
+  if (stored === null) return null;
+
+  const match = /^(\d{4})-(\d{2})$/.exec(stored);
+  if (match === null) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (!Number.isInteger(month) || month < 1 || month > 12) return null;
+
+  return { year, month };
+}
+
 export type IngestOutcome = 'scoreable' | 'needs_attention' | 'failed';
 
 export interface IngestedCandidate {
@@ -65,20 +106,23 @@ function outcomeOf(extraction: ExtractionResult): IngestOutcome {
 }
 
 /**
- * Ingests one candidate document: extracts text, stores the candidate and the
- * original bytes, and — only if the document is scoreable — extracts and
- * persists its attributes.
+ * Ingests one candidate document: extracts text and stores the candidate plus
+ * the original bytes.
  *
- * Attributes are persisted with their evidence spans, which index `rawText` as
- * stored. That is what keeps "every number traces to a highlighted span in the
- * source" true across a restart rather than only within one process.
+ * **Attributes are returned, never persisted** (ADR-024). They are a pure
+ * function of the stored `rawText` and the caller's `referenceDate`, so
+ * storing them would create a second copy that goes stale the moment those
+ * inputs change — which is exactly what H-052 measured: stored evidence
+ * reading 7 years beside a score computed from 21, simply because time had
+ * passed between ingest and re-score. Deriving on demand makes that
+ * divergence impossible rather than merely detectable.
  */
 export async function ingestCandidateDocument(
   db: Database.Database,
   filesDir: string,
   bytes: Buffer,
   originalFilename: string,
-  referenceDate: { readonly year: number; readonly month: number },
+  referenceDate: ReferenceDate,
 ): Promise<IngestedCandidate> {
   const extraction = await extractText(bytes, originalFilename);
 
@@ -97,31 +141,17 @@ export async function ingestCandidateDocument(
     return { candidate, outcome, attributes: [], extraction, alreadyExisted };
   }
 
-  // Re-uploading identical bytes must not duplicate attribute rows. The
-  // candidate is content-addressed, so the attributes already on record were
-  // derived from exactly this text by exactly this extractor.
-  if (alreadyExisted) {
-    return {
-      candidate,
-      outcome,
-      attributes: extractAttributes(candidate.rawText, { referenceDate }),
-      extraction,
-      alreadyExisted,
-    };
-  }
-
-  const attributes = extractAttributes(candidate.rawText, { referenceDate });
-  for (const attribute of attributes) {
-    addCandidateAttribute(db, {
-      candidateId: candidate.id,
-      attributeType: attribute.kind,
-      value: attribute.normalizedValue,
-      evidenceStart: attribute.sourceSpan.start,
-      evidenceEnd: attribute.sourceSpan.end,
-    });
-  }
-
-  return { candidate, outcome, attributes, extraction, alreadyExisted };
+  // Nothing branches on `alreadyExisted` any more: with no stored copy to
+  // reconcile, a re-upload of identical bytes derives the same attributes as
+  // the first upload did. The flag is still reported so a caller can say
+  // "already uploaded on <date>" instead of silently creating a duplicate.
+  return {
+    candidate,
+    outcome,
+    attributes: extractAttributes(candidate.rawText, { referenceDate }),
+    extraction,
+    alreadyExisted,
+  };
 }
 
 export interface IngestedJob {
@@ -222,7 +252,7 @@ export function scoreStoredPair(
   db: Database.Database,
   job: ScoringJob,
   candidate: StoredCandidate,
-  referenceDate: { readonly year: number; readonly month: number },
+  referenceDate: ReferenceDate,
   computedAt: string,
 ): ScoredPair {
   assertJobReadable(db, job.id);
@@ -250,6 +280,7 @@ export function scoreStoredPair(
     engineVersion: ENGINE_VERSION,
     embeddingModelRevision: null,
     computedAt,
+    referenceDate: formatReferenceDate(referenceDate),
   });
 
   return { jobId: job.id, candidateId: candidate.id, result };
@@ -281,7 +312,7 @@ export function scoreJobAgainstCandidates(
   db: Database.Database,
   job: ScoringJob,
   candidates: readonly StoredCandidate[],
-  referenceDate: { readonly year: number; readonly month: number },
+  referenceDate: ReferenceDate,
   computedAt: string,
 ): { readonly scored: readonly ScoredPair[]; readonly skipped: readonly string[] } {
   // Guarded identically to the single-pair path — an unreadable job must not
@@ -311,6 +342,7 @@ export function scoreJobAgainstCandidates(
       engineVersion: ENGINE_VERSION,
       embeddingModelRevision: null,
       computedAt,
+      referenceDate: formatReferenceDate(referenceDate),
     });
 
     scored.push({ jobId: job.id, candidateId: candidate.id, result });

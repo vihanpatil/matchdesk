@@ -12,6 +12,7 @@ interface MatchRow {
   engine_version: string | null;
   embedding_model_revision: string | null;
   computed_at: string | null;
+  reference_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +26,7 @@ function mapRow(row: MatchRow): Match {
     engineVersion: row.engine_version,
     embeddingModelRevision: row.embedding_model_revision,
     computedAt: row.computed_at,
+    referenceDate: row.reference_date,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
@@ -44,13 +46,14 @@ export function upsertMatch(db: Database.Database, input: UpsertMatchInput): Mat
 
   db.prepare(
     `INSERT INTO matches
-       (id, job_id, candidate_id, score, engine_version, embedding_model_revision, computed_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       (id, job_id, candidate_id, score, engine_version, embedding_model_revision, computed_at, reference_date, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (job_id, candidate_id) DO UPDATE SET
        score = excluded.score,
        engine_version = excluded.engine_version,
        embedding_model_revision = excluded.embedding_model_revision,
        computed_at = excluded.computed_at,
+       reference_date = excluded.reference_date,
        updated_at = excluded.updated_at`,
   ).run(
     newId,
@@ -60,6 +63,7 @@ export function upsertMatch(db: Database.Database, input: UpsertMatchInput): Mat
     parsed.engineVersion,
     parsed.embeddingModelRevision,
     parsed.computedAt,
+    parsed.referenceDate,
     now,
     now,
   );

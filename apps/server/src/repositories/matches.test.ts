@@ -58,6 +58,7 @@ describe('matches repository', () => {
       engineVersion: '0.0.0',
       embeddingModelRevision: 'abc123',
       computedAt: new Date().toISOString(),
+      referenceDate: '2026-01',
     });
 
     expect(match.jobId).toBe(jobId);
@@ -73,6 +74,7 @@ describe('matches repository', () => {
       engineVersion: '0.0.0',
       embeddingModelRevision: 'rev1',
       computedAt: new Date().toISOString(),
+      referenceDate: '2026-01',
     });
     const second = upsertMatch(db, {
       jobId,
@@ -81,6 +83,7 @@ describe('matches repository', () => {
       engineVersion: '0.0.1',
       embeddingModelRevision: 'rev2',
       computedAt: new Date().toISOString(),
+      referenceDate: '2026-01',
     });
 
     expect(second.id).toBe(first.id);
@@ -103,6 +106,7 @@ describe('matches repository', () => {
       engineVersion: '0.0.0',
       embeddingModelRevision: 'rev1',
       computedAt: new Date().toISOString(),
+      referenceDate: '2026-01',
     });
     const found = getMatch(db, jobId, candidateId);
     expect(found?.score).toBe(70);
@@ -117,6 +121,7 @@ describe('matches repository', () => {
         engineVersion: null,
         embeddingModelRevision: null,
         computedAt: null,
+        referenceDate: '2026-01',
       }),
     ).toThrow(/FOREIGN KEY/);
   });
@@ -139,6 +144,7 @@ describe('matches repository', () => {
       engineVersion: null,
       embeddingModelRevision: null,
       computedAt: null,
+      referenceDate: '2026-01',
     });
     upsertMatch(db, {
       jobId,
@@ -147,6 +153,7 @@ describe('matches repository', () => {
       engineVersion: null,
       embeddingModelRevision: null,
       computedAt: null,
+      referenceDate: '2026-01',
     });
 
     const matches = listMatchesForJob(db, jobId);
