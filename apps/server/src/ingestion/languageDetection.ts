@@ -244,3 +244,149 @@ export function detectLanguageHeuristic(text: string): LanguageDetectionResult {
     nearestOtherLanguage,
   };
 }
+
+// -------------------------------------------------------------------------
+// Mixed-language (code-switching) veto — ADR-022.
+//
+// `detectLanguageHeuristic` judges a document as ONE blob, so a CV that is
+// half English and half French wins the comparison for whichever language's
+// statistics dominate. Measured on this detector: a document with 50% French
+// sentences still classified English. Scoring it means running English-only
+// extraction over text we cannot read and reporting a confident number for
+// the half we could — C7's exact failure.
+//
+// **Why this is not a confidence threshold.** The obvious fix is to refuse
+// when English wins only narrowly. It cannot work here, and the numbers say
+// so: relative margin ((dOther - dEn) / dEn) for `headers_plus_tech_only` —
+// a legitimate English CV the eval corpus requires to pass — is 0.0016,
+// while the code-switched document is 0.0063, four times WIDER. Any cut that
+// catches code-switching rejects a real English CV first. The bands overlap,
+// so no threshold on that axis separates them.
+//
+// **What works instead:** judge each segment separately. Mixing is a
+// structural property — the languages sit in different paragraphs — and it
+// is visible per segment while being invisible in the aggregate.
+//
+// This layer is **veto-only**. It runs only after the whole-document verdict
+// is already English, and it can only ever turn "English" into "refuse". It
+// cannot make a non-English document look English, so the eval corpus's
+// zero-false-positive property is preserved by construction rather than by
+// re-measurement.
+// -------------------------------------------------------------------------
+
+/**
+ * Minimum words for a SEGMENT to get a verdict. Higher than
+ * {@link MIN_WORDS_FOR_JUDGEMENT} on purpose: a skills line ("Skills: Python,
+ * Docker, Kubernetes, AWS, React, Git") is 8-12 tokens of language-neutral
+ * technology names, and judging it produces a coin flip. Measured false
+ * alarms on a held-out ten-CV English corpus spanning nursing, teaching,
+ * accountancy, catering, trades, logistics, science, law, admin and haulage:
+ *
+ *     floor  8w -> 3 of 8 in-corpus English CVs wrongly flagged
+ *     floor 10w -> 1 of 10 held-out English CVs wrongly flagged
+ *     floor 12w -> 0 wrongly flagged, mixing still caught
+ *     floor 15w -> 0 wrongly flagged, mixing still caught   <-- chosen
+ *     floor 18w -> 0 wrongly flagged, mixing still caught
+ *     floor 20w -> 0 wrongly flagged, but catches NOTHING
+ *
+ * 15 sits in the middle of the 12-18 window rather than on either edge, so a
+ * small corpus change does not flip the behaviour. See
+ * `languageDetection.eval.test.ts`, which asserts this sweep rather than
+ * describing it.
+ */
+const MIN_WORDS_FOR_SEGMENT_JUDGEMENT = 15;
+
+/** Segment boundaries: blank/new lines, or sentence-ending punctuation. CV
+ *  structure is line-oriented, and a code-switched block is a paragraph or a
+ *  run of sentences — never half a sentence. */
+const SEGMENT_BOUNDARY = /\n+|(?<=[.!?])\s+/;
+
+export interface NonEnglishSegment {
+  /** The offending text, trimmed. */
+  readonly text: string;
+  /** Offsets into the ORIGINAL document text, so the recruiter can be shown
+   *  exactly which part could not be read (PRODUCT_DECISIONS: every claim
+   *  links to evidence in the source). */
+  readonly sourceSpan: { readonly start: number; readonly end: number };
+  /** Closest reference profile — diagnostic only, not a language-ID claim. */
+  readonly nearestLanguage: NonEnglishLanguage | null;
+}
+
+export interface MixedLanguageResult {
+  /** true when at least one substantial segment is not English. */
+  readonly hasNonEnglishSegment: boolean;
+  /** Every offending segment, in document order. */
+  readonly nonEnglishSegments: readonly NonEnglishSegment[];
+  /** How many segments were long enough to judge at all. **Zero means this
+   *  check said nothing** — see the blind spot below. */
+  readonly judgedSegmentCount: number;
+}
+
+interface TextSegment {
+  readonly text: string;
+  readonly start: number;
+  readonly end: number;
+}
+
+/** Splits into segments while keeping offsets into the original text valid.
+ *  Offsets are recovered by scanning forward rather than by summing lengths,
+ *  so the separators the split consumed cannot shift them. */
+function segmentsOf(text: string): TextSegment[] {
+  const found: TextSegment[] = [];
+  let cursor = 0;
+
+  for (const piece of text.split(SEGMENT_BOUNDARY)) {
+    const trimmed = piece.trim();
+    if (trimmed.length === 0) continue;
+
+    const start = text.indexOf(trimmed, cursor);
+    if (start === -1) continue;
+
+    found.push({ text: trimmed, start, end: start + trimmed.length });
+    cursor = start + trimmed.length;
+  }
+
+  return found;
+}
+
+/**
+ * Finds substantial segments that are not English, for use as a refusal veto
+ * on a document the whole-document check already called English (ADR-022).
+ *
+ * **Blind spot, stated rather than discovered later:** on a terse CV — pure
+ * bullets, skills lists, header-and-technology layouts — no segment reaches
+ * the word floor, `judgedSegmentCount` is 0, and this check is silent. Five
+ * of the ten held-out English CVs are that shape. A terse BILINGUAL CV
+ * therefore still passes. This narrows the C7 gap; it does not close it, and
+ * closing it needs per-segment detection that works on ~8-word fragments,
+ * which this method cannot do (see the eval file's measured limitation).
+ */
+export function findNonEnglishSegments(text: string): MixedLanguageResult {
+  const nonEnglishSegments: NonEnglishSegment[] = [];
+  let judgedSegmentCount = 0;
+
+  for (const segment of segmentsOf(text)) {
+    const verdict = detectLanguageHeuristic(segment.text);
+
+    // `isEnglish === null` means the segment was below the detector's own
+    // floor; the separate, higher segment floor keeps short technology lines
+    // out of the vote entirely.
+    if (verdict.isEnglish === null) continue;
+    if (verdict.wordCount < MIN_WORDS_FOR_SEGMENT_JUDGEMENT) continue;
+
+    judgedSegmentCount++;
+    if (verdict.isEnglish) continue;
+
+    nonEnglishSegments.push({
+      text: segment.text,
+      sourceSpan: { start: segment.start, end: segment.end },
+      nearestLanguage: verdict.nearestOtherLanguage,
+    });
+  }
+
+  return {
+    hasNonEnglishSegment: nonEnglishSegments.length > 0,
+    nonEnglishSegments,
+    judgedSegmentCount,
+  };
+}

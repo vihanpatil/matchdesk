@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { detectLanguageHeuristic } from './languageDetection.js';
+import { detectLanguageHeuristic, findNonEnglishSegments } from './languageDetection.js';
 
 describe('detectLanguageHeuristic', () => {
   it('recognizes English CV-style prose as English', () => {
@@ -108,5 +108,82 @@ describe('detectLanguageHeuristic', () => {
     const result = detectLanguageHeuristic(german);
     expect(result.isEnglish).toBe(false);
     expect(result.nearestOtherLanguage).toBe('de');
+  });
+});
+
+describe('findNonEnglishSegments (mixed-language veto, ADR-022)', () => {
+  const ENGLISH_PARAGRAPH =
+    'Bernadette Achebe is a registered nurse with eleven years of experience in acute cardiac care. She has worked night rotations on a thirty-bed ward, coordinating with consultants and allied health staff to manage post-operative recovery.';
+  const FRENCH_PARAGRAPH =
+    'Elle a travaillé pendant six ans dans un service de cardiologie où elle encadrait les infirmières nouvellement diplômées. Son expérience comprend la gestion des soins postopératoires et la coordination avec les médecins consultants du service.';
+
+  it('finds nothing to veto in a wholly English document', () => {
+    const result = findNonEnglishSegments(ENGLISH_PARAGRAPH);
+    expect(result.hasNonEnglishSegment).toBe(false);
+    expect(result.nonEnglishSegments).toEqual([]);
+    expect(result.judgedSegmentCount).toBeGreaterThan(0);
+  });
+
+  it('flags the non-English passages of a code-switched document', () => {
+    const result = findNonEnglishSegments(`${ENGLISH_PARAGRAPH}\n${FRENCH_PARAGRAPH}`);
+    expect(result.hasNonEnglishSegment).toBe(true);
+    expect(result.nonEnglishSegments.length).toBeGreaterThan(0);
+    expect(result.nonEnglishSegments.every((s) => s.nearestLanguage === 'fr')).toBe(true);
+  });
+
+  it('reports source spans that actually locate the offending text in the original', () => {
+    const document = `${ENGLISH_PARAGRAPH}\n${FRENCH_PARAGRAPH}`;
+    const result = findNonEnglishSegments(document);
+
+    // The span is what a recruiter would be shown as "this is the part we
+    // could not read", so it has to index the real document, not a copy.
+    for (const segment of result.nonEnglishSegments) {
+      expect(document.slice(segment.sourceSpan.start, segment.sourceSpan.end)).toBe(segment.text);
+      expect(segment.sourceSpan.start).toBeGreaterThanOrEqual(0);
+      expect(segment.sourceSpan.end).toBeLessThanOrEqual(document.length);
+    }
+  });
+
+  it('reports spans in document order', () => {
+    const document = `${ENGLISH_PARAGRAPH}\n${FRENCH_PARAGRAPH}\nShe reports to the ward manager.\n${FRENCH_PARAGRAPH}`;
+    const starts = findNonEnglishSegments(document).nonEnglishSegments.map(
+      (s) => s.sourceSpan.start,
+    );
+    expect(starts).toEqual([...starts].sort((a, b) => a - b));
+  });
+
+  it('does not vote on a skills line, which is technology names in no particular language', () => {
+    // 8-12 language-neutral tokens. Judging these is a coin flip, and at an
+    // 8-word floor this exact shape produced false refusals on real English
+    // CVs — hence the higher segment floor.
+    const result = findNonEnglishSegments(
+      'Skills: Python, Docker, Kubernetes, AWS, React, Node.js, PostgreSQL, Git, CI/CD, Agile',
+    );
+    expect(result.judgedSegmentCount).toBe(0);
+    expect(result.hasNonEnglishSegment).toBe(false);
+  });
+
+  it('KNOWN BLIND SPOT: says nothing at all about a terse bullet CV', () => {
+    // No segment reaches the floor, so the veto abstains rather than
+    // guessing. A terse BILINGUAL CV therefore still gets through — this
+    // narrows the C7 gap, it does not close it (HONESTY_LOG H-041).
+    const terse = `Kwabena Boateng - HGV Driver
+Class 1 licence, clean record, twelve years
+Long distance and multi-drop experience
+Digital tachograph and drivers hours compliant`;
+    const result = findNonEnglishSegments(terse);
+    expect(result.judgedSegmentCount).toBe(0);
+    expect(result.hasNonEnglishSegment).toBe(false);
+  });
+
+  it('returns an empty result for empty text rather than throwing', () => {
+    const result = findNonEnglishSegments('');
+    expect(result.hasNonEnglishSegment).toBe(false);
+    expect(result.judgedSegmentCount).toBe(0);
+  });
+
+  it('is deterministic across repeated calls on the same input', () => {
+    const document = `${ENGLISH_PARAGRAPH}\n${FRENCH_PARAGRAPH}`;
+    expect(findNonEnglishSegments(document)).toEqual(findNonEnglishSegments(document));
   });
 });

@@ -61,6 +61,40 @@ describe('extractText', () => {
     expect(result.warnings.join(' ')).toMatch(/english/i);
   });
 
+  it('refuses a mostly-English CV that contains a non-English passage (ADR-022)', async () => {
+    // Two English paragraphs plus one French paragraph. The whole-document
+    // verdict on this text is ENGLISH — the English statistics dominate — so
+    // without the segment veto this document would be scored, with the
+    // French third silently fed to English-only extraction. The French in
+    // the fixture is deliberately unaccented, which is the harder case and
+    // the one real extraction pipelines produce.
+    const bytes = readFixture('candidate-mixed-language.docx');
+    const result = await extractText(bytes, 'candidate-mixed-language.docx');
+
+    expect(result.parseStatus).toBe('needs_attention');
+    expect(result.reason).toBe('mixed_language_content');
+    expect(result.language).toBeNull();
+    expect(result.warnings.join(' ')).toMatch(/mix/i);
+  });
+
+  it('names the offending passage in the mixed-language warning rather than just refusing', async () => {
+    // A recruiter has to be able to act on a refusal; "not supported" with
+    // no location is not actionable on a five-page CV.
+    const bytes = readFixture('candidate-mixed-language.docx');
+    const result = await extractText(bytes, 'candidate-mixed-language.docx');
+
+    expect(result.warnings.join(' ')).toMatch(/Elle a travaille/);
+  });
+
+  it('still accepts a wholly English DOCX — the veto does not fire on clean input', async () => {
+    const bytes = readFixture('candidate-english.docx');
+    const result = await extractText(bytes, 'candidate-english.docx');
+
+    expect(result.parseStatus).toBe('ok');
+    expect(result.reason).toBeNull();
+    expect(result.language).toBe('en');
+  });
+
   it('marks a completely blank PDF (no extractable text at all) as failed, not scored', async () => {
     const bytes = readFixture('blank.pdf');
     const result = await extractText(bytes, 'blank.pdf');

@@ -1125,3 +1125,80 @@ branches landed. The `packages/core/src/**` aggregate still clears its 90% bar,
 so no gate fired — which is precisely the concealment described in H-004 and
 H-030, an aggregate absorbing a per-file regression. Named here so it is a known
 number rather than a discovered one.
+
+### H-041 · The detector scored half-French documents. Now it refuses them — mostly.
+
+**Severity:** was a live C7 violation; now reduced, explicitly not eliminated.
+
+Found by reading `docs/PRODUCT_DECISIONS.md` against the code rather than by a
+failing test. The charter says non-English and uncertain documents are never
+scored. The eval file, meanwhile, asserted as a "known limitation" that a
+code-switched document classifies as English — which means it gets scored. Both
+statements were true simultaneously, and nothing failed.
+
+**Measured before the fix,** sweeping an English CV with French sentences
+substituted in:
+
+| Mix         | Whole-document verdict |
+| ----------- | ---------------------- |
+| 5 EN / 1 FR | English → **scored**   |
+| 4 EN / 2 FR | English → **scored**   |
+| 3 EN / 3 FR | English → **scored**   |
+| 2 EN / 4 FR | not English → refused  |
+
+**A document that is half French was being scored on its English half**, with
+the French half handed to English-only extraction and silently contributing
+nothing. That is exactly C7: a confident number over text we could not read.
+
+**The fix that does not work, recorded because it is the obvious one.** Refuse
+when English wins only narrowly. Measured relative margins ((dOther − dEn)/dEn):
+
+```
+headers_plus_tech_only (real English CV, eval requires it to pass)  0.0016
+the code-switched document we want to catch                         0.0063
+```
+
+The legitimate CV's margin is **four times narrower** than the document we want
+to reject. Any threshold catching code-switching rejects a real English CV
+first. The classes do not separate on that axis and no amount of tuning creates
+a boundary that is not there. Written down so nobody re-derives it.
+
+**What was built (ADR-022):** per-segment judgement used as a veto. Mixing is
+structural — the languages sit in different paragraphs — so it is visible per
+segment while invisible in the aggregate. The veto runs only after the whole
+document has already been judged English, so it can add refusals and can never
+manufacture an English verdict. The zero-false-positive property of the eval
+corpus survives by construction rather than by re-measurement.
+
+**On calibration, which is where this project keeps getting caught.** I chose
+the 15-word segment floor by testing against the same eight English CVs the
+eval file asserts on — the exact trap in H-023 and H-028 D6. So the floor was
+re-validated against a **held-out corpus written afterwards**: ten English CVs
+in nursing, teaching, accountancy, catering, trades, logistics, science, law,
+admin and haulage, deliberately outside the software-engineering domain that
+both the reference profiles and the original eval set live in.
+
+```
+floor 10w -> 1 of 10 held-out English CVs falsely refused
+floor 12w -> 0 falsely refused, mixing still caught
+floor 15w -> 0 falsely refused, mixing still caught   <-- chosen
+floor 18w -> 0 falsely refused, mixing still caught
+floor 20w -> 0 falsely refused, and catches nothing at all
+```
+
+15 is mid-window, not on an edge. **A side result worth stating:** all ten
+held-out CVs classify English and all four held-out non-English CVs stay
+refused, so the n-gram detector holds up outside its training domain — which
+was previously assumed, never measured.
+
+**The residual gap, stated plainly.** The veto abstains when no segment reaches
+15 words. **Five of the ten held-out CVs are that shape** — terse bullets,
+skills lists, header-and-technology layouts. On those documents this check says
+nothing at all, so **a terse bilingual CV is still scored**. The C7 hole is
+narrower, not closed. Closing it needs per-segment identification that works on
+~8-word fragments, which character-statistics cannot do; that is a different
+method, not a tuning change.
+
+Also accepted: a genuine English CV containing a long foreign-language
+quotation will be refused. A false refusal costs one manual review; a false
+acceptance costs a candidate a wrong score. The asymmetry is the argument.

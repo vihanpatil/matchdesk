@@ -609,3 +609,63 @@ decision explicitly restores them.
 **Cost:** product decisions now live in a dedicated compact document alongside
 the append-only technical ADRs. Accepted: it makes the source of truth usable
 without rewriting or erasing the history that explains existing code.
+
+---
+
+## ADR-022 — A partly-English document is refused, not scored on its English part
+
+**Date:** 2026-08-12 · **Status:** Accepted
+
+`detectLanguageHeuristic` judges a document as one blob, so a code-switched CV
+is classified by whichever language's statistics dominate. Measured on the
+shipped detector: a document with **50% French sentences still classified
+English**, and a single French paragraph appended to any of ten held-out
+English CVs left the aggregate verdict unchanged.
+
+`docs/PRODUCT_DECISIONS.md` says non-English and uncertain documents go to
+**Needs attention** and are never scored; C7 says never score a document you
+could not fully read. A half-French CV scored on its English half violates
+both — the recruiter gets a confident number computed over text the extractor
+silently skipped.
+
+**Rejected: a confidence threshold.** The obvious fix is refusing when English
+wins only narrowly. The measured margins make it impossible: relative margin
+for `headers_plus_tech_only` — a legitimate English CV the eval corpus requires
+to pass — is **0.0016**, while the code-switched document sits at **0.0063**,
+four times wider. Any cut catching code-switching rejects a real English CV
+first. The classes are not separable on that axis, so no threshold exists.
+
+**Decision:** judge each segment separately and use the result as a **veto**.
+`findNonEnglishSegments` splits on line and sentence boundaries, judges only
+segments of ≥15 words, and reports any that are not English with source spans.
+`extractText` runs it **only after** the whole-document verdict is already
+English, and refuses with `mixed_language_content` if it fires.
+
+Veto-only is the point: this layer can add refusals but can never turn a
+non-English document into an English one, so the eval corpus's zero-false-
+positive property is preserved **by construction**, not by re-measurement.
+
+**The 15-word floor is measured, not chosen.** A held-out corpus of ten English
+CVs spanning nursing, teaching, accountancy, catering, trades, logistics,
+science, law, admin and haulage — deliberately outside the software domain both
+the reference profiles and the original eval set are drawn from:
+
+| Floor | False alarms on 10 held-out English CVs | Catches mixing |
+| ----- | --------------------------------------- | -------------- |
+| 8w    | 3 of 8 (in-corpus)                      | yes            |
+| 10w   | 1 of 10                                 | yes            |
+| 12w   | 0                                       | yes            |
+| 15w   | **0**                                   | **yes**        |
+| 18w   | 0                                       | yes            |
+| 20w   | 0                                       | **no**         |
+
+15 sits mid-window rather than on an edge. The sweep is asserted in
+`languageDetection.eval.test.ts`, not merely described here.
+
+**Cost, accepted:** the veto abstains on terse CVs — five of the ten held-out
+documents have no segment long enough to judge — so a **terse bilingual CV
+still passes**. This narrows the C7 gap; it does not close it (H-041). A
+document with a legitimate short foreign-language quotation may also be
+refused; a false refusal costs the recruiter one manual review, while a false
+acceptance costs a candidate a wrong score, and that asymmetry is the whole
+argument for erring here.

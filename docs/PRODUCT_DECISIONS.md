@@ -27,6 +27,12 @@ verification failures remain append-only in `../HONESTY_LOG.md`.
   uncertain language classification go to **Needs attention** and are never
   scored. There is no v1 OCR, manual text correction, or local translation.
 - V1 is English-only and must state that limitation plainly in the product.
+- **Partly-English documents are refused, not partly scored** (ADR-022). A CV
+  that mixes English with another language is sent to **Needs attention** with
+  the non-English passage identified, rather than scored on the portion that
+  happened to be readable. Detection is best-effort and abstains on very terse
+  documents, so this reduces the risk rather than eliminating it — the residual
+  gap is tracked in `../HONESTY_LOG.md`.
 - Matching is deterministic and evidence-backed. Generative models, semantic
   embeddings, and non-deterministic analysis are not part of the scoring path.
 - Every displayed strength, gap, eligibility result, and score contribution must

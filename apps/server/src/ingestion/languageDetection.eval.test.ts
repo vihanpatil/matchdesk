@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { detectLanguageHeuristic } from './languageDetection.js';
+import { detectLanguageHeuristic, findNonEnglishSegments } from './languageDetection.js';
 
 /**
  * Real evaluation set for the language detector (H-028 D6 / ADR-018).
@@ -159,14 +159,16 @@ describe('detectLanguageHeuristic — documented limitations (not requirements; 
     expect(result.isEnglish).toBe(false);
   });
 
-  it('KNOWN LIMITATION: a code-switched (bilingual) document is judged as one blob, not per-section', () => {
+  it('judges a code-switched (bilingual) document as one blob — which is why the segment veto exists (ADR-022)', () => {
     const text =
       'Jordan Rivera is a software engineer with five years of experience. Jordan a dirige des migrations vers des microservices et encadre des ingenieurs juniors dans une equipe.';
-    const result = detectLanguageHeuristic(text);
-    // Whichever language's statistics happen to dominate wins; this asserts
-    // the actual current output so a change in behaviour is visible, not a
-    // guarantee that this is the "right" answer for a mixed document.
-    expect(result.isEnglish).toBe(true);
+    // Whichever language's statistics dominate wins the aggregate. This is
+    // no longer merely "documented": `findNonEnglishSegments` vetoes exactly
+    // this case downstream, and `extractText` refuses the document. The
+    // assertion stays so the two layers cannot silently drift apart — if
+    // this ever flips to false, the veto is doing work it no longer needs to.
+    expect(detectLanguageHeuristic(text).isEnglish).toBe(true);
+    expect(findNonEnglishSegments(text).hasNonEnglishSegment).toBe(true);
   });
 
   it('does NOT misjudge a short, minimally-structured English bullet CV that has at least a couple of header/verb words', () => {
@@ -182,5 +184,143 @@ describe('detectLanguageHeuristic — documented limitations (not requirements; 
 - Reviewed code`;
     const result = detectLanguageHeuristic(text);
     expect(result.isEnglish).toBe(true);
+  });
+});
+
+// -------------------------------------------------------------------------
+// HELD-OUT corpus for the mixed-language veto (ADR-022).
+//
+// The 15-word segment floor was first chosen by testing against ENGLISH_CVS
+// above — the same documents this file asserts on. That is the trap H-023
+// and H-028 D6 were both about: a threshold fitted to the fixtures that
+// grade it looks calibrated and is not.
+//
+// This corpus is the independent check. Different names, and deliberately
+// outside the software-engineering domain that BOTH the reference profiles
+// in languageDetection.ts AND the ENGLISH_CVS above are drawn from: nursing,
+// teaching, accountancy, catering, trades, logistics, science, law, admin,
+// haulage. If the detector or the floor only works on software CVs, this is
+// what exposes it.
+// -------------------------------------------------------------------------
+
+const HELD_OUT_ENGLISH_CVS: Record<string, string> = {
+  nurse_prose: `Bernadette Achebe is a registered nurse with eleven years of experience in acute cardiac care. She has worked night rotations on a thirty-bed ward, coordinating with consultants and allied health staff to manage post-operative recovery. Bernadette trains new graduate nurses each intake and sits on the ward's medication safety committee. She holds a Bachelor of Nursing and maintains current advanced life support certification.`,
+
+  teacher_prose: `Hollis Marchetti has taught secondary mathematics for nine years across two comprehensive schools. He currently leads the numeracy intervention programme, working with pupils who arrive below the expected standard, and has raised attainment in his cohort for four consecutive years. Hollis mentors trainee teachers on placement and contributes to the department's scheme of work. He holds a postgraduate certificate in education.`,
+
+  accountant_prose: `Winifred Osei-Bonsu is a chartered accountant specialising in statutory audit for mid-market manufacturing clients. Over eight years she has managed audit engagements from planning through to completion, supervising teams of three to five and presenting findings to audit committees. Winifred has led the transition of two clients onto new revenue recognition standards.`,
+
+  scientist_prose: `Oluwaseun Adeyinka-Brooks is a research scientist working on freshwater ecology. Her doctoral work examined nutrient loading in lowland rivers, and she has since published on catchment restoration in three peer-reviewed journals. Oluwaseun designs and runs field sampling campaigns, supervises two doctoral students, and manages a modest grant portfolio.`,
+
+  admin_short_prose: `Marisol Cabrera-Lynch has managed a busy medical practice reception for seven years. She oversees appointment scheduling, patient records and the daily reconciliation of payments, and has introduced a recall system that improved screening uptake.`,
+
+  chef_terse: `Dmitri Karalis - Head Chef
+- Ran a brigade of fourteen across two services daily
+- Cut food waste by a third through revised prep scheduling
+- Designed seasonal menus changing four times a year
+- Managed supplier relationships and weekly ordering
+- Trained six commis chefs to chef de partie level`,
+
+  electrician_terse: `Sione Fifita - Qualified Electrician
+- Completed domestic and light commercial installations
+- Carried out periodic inspection and testing to current wiring regulations
+- Supervised two apprentices on site
+- Maintained fault-free record across four years of scheduled maintenance
+- Held responsibility for site safety documentation`,
+
+  logistics_headers: `Anneliese Vogt-Ramirez
+Contact: a.vogt.ramirez@example.com
+Skills: Warehouse Management, SAP, Forecasting, Route Planning, Inventory Control
+Experience: Logistics Coordinator, 2017-present
+Certifications: Forklift, IOSH Managing Safely
+Education: Diploma in Supply Chain Management`,
+
+  paralegal_mixed_shape: `Thaddeus Ngcobo
+Paralegal with six years in commercial property. Prepares lease documentation, manages completions, and liaises with land registry.
+Skills: Drafting, Title Review, Case Management Systems
+Education: LLB, 2016
+Additional: Conversational Portuguese`,
+
+  driver_very_terse: `Kwabena Boateng - HGV Driver
+Class 1 licence, clean record, twelve years
+Long distance and multi-drop experience
+Digital tachograph and drivers hours compliant
+Manual handling trained`,
+};
+
+const HELD_OUT_NON_ENGLISH_CVS: Record<string, string> = {
+  german_nurse: `Bernadette Achebe ist eine erfahrene Krankenschwester mit elf Jahren Erfahrung in der Herzintensivpflege. Sie hat Nachtschichten auf einer Station mit dreißig Betten übernommen und mit Fachärzten zusammengearbeitet.`,
+  spanish_teacher: `Hollis Marchetti ha enseñado matemáticas en secundaria durante nueve años en dos institutos. Actualmente dirige el programa de refuerzo y trabaja con alumnos que llegan por debajo del nivel esperado.`,
+  dutch_accountant: `Winifred Osei-Bonsu is een registeraccountant gespecialiseerd in wettelijke controles voor middelgrote productiebedrijven. Zij heeft controleopdrachten geleid van planning tot afronding.`,
+  swedish_chef: `Dmitri Karalis har arbetat som köksmästare i tolv år och lett ett team på fjorton personer under två serveringar varje dag. Han har minskat matsvinnet med en tredjedel.`,
+};
+
+/** A French passage long enough to be a real paragraph in a CV — the
+ *  realistic code-switching case is a cover paragraph or a prior-role
+ *  description left in the candidate's first language. */
+const FRENCH_PARAGRAPH = `Elle a travaillé pendant six ans dans un service de cardiologie où elle encadrait les infirmières nouvellement diplômées. Son expérience comprend la gestion des soins postopératoires et la coordination avec les médecins consultants du service.`;
+
+describe('held-out corpus — the detector outside the domain it was built on', () => {
+  it('classifies all ten held-out English CVs as English, across ten unrelated professions', () => {
+    const misclassified = Object.entries(HELD_OUT_ENGLISH_CVS)
+      .filter(([, cv]) => detectLanguageHeuristic(cv).isEnglish !== true)
+      .map(([label]) => label);
+    expect(misclassified).toEqual([]);
+  });
+
+  it('still refuses non-English CVs in those same unrelated professions', () => {
+    const misclassified = Object.entries(HELD_OUT_NON_ENGLISH_CVS)
+      .filter(([, cv]) => detectLanguageHeuristic(cv).isEnglish !== false)
+      .map(([label]) => label);
+    expect(misclassified).toEqual([]);
+  });
+});
+
+describe('mixed-language veto — held-out validation of the 15-word floor (ADR-022)', () => {
+  it('raises no false alarm on any of the ten held-out English CVs', () => {
+    // A false alarm here is a real recruiter's real English CV being refused.
+    // This is the assertion that makes the floor a measurement rather than a
+    // guess, because none of these documents informed the original choice.
+    const falseAlarms = Object.entries(HELD_OUT_ENGLISH_CVS)
+      .filter(([, cv]) => findNonEnglishSegments(cv).hasNonEnglishSegment)
+      .map(([label]) => label);
+    expect(falseAlarms).toEqual([]);
+  });
+
+  it('catches a French paragraph appended to every one of the ten held-out English CVs', () => {
+    const missed = Object.entries(HELD_OUT_ENGLISH_CVS)
+      .filter(
+        ([, cv]) => !findNonEnglishSegments(`${cv}\n${FRENCH_PARAGRAPH}`).hasNonEnglishSegment,
+      )
+      .map(([label]) => label);
+    expect(missed).toEqual([]);
+  });
+
+  it('catches mixing the whole-document verdict misses entirely', () => {
+    // The gap this closes: at these ratios the aggregate still says English,
+    // so without the veto the document is scored on the part we could read
+    // and silently ignores the rest.
+    const englishPart = HELD_OUT_ENGLISH_CVS['nurse_prose'] ?? '';
+    const oneFrenchParagraph = `${englishPart}\n${FRENCH_PARAGRAPH}`;
+
+    expect(detectLanguageHeuristic(oneFrenchParagraph).isEnglish).toBe(true);
+    expect(findNonEnglishSegments(oneFrenchParagraph).hasNonEnglishSegment).toBe(true);
+  });
+
+  it('KNOWN BLIND SPOT: abstains entirely on terse CVs, so a terse bilingual CV still passes', () => {
+    // Five of the ten held-out CVs are terse enough that no segment reaches
+    // the floor. The veto narrows the C7 gap; it does not close it. Asserted
+    // as current behaviour so the limit is a known number, not a discovery
+    // (HONESTY_LOG H-041).
+    const silent = Object.entries(HELD_OUT_ENGLISH_CVS)
+      .filter(([, cv]) => findNonEnglishSegments(cv).judgedSegmentCount === 0)
+      .map(([label]) => label);
+    expect(silent).toEqual([
+      'chef_terse',
+      'electrician_terse',
+      'logistics_headers',
+      'paralegal_mixed_shape',
+      'driver_very_terse',
+    ]);
   });
 });

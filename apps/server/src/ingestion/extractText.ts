@@ -1,7 +1,11 @@
 import path from 'node:path';
 
 import { extractDocxText } from './docxExtractor.js';
-import { detectLanguageHeuristic, type LanguageDetectionResult } from './languageDetection.js';
+import {
+  detectLanguageHeuristic,
+  findNonEnglishSegments,
+  type LanguageDetectionResult,
+} from './languageDetection.js';
 import { extractPdfText } from './pdfExtractor.js';
 
 export type ParseStatus = 'ok' | 'needs_attention' | 'failed';
@@ -12,6 +16,7 @@ export type ExtractionReason =
   | 'no_extractable_text'
   | 'language_undetermined'
   | 'non_english_language_not_supported'
+  | 'mixed_language_content'
   | null;
 
 export interface ExtractionResult {
@@ -74,6 +79,30 @@ function judgeLanguage(
       warnings: [...warnings, 'Language not supported — English only (ADR-006).'],
       language: null,
       reason: 'non_english_language_not_supported',
+    };
+  }
+
+  // The whole-document verdict is English. Before accepting it, check whether
+  // the document is only MOSTLY English (ADR-022) — a code-switched CV wins
+  // the aggregate comparison while containing paragraphs we cannot read, and
+  // scoring it would report a confident number over text that was skipped.
+  // This is a veto: it can refuse, never accept.
+  const mixed = findNonEnglishSegments(text);
+  if (mixed.hasNonEnglishSegment) {
+    const [first] = mixed.nonEnglishSegments;
+    const excerpt = first === undefined ? '' : first.text.slice(0, 60);
+    return {
+      parseStatus: 'needs_attention',
+      parseConfidence: baseConfidence * 0.5,
+      warnings: [
+        ...warnings,
+        `Document appears to mix English with non-English text — ` +
+          `${String(mixed.nonEnglishSegments.length)} of ${String(mixed.judgedSegmentCount)} ` +
+          `passage(s) were not English (first: "${excerpt}…"). English only (ADR-006), and a ` +
+          'partly-unreadable document is never scored (C7).',
+      ],
+      language: null,
+      reason: 'mixed_language_content',
     };
   }
 

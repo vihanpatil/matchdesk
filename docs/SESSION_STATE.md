@@ -65,9 +65,9 @@ work until it is done** (ADR-018).
 | `pnpm lint`          | pass                                                       |
 | `pnpm format:check`  | pass                                                       |
 | `pnpm license:audit` | pass (1 waiver: `duck@0.1.12`, ADR-016)                    |
-| `pnpm test:cov`      | **454 passed / 40 files**, none skipped, manifest complete |
+| `pnpm test:cov`      | **471 passed / 40 files**, none skipped, manifest complete |
 
-Coverage: **98.14% statements, 92.5% branches, 100% functions** repo-wide.
+Coverage: **98.1% statements, 92.18% branches, 100% functions** repo-wide.
 Mutation score **65.03%** is from the last `pnpm mutate` at `e778837` and has
 **not** been re-run since the D5/D6 work landed — treat it as stale, not as
 evidence. That gap is still the most important number in this document (§6).
@@ -91,6 +91,13 @@ copy a gate result forward; run it.
    quantity words rejected, future-dated ranges rejected, and explicit
    "N years" claims no longer summed with the ranges that describe them
    (**H-040** records what that rule costs).
+
+3. **Mixed-language refusal (ADR-022)** — a code-switched CV was being scored
+   on its English part; measured, a 50%-French document still classified
+   English. `findNonEnglishSegments` now vetoes it and `extractText` refuses
+   with `mixed_language_content`. Veto-only, so it cannot manufacture an
+   English verdict. Floor validated against a held-out ten-CV corpus outside
+   the software domain (**H-041**, which also records what it still misses).
 
 **Still absent:** D7 `PRAGMA recursive_triggers` and audit-log mutation
 coverage; the `explain.ts` mutation-survivor backlog; a _consumer_ of the
@@ -168,6 +175,7 @@ accident:
 | H-034 | Invisible characters                          | ZWSP/soft-hyphen break extraction; routine in PDFs. No relation yet      |
 | H-036 | **607 mutation survivors**                    | `explain.ts` 28.93% — the recruiter-facing reasoning is unverified       |
 | H-040 | Tenure understated when ranges don't parse    | A 3-year parsed role beats a 20-year claim. Needs an `explain.ts` caveat |
+| H-041 | Mixed-language veto abstains on terse CVs     | A terse BILINGUAL CV is still scored. C7 gap narrowed, not closed        |
 
 **From H-028, still open:** D7 audit-log `REPLACE` bypass; D8 (negative weights
 unvalidated, `confidence` computed but never read, evidence spans
