@@ -1,3 +1,4 @@
+import { extractIgnoringInvisibleCharacters } from './invisible.js';
 import { assertValidSpan } from './span.js';
 import type { DegreeLevel, EducationAttribute } from './types.js';
 
@@ -165,6 +166,22 @@ function hasDegreeContext(text: string, start: number, end: number): boolean {
   return false;
 }
 
+/**
+ * True when the matched text contains no upper-case letter — i.e. it is the
+ * ordinary English word rather than an abbreviation (H-033).
+ *
+ * Scoped to `AMBIGUOUS_BARE_FORMS` only. The distinctive spellings (BSc,
+ * MEng, PhD, LLB) are not affected, and neither are the full words
+ * ("bachelor of arts" in a lower-cased document still extracts), because
+ * those are guarded separately. The cost is a genuinely lower-cased "bs in
+ * computer science", which stops extracting — a false negative, and the
+ * right direction to fail: a missing degree is visible to the recruiter
+ * reviewing the CV, an invented one is not.
+ */
+function isLowerCaseWord(value: string): boolean {
+  return value === value.toLowerCase();
+}
+
 /** "in"/"of" immediately (allowing only a few characters of whitespace) after the match. */
 const IMMEDIATE_PREPOSITION = /^\s{0,3}(?:in|of)\b/i;
 
@@ -214,6 +231,10 @@ function hasBareWordContext(text: string, start: number, end: number): boolean {
  * "Master's in Computer Science, self-funded while working full time").
  */
 export function extractEducation(text: string): readonly EducationAttribute[] {
+  return extractIgnoringInvisibleCharacters(text, extractEducationFromVisibleText);
+}
+
+function extractEducationFromVisibleText(text: string): readonly EducationAttribute[] {
   if (text.length === 0) return [];
 
   const results: EducationAttribute[] = [];
@@ -252,6 +273,17 @@ export function extractEducation(text: string): readonly EducationAttribute[] {
       // set, since stripping punctuation leaves "associatesdegree", not
       // "associates".
       const normalizedForm = value.toLowerCase().replace(/[.\s'’]/g, '');
+      if (AMBIGUOUS_BARE_FORMS.has(normalizedForm) && isLowerCaseWord(value)) {
+        // H-033: a two-letter degree abbreviation written in lower case is
+        // not a degree, it is an English word. "such as Mathematics" yielded
+        // an associate degree with the word "as" highlighted as the evidence,
+        // because a recognized field followed and that satisfied
+        // `hasDegreeContext`. No context test can fix this — the context IS
+        // legitimate; the token is not. Every real CV writes these forms
+        // capitalised ("BS", "B.S.", "MSc"), so case is the signal that
+        // separates the abbreviation from the word.
+        continue;
+      }
       if (AMBIGUOUS_BARE_FORMS.has(normalizedForm) && !hasDegreeContext(text, start, end)) {
         continue;
       }

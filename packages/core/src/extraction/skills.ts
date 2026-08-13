@@ -1,5 +1,6 @@
 import { quantize } from '../numeric/round.js';
 import { TAXONOMY } from '../taxonomy/data.js';
+import { extractIgnoringInvisibleCharacters } from './invisible.js';
 import { assertValidSpan } from './span.js';
 import { detectSections } from './sections.js';
 import type { SkillAttribute, SkillExtractionMatchType } from './types.js';
@@ -162,6 +163,10 @@ const GAZETTEER: readonly GazetteerTerm[] = (() => {
  * "Skills" section.
  */
 export function extractSkills(text: string): readonly SkillAttribute[] {
+  return extractIgnoringInvisibleCharacters(text, extractSkillsFromVisibleText);
+}
+
+function extractSkillsFromVisibleText(text: string): readonly SkillAttribute[] {
   if (text.length === 0) return [];
 
   const claimed = new Array<boolean>(text.length).fill(false);

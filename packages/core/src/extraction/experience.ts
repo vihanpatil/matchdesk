@@ -1,4 +1,5 @@
 import { quantize, roundHalfUp } from '../numeric/round.js';
+import { extractIgnoringInvisibleCharacters } from './invisible.js';
 import { assertValidSpan } from './span.js';
 import { detectSections } from './sections.js';
 import type { ExtractionOptions, YearsExperienceAttribute } from './types.js';
@@ -164,6 +165,15 @@ function overlapsAny(
  * `packages/core`).
  */
 export function extractYearsExperience(
+  text: string,
+  referenceDate: ExtractionOptions['referenceDate'],
+): readonly YearsExperienceAttribute[] {
+  return extractIgnoringInvisibleCharacters(text, (visible) =>
+    extractYearsExperienceFromVisibleText(visible, referenceDate),
+  );
+}
+
+function extractYearsExperienceFromVisibleText(
   text: string,
   referenceDate: ExtractionOptions['referenceDate'],
 ): readonly YearsExperienceAttribute[] {

@@ -1,4 +1,5 @@
 import { quantize } from '../numeric/round.js';
+import { extractIgnoringInvisibleCharacters } from './invisible.js';
 import { assertValidSpan } from './span.js';
 import type { CertificationAttribute } from './types.js';
 
@@ -90,6 +91,10 @@ const GAZETTEER: readonly GazetteerTerm[] = (() => {
  * here.
  */
 export function extractCertifications(text: string): readonly CertificationAttribute[] {
+  return extractIgnoringInvisibleCharacters(text, extractCertificationsFromVisibleText);
+}
+
+function extractCertificationsFromVisibleText(text: string): readonly CertificationAttribute[] {
   if (text.length === 0) return [];
 
   const claimed = new Array<boolean>(text.length).fill(false);
