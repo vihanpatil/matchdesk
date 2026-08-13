@@ -1202,3 +1202,128 @@ method, not a tuning change.
 Also accepted: a genuine English CV containing a long foreign-language
 quotation will be refused. A false refusal costs one manual review; a false
 acceptance costs a candidate a wrong score. The asymmetry is the argument.
+
+---
+
+## 2026-08-12 — Metamorphic relations, and the three defects they found
+
+### H-042 · Two live defects, both fabricating credentials, found by writing four relations
+
+**Severity:** both were producing wrong scores for real people, and both had
+survived 471 passing tests.
+
+ADR-019's claim is that relations catch what examples cannot. Writing the
+relations for the known-but-unpinned gaps (H-033, H-034) produced two failures
+within minutes, and neither was the failure that had been written down.
+
+**1. Invisible characters do not "break extraction" — they FABRICATE skills.**
+H-034 recorded that ZWSP and soft hyphens "break extraction". Measured:
+
+```
+"Java<ZWSP>Script"        -> skill `java`   NOT lost — CHANGED to another skill
+"Software Enginee<ZWSP>r" -> skill `r`      FABRICATED from inside "Engineer"
+```
+
+The second is **H-028 D3 reappearing by a different route** — the defect where
+"Rémi" produced skill `r` and ranked the candidate eligible for an R role, with
+the letter sliced out of their own name shown as evidence. Same fabrication,
+same shape of false evidence, different trigger. A candidate is credited with
+Java they may not have, or with R they certainly do not have, because their PDF
+producer emitted a zero-width space — which no human reading the document can
+see.
+
+**2. The lower-case English word "as" is read as an Associate of Science.**
+
+```
+"such as Mathematics"                             -> associate degree
+"Tutored students in subjects such as Mathematics." -> associate degree
+```
+
+with **the word "as" highlighted as the evidence for the qualification.** The
+guard was not missing; it was satisfied. `hasDegreeContext` looks for a
+recognized field near the match, "Mathematics" is one, so the corroboration
+test passed. The context was genuine — the token was not.
+
+**R9 already contained this sentence and passed.** It uses "…such as
+Mathematics _and Physics_", and the trailing " and Physics" makes the captured
+field un-canonicalizable, so the guard rejected it. **The existing relation
+passed by luck**, one conjunction away from failing. Recorded because it is the
+strongest evidence yet for R10's shape: the same fragment at several context
+lengths, not one sentence.
+
+**Fixes.** For invisibles: extraction runs on cleaned text and every span is
+mapped back to ORIGINAL coordinates, so evidence highlighting still indexes the
+stored document and `assertValidSpan` holds against it. A document with no
+invisible characters takes a fast path and is not touched at all, so this
+cannot alter existing behaviour — and did not: all 70 education tests and 26
+skills tests passed unchanged. For "as": an ambiguous two-letter form written
+in lower case is rejected outright, because no context test can fix a case
+where the context is legitimate and the token is not.
+
+**Cost of the "as" fix, stated:** a genuinely lower-cased "bs in computer
+science" now extracts nothing. A false negative, and the right direction —
+a missing degree is visible to a recruiter reading the CV; an invented one is
+not.
+
+### H-043 · The mixed-language veto missed Danish, Norwegian and Swedish. Its own relation caught it.
+
+**Severity:** ADR-022 shipped one commit earlier with a hole in exactly the
+language family H-028 D6 identified as hardest.
+
+`R-L1` states: appending any non-English paragraph to any English CV must leave
+the document unscoreable. Across 10 held-out CVs × 8 languages, **15 of 80
+combinations failed** — every one of them Danish, Norwegian or Swedish.
+
+The cause was not classification. Each Scandinavian sentence is classified
+non-English _correctly_ when asked. They are **13 and 14 words long**, and the
+segment floor is 15 — so both were discarded unjudged, while the 27-word
+paragraph they form is caught easily. **Sentence-splitting fragmented the
+evidence below the floor and threw it away.**
+
+Fixed by judging at two granularities — paragraph and sentence — and vetoing on
+either. Strictly more sensitive than either alone, still veto-only. A side
+effect worth recording: the terse-CV blind spot **shrank from five of ten
+held-out CVs to four**, because one CV's two short sentences are judgeable as a
+paragraph when they were not as sentences.
+
+**What this says about the previous entry.** H-041 reported the veto's
+limitation as "abstains on terse CVs". That was true and incomplete: it also
+abstained on ordinary two-sentence paragraphs in three languages, and the
+held-out corpus that validated the floor did not catch it because it only ever
+appended ONE French paragraph. **A corpus that varies one axis validates one
+axis.** The relation varied both and found the hole immediately.
+
+### H-044 · The test-identity manifest can be silently truncated. I nearly committed it.
+
+**Severity:** would have disabled the identity gate while every check stayed
+green.
+
+`pnpm test:manifest` regenerates from `coverage/test-results.json`, which is
+simply "the last run". After running a single test file, I ran it — and the
+manifest went from **493 identities to 13**. Every gate still passed:
+
+```
+✅ All 493 tests executed — none skipped, and all 13 manifest tests present.
+```
+
+The identity check verifies that manifest entries **still exist** — a subset
+test — so a 13-entry manifest passes trivially. The count floor passed because
+493 real tests still ran. Nothing in the system compares the manifest against
+the suite it is supposed to be guarding. The gate would have gone on reporting
+success while checking **2.6%** of what it was built to check.
+
+This is H-004 again — "a green coverage percentage over a file set that is
+quietly too small is worse than no gate at all" — one layer up: a green
+identity gate over a _test_ set quietly too small.
+
+**Fixed:** `update-test-manifest.mjs` refuses to write a manifest smaller than
+the committed `minTests` floor, and says exactly why. `--allow-shrink` exists
+for a genuine reduction and prints a warning demanding an entry here. Verified
+by reproducing the truncation: the guard rejected it and the committed manifest
+was left untouched at 493.
+
+**Not fixed:** the underlying asymmetry. The identity check still cannot tell
+"the manifest is complete" from "the manifest is a subset", it can only tell
+that what is listed still exists. The floor guard blocks the accident that
+actually happened; a manifest deliberately edited down by hand would still
+pass.

@@ -51,7 +51,7 @@ work until it is done** (ADR-018).
 | --------------------------- | ------------------------------------------------------------- |
 | `packages/core`             | Taxonomy, extraction, cascade 1-3, eligibility, explanation   |
 | `apps/server`               | SQLite, migrations, repositories, dedup, file store, PDF/DOCX |
-| Metamorphic relations       | 11, all green (ADR-019)                                       |
+| Metamorphic relations       | 18 in core + 2 language relations, all green (ADR-019)        |
 | Mutation testing            | Configured, baseline measured, ratchet at 64 (ADR-020)        |
 | `apps/web`                  | **NOT STARTED** — blocked behind extraction hardening         |
 | Embeddings (cascade step 4) | Deferred; typed seam exists                                   |
@@ -65,9 +65,9 @@ work until it is done** (ADR-018).
 | `pnpm lint`          | pass                                                       |
 | `pnpm format:check`  | pass                                                       |
 | `pnpm license:audit` | pass (1 waiver: `duck@0.1.12`, ADR-016)                    |
-| `pnpm test:cov`      | **471 passed / 40 files**, none skipped, manifest complete |
+| `pnpm test:cov`      | **493 passed / 41 files**, none skipped, manifest complete |
 
-Coverage: **98.1% statements, 92.18% branches, 100% functions** repo-wide.
+Coverage: **98.26% statements, 92.06% branches, 100% functions** repo-wide.
 Mutation score **65.03%** is from the last `pnpm mutate` at `e778837` and has
 **not** been re-run since the D5/D6 work landed — treat it as stale, not as
 evidence. That gap is still the most important number in this document (§6).
@@ -171,11 +171,12 @@ accident:
 | H-008 | OCR + matrix budgets unmeasured               | Section 11 numbers may be unachievable                                   |
 | H-015 | `--no-verify` bypasses hooks                  | Unfixable client-side; CI is the backstop                                |
 | H-020 | Stale `dist/` survives a failing compile      | **Goes live when `apps/server` imports `@matchdesk/core`**               |
-| H-033 | Degree guard is context-window dependent      | Bare fragment "such as Mathematics" still yields a degree                |
-| H-034 | Invisible characters                          | ZWSP/soft-hyphen break extraction; routine in PDFs. No relation yet      |
+| H-033 | ~~Degree guard context-window dependent~~     | **CLOSED** — lower-case "as" rejected; pinned by R10 (H-042)             |
+| H-034 | ~~Invisible characters~~                      | **CLOSED** — they FABRICATED skills, not just broke extraction (H-042)   |
 | H-036 | **607 mutation survivors**                    | `explain.ts` 28.93% — the recruiter-facing reasoning is unverified       |
 | H-040 | Tenure understated when ranges don't parse    | A 3-year parsed role beats a 20-year claim. Needs an `explain.ts` caveat |
-| H-041 | Mixed-language veto abstains on terse CVs     | A terse BILINGUAL CV is still scored. C7 gap narrowed, not closed        |
+| H-041 | Mixed-language veto abstains on terse CVs     | A terse BILINGUAL CV is still scored. 4 of 10 held-out CVs are silent    |
+| H-044 | Manifest completeness is unverifiable         | Floor guard blocks the accident; a hand-edited manifest still passes     |
 
 **From H-028, still open:** D7 audit-log `REPLACE` bypass; D8 (negative weights
 unvalidated, `confidence` computed but never read, evidence spans
@@ -185,8 +186,10 @@ landed and verified** — but neither has been through the ADR-015 adversarial
 verifier, which has falsified three gate claims so far.
 
 **Also unverified by anything automated:** `experience.ts` branch coverage is
-**84%**, below the 90% bar its package is held to — absorbed by the
-`packages/core/src/**` aggregate, so no gate fired (H-040).
+**84%** and `invisible.ts` is **70%**, both below the 90% bar their package is
+held to — absorbed by the `packages/core/src/**` aggregate at 92.53%, so no
+gate fired (H-040). An aggregate hiding a per-file regression is H-004's
+pattern; these two are named so they are known numbers, not discoveries.
 
 **Known extraction gaps, reported not fixed:** UK vocational (A-Level, GCSE,
 HND, BTEC, NVQ); PGDip/PGCE; non-English degree names; `FIELD_VOCAB` is 14
@@ -240,11 +243,13 @@ wrong numbers invites trust the tool has not earned.
 1. ~~Land the two in-flight agents.~~ **Done** — verified against live
    behaviour, manifest reconciled, floor 428 → 454, `pnpm verify` exit 0
    (H-037, H-038).
-2. **Add metamorphic relations for the gaps that have none:** invisible
-   characters (H-034), bare-fragment degree guard (H-033), and experience
-   de-duplication now that D5 has landed. Each of these is currently a defect
-   no automated check would catch. Start here — D5b/D5c shipped with example
-   tests but **no stable relation**, which is how H-028 got through.
+2. ~~Add metamorphic relations for the gaps that have none.~~ **Done** —
+   R10 (bare-fragment degree guard, H-033), R11/R12 (invisible characters,
+   H-034), R13-R16 (experience de-duplication), and R-L1/R-L2 (mixed
+   language). **They found three live defects on the first run**: invisible
+   characters FABRICATE skills rather than merely breaking extraction, the
+   lower-case word "as" yields an associate degree, and the ADR-022 veto
+   missed Danish/Norwegian/Swedish. All three fixed (H-042, H-043).
 3. **Re-run the Opus adversarial verifier** over the hardened slice (ADR-015).
    It falsified the previous two gate claims and produced H-028. Do not skip it.
 4. **Re-run `pnpm mutate`** — the 65.03% baseline predates D5/D6 and is stale.
