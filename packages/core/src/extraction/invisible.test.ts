@@ -118,3 +118,66 @@ describe('the lowercase word "as" is not an associate degree (H-033)', () => {
     ]);
   });
 });
+
+describe('the invisible set is a Unicode PROPERTY, not a hand-written list (H-048)', () => {
+  // The original fix listed six code points. Adversarial enumeration found
+  // sixteen more that produce the IDENTICAL fabrication — `java` instead of
+  // `javascript` — because a hand-maintained list cannot keep up with what
+  // document producers actually emit.
+  const NEWLY_COVERED: readonly (readonly [string, string])[] = [
+    ['LEFT-TO-RIGHT MARK', '‎'],
+    ['RIGHT-TO-LEFT MARK', '‏'],
+    ['LEFT-TO-RIGHT EMBEDDING', '‪'],
+    ['POP DIRECTIONAL FORMATTING', '‬'],
+    ['LEFT-TO-RIGHT ISOLATE', '⁦'],
+    ['POP DIRECTIONAL ISOLATE', '⁩'],
+    ['COMBINING GRAPHEME JOINER', '͏'],
+    ['MONGOLIAN VOWEL SEPARATOR', '᠎'],
+    ['VARIATION SELECTOR-1', '︀'],
+    ['VARIATION SELECTOR-16', '️'],
+    ['FUNCTION APPLICATION', '⁡'],
+    ['INVISIBLE TIMES', '⁢'],
+    ['INVISIBLE SEPARATOR', '⁣'],
+    ['INVISIBLE PLUS', '⁤'],
+    ['INTERLINEAR ANNOTATION ANCHOR', '￹'],
+    ['UNICODE TAG CHARACTER (astral)', '\u{E0061}'],
+  ];
+
+  it.each(NEWLY_COVERED)('%s does not change which skill is extracted', (_name, char) => {
+    expect(
+      extractSkills(`Skills: Java${char}Script, Python`).map((s) => s.normalizedValue),
+    ).toEqual(['javascript', 'python']);
+  });
+
+  it('handles an ASTRAL invisible character, which a code-unit loop would miss', () => {
+    // Unicode tag characters are surrogate PAIRS. Testing each UTF-16 unit
+    // separately matches nothing, so the strip loop must iterate code points.
+    const original = `Skills: Java\u{E0061}Script`;
+    const skills = extractSkills(original);
+    expect(skills.map((s) => s.normalizedValue)).toEqual(['javascript']);
+    for (const skill of skills) {
+      expect(() => {
+        assertValidSpan(original, skill.sourceSpan, skill.value);
+      }).not.toThrow();
+    }
+  });
+
+  it('LEAVES visible whitespace alone — a reader sees two words there', () => {
+    // U+00A0 and friends RENDER AS A SPACE. Stripping them would join
+    // genuinely separate words and invent a skill nobody can see, which is
+    // this module's own failure mode pointed the other way.
+    expect(extractSkills('Skills: Java Script, Python').map((s) => s.normalizedValue)).toEqual([
+      'java',
+      'python',
+    ]);
+  });
+
+  it('LEAVES diacritics alone — stripping category Mn wholesale would rewrite names', () => {
+    // Variation selectors are Mn and ARE stripped; ordinary combining accents
+    // are Mn and must NOT be. "Rémi" must not become "Remi", and must still
+    // never produce the phantom skill `r` (H-028 D3).
+    expect(extractSkills('Rémi Dubois\nSkills: Python').map((s) => s.normalizedValue)).toEqual([
+      'python',
+    ]);
+  });
+});

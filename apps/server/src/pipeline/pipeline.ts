@@ -11,7 +11,7 @@ import type Database from 'better-sqlite3';
 import { extractText, type ExtractionResult } from '../ingestion/extractText.js';
 import { addCandidateAttribute } from '../repositories/candidateAttributes.js';
 import { createOrGetCandidate } from '../repositories/candidates.js';
-import { createJob } from '../repositories/jobs.js';
+import { createJob, getJobById } from '../repositories/jobs.js';
 import { upsertMatch } from '../repositories/matches.js';
 import type { Candidate as StoredCandidate, Job as StoredJob } from '../repositories/types.js';
 
@@ -169,6 +169,35 @@ export interface ScoredPair {
 }
 
 /**
+ * C7 applies to the JOB as well as the candidate (H-049).
+ *
+ * The first version of this pipeline enforced readability on the candidate
+ * only. An adversarial probe ingested a FRENCH job description — stored with
+ * `parseStatus="needs_attention"`, `language=null` — and scored a candidate
+ * against it: **score 100, persisted match row, no warning.** The requirements
+ * being scored against came from a document the tool could not read, so every
+ * number under that job was untraceable to any source the recruiter could
+ * check. That is the same C7 failure ADR-006 and ADR-022 close on the
+ * candidate side, on the axis nobody had tested.
+ */
+function assertJobReadable(db: Database.Database, jobId: string): void {
+  const stored = getJobById(db, jobId);
+  if (stored === null) {
+    throw new Error(
+      `refusing to score against job "${jobId}": no such job row. A score that references ` +
+        'no job is traceable to nothing.',
+    );
+  }
+  if (stored.parseStatus !== 'ok' || stored.language !== 'en') {
+    throw new Error(
+      `refusing to score against job "${jobId}" with parseStatus="${stored.parseStatus}" ` +
+        `language="${String(stored.language)}". Requirements derived from a document that was ` +
+        'not fully read cannot produce a traceable score (C7).',
+    );
+  }
+}
+
+/**
  * Scores one (job, candidate) pair from stored state and persists the match.
  *
  * **`job.id` must be the id of a STORED job row.** `Job` here is the core
@@ -196,6 +225,8 @@ export function scoreStoredPair(
   referenceDate: { readonly year: number; readonly month: number },
   computedAt: string,
 ): ScoredPair {
+  assertJobReadable(db, job.id);
+
   if (candidate.parseStatus !== 'ok' || candidate.language !== 'en') {
     throw new Error(
       `scoreStoredPair: refusing to score candidate ${candidate.id} with ` +
@@ -253,6 +284,10 @@ export function scoreJobAgainstCandidates(
   referenceDate: { readonly year: number; readonly month: number },
   computedAt: string,
 ): { readonly scored: readonly ScoredPair[]; readonly skipped: readonly string[] } {
+  // Guarded identically to the single-pair path — an unreadable job must not
+  // become scoreable simply by using the batch entry point (H-049).
+  assertJobReadable(db, job.id);
+
   const scored: ScoredPair[] = [];
   const skipped: string[] = [];
 

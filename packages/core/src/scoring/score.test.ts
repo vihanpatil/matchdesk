@@ -400,3 +400,28 @@ describe('ADR-017: must-have requirements both score and partition', () => {
     expect(pgStrength?.contribution).toBeGreaterThan(0);
   });
 });
+
+describe('weight validation (H-050)', () => {
+  const candidate = { id: 'c', createdAt: '2026-01-01T00:00:00.000Z', attributes: [] };
+
+  it('refuses a negative dimension weight rather than producing a score', () => {
+    // Measured before this guard existed: skills.weight = -5 produced a score
+    // of 100 out of 100, persisted as a match. A negative weight rewards a
+    // candidate for NOT matching, which cannot be shown as a match score.
+    expect(() =>
+      scoreCandidate({ id: 'j', skills: { weight: -5, requirements: [] } }, candidate),
+    ).toThrow(/negative/i);
+  });
+
+  it('refuses a non-finite weight', () => {
+    expect(() =>
+      scoreCandidate({ id: 'j', skills: { weight: Number.NaN, requirements: [] } }, candidate),
+    ).toThrow(/non-finite/i);
+  });
+
+  it('still accepts a zero weight, which is a legitimate way to disable a dimension', () => {
+    expect(() =>
+      scoreCandidate({ id: 'j', skills: { weight: 0, requirements: [] } }, candidate),
+    ).not.toThrow();
+  });
+});

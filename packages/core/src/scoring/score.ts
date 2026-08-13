@@ -26,6 +26,46 @@ interface ActiveDimension {
   readonly subscore: number;
 }
 
+/**
+ * Rejects a job whose dimension weights are not usable (H-028 D8, closed by
+ * H-050). `docs/PRODUCT_DECISIONS.md` requires weights to be non-negative;
+ * nothing enforced it, and an adversarial probe through the pipeline scored a
+ * candidate **100 out of 100 with `skills.weight = -5`**. A negative weight
+ * inverts a dimension's meaning — a candidate is rewarded for NOT matching —
+ * and the resulting number is presented to a recruiter as a match score with
+ * no indication anything is wrong.
+ *
+ * Throws rather than clamping. A negative weight is not a preference to be
+ * silently corrected; it means the caller's configuration is wrong, and a
+ * tool whose entire premise is traceable numbers must not quietly reinterpret
+ * a job's definition.
+ */
+function assertUsableWeights(job: Job): void {
+  const weights: readonly (readonly [string, number | undefined])[] = [
+    ['skills', job.skills?.weight],
+    ['experience', job.experience?.weight],
+    ['seniority', job.seniority?.weight],
+    ['educationCerts', job.educationCerts?.weight],
+  ];
+
+  for (const [name, weight] of weights) {
+    if (weight === undefined) continue;
+    if (!Number.isFinite(weight)) {
+      throw new Error(
+        `scoreCandidate: job "${job.id}" has a non-finite ${name} weight (${String(weight)}). ` +
+          'Weights must be finite, non-negative numbers.',
+      );
+    }
+    if (weight < 0) {
+      throw new Error(
+        `scoreCandidate: job "${job.id}" has a negative ${name} weight (${String(weight)}). ` +
+          'Weights must be non-negative (docs/PRODUCT_DECISIONS.md) — a negative weight rewards ' +
+          'a candidate for NOT matching, which cannot be presented as a match score.',
+      );
+    }
+  }
+}
+
 function activeDimensions(
   job: Job,
   candidate: Candidate,
@@ -103,6 +143,8 @@ export function scoreCandidate(
   candidate: Candidate,
   semanticMatcher?: SemanticMatcher,
 ): ScoreResult {
+  assertUsableWeights(job);
+
   const active = activeDimensions(job, candidate, semanticMatcher);
   const dimensions = contributionsFor(active);
   const raw = Math.max(

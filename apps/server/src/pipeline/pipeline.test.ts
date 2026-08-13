@@ -258,6 +258,77 @@ describe('pipeline: a document becomes a score', () => {
     expect(scored[0]?.result).toEqual(single.result);
   });
 
+  it('REFUSES to score against a job whose OWN document was unreadable (H-049, C7)', async () => {
+    // Found by adversarial probe: C7 was enforced on the candidate side only.
+    // A French job description stored with parseStatus="needs_attention" and
+    // language=null scored a candidate 100/100 with a persisted match row.
+    // The requirements came from a document nobody could read, so every
+    // number under that job was untraceable to any source.
+    const badJob = await ingestJobDocument(
+      db,
+      filesDir,
+      readFixture('candidate-french.docx'),
+      'job-fr.docx',
+      'French job description',
+    );
+    expect(badJob.outcome).toBe('needs_attention');
+
+    const candidate = await ingestCandidateDocument(
+      db,
+      filesDir,
+      readFixture('candidate-english.docx'),
+      'c.docx',
+      REF,
+    );
+
+    expect(() =>
+      scoreStoredPair(db, specFor(badJob.job.id), candidate.candidate, REF, COMPUTED_AT),
+    ).toThrow(/C7/);
+    expect(getMatch(db, badJob.job.id, candidate.candidate.id)).toBeNull();
+  });
+
+  it('guards the BATCH path against an unreadable job identically (H-049)', async () => {
+    // An unreadable job must not become scoreable by choosing a different
+    // entry point.
+    const badJob = await ingestJobDocument(
+      db,
+      filesDir,
+      readFixture('candidate-french.docx'),
+      'job-fr.docx',
+      'French job description',
+    );
+    const candidate = await ingestCandidateDocument(
+      db,
+      filesDir,
+      readFixture('candidate-english.docx'),
+      'c.docx',
+      REF,
+    );
+
+    expect(() =>
+      scoreJobAgainstCandidates(
+        db,
+        specFor(badJob.job.id),
+        [candidate.candidate],
+        REF,
+        COMPUTED_AT,
+      ),
+    ).toThrow(/C7/);
+  });
+
+  it('REFUSES to score against a job id that does not exist at all', async () => {
+    const candidate = await ingestCandidateDocument(
+      db,
+      filesDir,
+      readFixture('candidate-english.docx'),
+      'c.docx',
+      REF,
+    );
+    expect(() =>
+      scoreStoredPair(db, specFor('no-such-job'), candidate.candidate, REF, COMPUTED_AT),
+    ).toThrow(/no such job row/);
+  });
+
   it('ADR-018 Decision 1: adding a matched requirement never lowers the score, TEXT IN -> SCORE OUT', async () => {
     // The invariant ADR-018 said had to be restated at the level a candidate
     // actually experiences. It was previously provable only for the weighted

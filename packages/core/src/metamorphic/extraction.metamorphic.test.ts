@@ -239,12 +239,20 @@ describe('metamorphic: non-fabrication — things that must NOT be invented', ()
     }
   });
 
-  it('R10 · a field of study with no degree word never produces a degree, at any fragment length (H-033)', () => {
-    // R9 covers full sentences. H-033 is narrower and nastier: the degree
-    // guard looks back over an 80-character context window, so the SAME field
-    // name yields a degree or not depending on how much text precedes it.
-    // A PDF that extracts one line per text run — routine — produces exactly
-    // these short fragments.
+  it('R10 · a field of study with no degree word never produces a degree, at ANY context length (H-033)', () => {
+    // WHY THIS IS A GENERATED PROPERTY AND NOT A LOOP. The first version of
+    // this test was a nested `for` over two hard-coded lists. An E2 audit
+    // (H-051) correctly called that out: it lived in the metamorphic file and
+    // was named like a relation, but it asserted only the 60 combinations
+    // someone thought of — which is precisely the failure mode R9 already
+    // demonstrated, where a hand-written sentence passed by luck because a
+    // trailing " and Physics" happened to defeat the field lookup.
+    //
+    // H-033 is ABOUT context length: the degree guard looks back over an
+    // 80-character window, so the same fragment yields a degree or not
+    // depending on how much text precedes it. A test that cannot vary the
+    // context length cannot test the defect. `padding` below sweeps across
+    // and past that window.
     const FIELDS = [
       'Mathematics',
       'Computer Science',
@@ -257,25 +265,38 @@ describe('metamorphic: non-fabrication — things that must NOT be invented', ()
       'Marketing',
       'Data Science',
     ];
-    // Same fragment, progressively less preceding context.
-    const FRAMES: readonly ((field: string) => string)[] = [
-      (f) => `Tutored school students in subjects such as ${f} and related areas.`,
-      (f) => `Tutored students in subjects such as ${f}.`,
-      (f) => `subjects such as ${f}`,
-      (f) => `such as ${f}`,
-      (f) => `Interested in ${f}`,
-      (f) => `Courses in ${f}`,
+    const LEAD_INS = [
+      'such as',
+      'subjects such as',
+      'in subjects such as',
+      'interested in',
+      'courses in',
+      'tutoring in',
+      'reading about',
     ];
+    const TAILS = ['', '.', ',', ' and related areas.', '\n', ' with the team.'];
+    // Deliberately contains no degree keyword and no ambiguous two-letter
+    // token, so any degree extracted from a padded string is a fabrication.
+    const FILLER_WORD = 'project ';
 
-    for (const field of FIELDS) {
-      for (const frame of FRAMES) {
-        const text = frame(field);
-        expect(
-          extractEducation(text).map((d) => d.normalizedValue),
-          `"${text}" states no qualification, so it must not yield a degree`,
-        ).toEqual([]);
-      }
-    }
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...FIELDS),
+        fc.constantFrom(...LEAD_INS),
+        fc.constantFrom(...TAILS),
+        fc.nat({ max: 30 }),
+        (field, leadIn, tail, paddingWords) => {
+          const filler = FILLER_WORD.repeat(paddingWords);
+          const text = `${filler}${leadIn} ${field}${tail}`;
+
+          expect(
+            extractEducation(text).map((d) => d.normalizedValue),
+            `"${text}" states no qualification, so it must not yield a degree`,
+          ).toEqual([]);
+        },
+      ),
+      RUNS,
+    );
   });
 });
 

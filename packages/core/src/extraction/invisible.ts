@@ -33,17 +33,47 @@ import type { SourceSpan } from './types.js';
 
 /**
  * Code points that are invisible when rendered and must never influence
- * tokenization. Deliberately NOT a general Unicode category sweep: this is
- * the closed set of format/zero-width characters real document producers
- * emit. Anything visible — including unusual whitespace — is left alone,
- * because removing it could join two genuinely separate words.
+ * tokenization.
+ *
+ * **This was a hand-written list of six code points, and that was wrong**
+ * (H-048). Adversarial enumeration found SIXTEEN further characters that
+ * produce the identical fabrication — `Java<CHAR>Script` extracting the skill
+ * `java` — including the bidi marks and embeddings (U+200E, U+200F, U+202A,
+ * U+202C, U+2066, U+2069), the invisible math operators (U+2061-U+2064),
+ * variation selectors (U+FE00-U+FE0F), the combining grapheme joiner
+ * (U+034F), the Mongolian vowel separator (U+180E), interlinear annotation
+ * (U+FFF9) and the Unicode tag characters. A hand-maintained list is the
+ * wrong SHAPE for this problem: the set is defined by a Unicode property, so
+ * the pattern must be too, or it goes stale every time a producer picks a
+ * different separator.
+ *
+ * `\p{Cf}` (Format) covers every zero-width and directional-control
+ * character, including all six originals. Variation selectors are matched by
+ * their own binary property, and the combining grapheme joiner (U+034F) and
+ * Mongolian vowel separator (U+180E) are named explicitly.
+ *
+ * **`\p{Mn}` is deliberately NOT used**, even though variation selectors live
+ * in it: the rest of `Mn` is real diacritics. Sweeping the category would
+ * strip the accent from "Rémi", altering a person's name — and the combining
+ * acute U+0301 is verified NOT to match this pattern.
+ *
+ * **Deliberately NOT stripped — a decision, not an oversight:**
+ *
+ * - **Whitespace that renders as a space** — U+00A0 no-break space, U+202F,
+ *   U+2009, U+200A, U+2007. These are VISIBLE. A human reading
+ *   `Java<NBSP>Script` sees "Java Script", two words, and extracting `java`
+ *   agrees with the page. Stripping them would join genuinely separate words
+ *   and invent skills no reader can see — the same defect this module exists
+ *   to prevent, pointing the other way.
+ * - **U+FFFC object replacement character** — renders as a visible box
+ *   standing in for an embedded object. Removing it would splice together
+ *   text a reader sees as separated.
  */
-// Alternation rather than a character class: a class containing ZWJ trips
-// `no-misleading-character-class`, and the rule is right that a class of
-// joiners is easy to misread. Escapes rather than literals so the source
-// itself contains no invisible characters — this file must stay greppable.
-const INVISIBLE_PATTERN = /\u00AD|\u200B|\u200C|\u200D|\u2060|\uFEFF/;
-const INVISIBLE_PATTERN_GLOBAL = new RegExp(INVISIBLE_PATTERN, 'g');
+// Alternation, not a character class: ESLint's `no-misleading-character-class`
+// correctly objects to combining marks inside a class, and it is right that
+// such a class is easy to misread.
+const INVISIBLE_PATTERN = /\p{Cf}|\p{Variation_Selector}|\u034F|\u180E/u;
+const INVISIBLE_PATTERN_GLOBAL = new RegExp(INVISIBLE_PATTERN, 'gu');
 
 export interface CleanedText {
   /** The text with every invisible character removed. */
@@ -70,13 +100,20 @@ export function hasInvisibleCharacters(text: string): boolean {
 export function stripInvisibleCharacters(text: string): CleanedText {
   const kept: number[] = [];
   let cleaned = '';
+  let index = 0;
 
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    if (char === undefined) continue;
-    if (INVISIBLE_PATTERN.test(char)) continue;
-    cleaned += char;
-    kept.push(i);
+  // Iterates by CODE POINT (`for...of` over a string), not by UTF-16 code
+  // unit. The Unicode tag characters (U+E0000 block) are astral and arrive as
+  // surrogate PAIRS; testing each half separately matches nothing, so a
+  // code-unit loop silently fails to strip exactly the characters that are
+  // hardest to notice. Offsets stay in UTF-16 units because that is what
+  // `String.prototype.slice` and every stored span use.
+  for (const char of text) {
+    if (!INVISIBLE_PATTERN.test(char)) {
+      cleaned += char;
+      for (let unit = 0; unit < char.length; unit++) kept.push(index + unit);
+    }
+    index += char.length;
   }
 
   return {
