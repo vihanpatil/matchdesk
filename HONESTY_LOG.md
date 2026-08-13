@@ -1642,3 +1642,152 @@ audited; only the extractor's derivable output is not.
 **E5 is now unblocked.** H-052 was the only open wrong-score entry. E1-E4
 remain unmet — E2 in particular still fails for 9 of 12 defect lineages
 (H-051), so the UI stays blocked, for stated reasons.
+
+---
+
+## 2026-08-13 — E2 unblocked
+
+### H-053 · `<degree word> of <field>` is genuinely ambiguous, and stays that way
+
+**Severity:** coverage-gap. Does NOT block (ADR-023).
+
+Writing R18 (generated degree-shaped words in non-degree contexts) produced a
+failure: `Reported to the Associate of Engineering.` yields an associate
+degree. Investigated rather than assumed:
+
+```
+"Associate of Engineering"           -> ["associate"]
+"Associate of Science"               -> ["associate"]   <- a REAL degree
+"Bachelor of Arts"                   -> ["bachelor"]    <- a REAL degree
+"Associate Director of Engineering"  -> []
+"Promoted to Associate within two years." -> []
+```
+
+The trigger is `<degree word> of <anything>`, which is **the shape of every
+real degree name**. Asserting it must never yield a degree would demand the
+extractor MISS real qualifications, and no 80-character window separates the
+two — a human reading only that fragment cannot either.
+
+**R18 was therefore scoped to unambiguous non-degree contexts, with the reason
+written into the test** so it is not mistaken for a relation weakened to pass.
+A relation must assert something that is actually true; this one was over-
+reaching, and the guard was right.
+
+### H-054 · The explanation claimed a requirement was MET while reporting it as a gap
+
+**Severity:** wrong-score — fabricated justification. Found by a new property,
+fixed.
+
+H-036 recorded that `explain.ts` has 140 surviving mutants and that its content
+— the text a recruiter reads to justify a decision to a hiring manager or a
+candidate — is essentially unverified. A generated anti-fabrication property
+found this immediately:
+
+```
+STRENGTH:  Education & Certifications  matchType: meets_requirement
+GAP:       Education & Certifications  "Requires at least a high_school degree (50% met)."
+```
+
+The candidate **held** the required degree. `educationCertsSubscore` averages
+degree and certifications, so a missing certification dragged the dimension to
+0.5 — and the explanation then (a) claimed the requirement was met, (b)
+simultaneously reported it as a gap, and (c) blamed the DEGREE for a shortfall
+caused by the certification, which was already listed separately as its own
+must-have gap.
+
+Two defects in one output. A recruiter reading it would conclude the
+candidate's education was deficient when it was not.
+
+**Fixed:** `meets_requirement` is now claimed only when a dimension is fully
+met (`subscore >= 1`), not `> 0`. A partial subscore still reaches the score
+through `composition`; what was withdrawn is a false claim. And the education
+shortfall reason now checks whether the degree bar is actually cleared before
+naming the degree as the deficiency.
+
+**A note on the property itself.** Its first form — "no dimension+label is ever
+both a strength and a gap" — was too strong, and failed on a legitimate case:
+a must-have for `project-management` against a candidate with `leadership`
+produces a RELATED match, and "related evidence found, but the must-have is not
+satisfied" is true and useful. The property was narrowed to
+`meets_requirement` specifically, because that is an ABSOLUTE claim and is the
+part that cannot coexist with a shortfall. Recorded because narrowing a
+property is exactly how a suite quietly stops testing anything, and the reason
+belongs in the open.
+
+**Also fixed while here:** the `skillRequirementArb` generator produced jobs
+where a requirement for `vue` was labelled `javascript`. Failures from
+impossible inputs are unactionable noise, so `label` is now derived from
+`canonicalSkillId` as it is in production.
+
+### H-055 · E2 audit reconciled — the gap is closed, with two stated exceptions
+
+The H-051 audit found 9 of 12 wrong-score defect lineages had no genuine
+property or metamorphic test. Current state:
+
+| Defect                             | Pinned by                                      | E2      |
+| ---------------------------------- | ---------------------------------------------- | ------- |
+| H-013 round.ts survivors           | `round.property.test.ts` (8 properties)        | YES     |
+| H-022 British degrees              | `education.property.test.ts`                   | YES     |
+| H-028 D1 header swallow            | R1, R2, R5                                     | YES     |
+| H-028 D2 longest-first swallow     | **R17, R17b** (whole taxonomy, generated)      | YES     |
+| H-028 D3 / H-034 / H-042 invisible | R3, R11, R12                                   | YES     |
+| H-028 D4 / H-033 phantom degrees   | **R10 (converted), R18**                       | YES     |
+| H-028 D5 / H-040 years             | R13, R16, **R19, R20**                         | YES     |
+| H-028 D6 / H-043 language          | **R-L1, R-L2, R-L3** (generated, converted)    | YES     |
+| H-028 D8 weights + cert identity   | **negative-weight + cert-identity properties** | YES     |
+| H-029 seniority / hasCertification | **monotonicity + kind-check properties**       | YES     |
+| H-036 explain.ts                   | **4 anti-fabrication properties**              | PARTIAL |
+| H-028 D7 audit-log REPLACE         | nothing                                        | N/A     |
+
+**Two exceptions, stated rather than glossed:**
+
+1. **H-028 D7 is not a wrong-score defect.** `INSERT OR REPLACE` bypassing the
+   append-only audit trigger is an integrity/tamper defect: it corrupts the
+   record of what happened, not any number shown to a recruiter. Under
+   ADR-023's classification it is neither wrong-score, false-refusal nor
+   coverage-gap — it is a separate class, and E2 does not apply to it. It
+   remains open and must be fixed on its own merits.
+2. **H-036 is PARTIAL and I will not claim otherwise.** The four new properties
+   pin ANTI-FABRICATION — no invented strengths, no invented gaps, no
+   contradictory `meets_requirement`, must-have gaps matching eligibility —
+   and they found H-054 on their first run. They do **not** pin all 140
+   surviving mutants. The correct measurement is a mutation re-run (E4), which
+   is still stale.
+
+**E2 is treated as MET** on the basis that every wrong-score lineage now has a
+generated property or metamorphic relation, with H-036's residual tracked
+under E4 rather than hidden.
+
+### H-056 · `roundHalfUp` breaks its own error bound at large magnitudes
+
+**Severity:** known limitation, outside the operating domain. Does not block.
+
+Found by the new `round.property.test.ts` bounded-error property, and it is a
+FIFTH defect in this module beyond the four H-013 already recorded.
+Independently reproduced rather than taken on report:
+
+```
+roundHalfUp(4864715944.476645, 4) = 4864715944.4767
+error 0.00005435943603515625   bound 0.00005   -> VIOLATION
+```
+
+Cause: the `toPrecision(15)` tie-break correction has only
+`15 - digitsBefore(scaled)` digits of fractional headroom. As `|value| * 10^dp`
+climbs toward that limit the headroom collapses and the correction step itself
+can push the result past the promised half-unit bound.
+
+**Why it is not a live wrong-score defect.** Verified the engine's actual
+domain: a score is `roundHalfUp(raw * 100, 0)` with `raw` in `[0, 1]`, so the
+largest input is 100, and `quantize` works at 6 dp on values in `[0, 1]`. Every
+value the scoring path passes through this function is many orders of
+magnitude below where the bound breaks — checked explicitly at 0.5, 1, 100 and
+12345.6789, all exact.
+
+The property's generator is therefore scoped to `±1e5`, with the counterexample
+and reasoning written into the test file so the limit is documented where
+someone would look for it. **Scoping a generator to the operating domain is
+legitimate; scoping it to make a failure disappear is not, and the distinction
+is that this one is written down with the exact failing input.**
+
+Open: if this function is ever reused outside scoring — a report, a currency
+figure, an export — the bound does not hold and the caller must not assume it.

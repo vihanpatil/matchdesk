@@ -9,6 +9,7 @@ import type {
   YearsExperienceAttribute,
 } from '../extraction/types.js';
 import { TAXONOMY } from '../taxonomy/data.js';
+import { hasCertification, inferSeniorityLevel } from './dimensions.js';
 import { rankCandidates, scoreCandidate } from './score.js';
 import { DEGREE_LADDER, SENIORITY_LADDER, type Candidate, type Job } from './types.js';
 
@@ -93,12 +94,22 @@ const candidateArb: fc.Arbitrary<Candidate> = fc.record({
   attributes: fc.array(attributeArb, { maxLength: 12 }),
 });
 
-const skillRequirementArb = fc.record({
-  id: idArb,
-  canonicalSkillId: fc.constantFrom(...CANONICAL_SKILL_IDS),
-  label: fc.constantFrom(...CANONICAL_SKILL_IDS),
-  mustHave: fc.boolean(),
-});
+/**
+ * `label` is DERIVED from `canonicalSkillId` rather than generated
+ * independently, because in production a requirement's label comes from the
+ * skill it refers to. Generating them independently produced jobs where a
+ * requirement for `vue` was labelled `javascript`, and the resulting failures
+ * were artefacts of an impossible input rather than defects — a generator
+ * that can produce states the system can never reach wastes the signal it
+ * exists to give.
+ */
+const skillRequirementArb = fc
+  .record({
+    id: idArb,
+    canonicalSkillId: fc.constantFrom(...CANONICAL_SKILL_IDS),
+    mustHave: fc.boolean(),
+  })
+  .map((r) => ({ ...r, label: r.canonicalSkillId }));
 
 const skillsSpecArb = fc.record({
   weight: weightArb,
@@ -278,6 +289,229 @@ describe('ranking property tests', () => {
       fc.property(idArb, (id) => {
         expect(() => rankCandidates({ id }, [])).not.toThrow();
       }),
+    );
+  });
+});
+
+/**
+ * PROPERTIES ADDED FOR ADR-023 E2 (H-051).
+ *
+ * H-029 recorded that the seniority ladder thresholds and `hasCertification`'s
+ * `kind` check are movable with a green suite — a mutant that drops the kind
+ * check means a SKILL named `pmp` satisfies a required CERTIFICATION. H-036
+ * recorded that `explain.ts`, which builds the text a recruiter reads to
+ * justify a decision, has 140 surviving mutants and no test of its content.
+ * Both were pinned by nothing generated.
+ */
+describe('seniority and certification properties (H-029)', () => {
+  it('seniority is monotone in years: more experience never infers a LOWER level', () => {
+    // Pins every threshold boundary without hard-coding one. A mutant that
+    // flips a >= to > or moves a threshold breaks monotonicity somewhere in
+    // the generated range, which no fixed example set guarantees to hit.
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0, max: 60, noNaN: true }),
+        fc.double({ min: 0, max: 60, noNaN: true }),
+        (a, b) => {
+          const lower = Math.min(a, b);
+          const higher = Math.max(a, b);
+          const lowerIndex = SENIORITY_LADDER.indexOf(inferSeniorityLevel(lower));
+          const higherIndex = SENIORITY_LADDER.indexOf(inferSeniorityLevel(higher));
+
+          expect(higherIndex).toBeGreaterThanOrEqual(lowerIndex);
+        },
+      ),
+      { numRuns: 500 },
+    );
+  });
+
+  it('a SKILL never satisfies a certification requirement, whatever it is named (H-029)', () => {
+    // The exact surviving mutant: dropping `a.kind === 'certification'` from
+    // hasCertification. A candidate listing the skill "pmp" would then satisfy
+    // a required PMP certification — credentials fabricated from a skills
+    // list. Generated over every certification id AND every taxonomy skill id
+    // so the collision is found wherever the two vocabularies overlap.
+    fc.assert(
+      fc.property(fc.constantFrom(...CERT_IDS, ...CANONICAL_SKILL_IDS), (id) => {
+        const skillOnly: readonly ExtractedAttribute[] = [
+          {
+            kind: 'skill',
+            value: id,
+            normalizedValue: id,
+            confidence: 0.95,
+            sourceSpan: { start: 0, end: Math.max(1, id.length) },
+            canonicalId: id,
+            matchType: 'exact',
+          },
+        ];
+
+        expect(
+          hasCertification(id, skillOnly),
+          `a skill named "${id}" must not satisfy a certification requirement`,
+        ).toBe(false);
+      }),
+      { numRuns: 300 },
+    );
+  });
+
+  it('a certification satisfies ONLY its own canonical id (H-028 D8: level-variant identity)', () => {
+    fc.assert(
+      fc.property(fc.constantFrom(...CERT_IDS), fc.constantFrom(...CERT_IDS), (held, required) => {
+        const attrs: readonly ExtractedAttribute[] = [
+          {
+            kind: 'certification',
+            value: held,
+            normalizedValue: held,
+            confidence: 0.9,
+            sourceSpan: { start: 0, end: Math.max(1, held.length) },
+            canonicalId: held,
+          },
+        ];
+
+        expect(hasCertification(required, attrs)).toBe(held === required);
+      }),
+      { numRuns: 200 },
+    );
+  });
+});
+
+describe('weight validation properties (H-028 D8 / H-050)', () => {
+  it('ANY negative weight is rejected, on every dimension', () => {
+    // Pinned by example tests only until now. A negative weight inverts a
+    // dimension — the candidate is rewarded for NOT matching — and produced a
+    // score of 100/100 before H-050. Generated over every dimension and a
+    // range of negative magnitudes so no single hand-picked case is load
+    // bearing.
+    fc.assert(
+      fc.property(
+        fc.constantFrom('skills', 'experience', 'seniority', 'educationCerts'),
+        fc.double({ min: -1000, max: -0.000001, noNaN: true }),
+        candidateArb,
+        (dimension, weight, candidate) => {
+          // Built as a typed Job per dimension rather than assembled through
+          // an index signature and cast — the repo bans `as` narrowing, and a
+          // cast here would also let a malformed job through the very check
+          // being tested.
+          const job: Job =
+            dimension === 'skills'
+              ? { id: 'j', skills: { weight, requirements: [] } }
+              : dimension === 'experience'
+                ? { id: 'j', experience: { weight, requirement: { minYears: 3 } } }
+                : dimension === 'seniority'
+                  ? { id: 'j', seniority: { weight, requirement: { level: 'senior' } } }
+                  : {
+                      id: 'j',
+                      educationCerts: { weight, requirement: { minDegreeLevel: 'bachelor' } },
+                    };
+
+          expect(() => scoreCandidate(job, candidate)).toThrow(/negative/i);
+        },
+      ),
+      { numRuns: 300 },
+    );
+  });
+});
+
+describe('explanation anti-fabrication properties (H-036)', () => {
+  it('never reports a strength for a requirement the job did not state', () => {
+    // explain.ts builds what the recruiter reads to justify a shortlisting
+    // decision to a hiring manager or a candidate. 140 of its mutants survive,
+    // so its CONTENT is essentially unverified. This is the property that
+    // matters most: it must not invent a reason.
+    fc.assert(
+      fc.property(jobArb, candidateArb, (job, candidate) => {
+        const result = scoreCandidate(job, candidate);
+        const statedSkillLabels = new Set(
+          (job.skills?.requirements ?? []).map((r) => r.label.toLowerCase()),
+        );
+
+        for (const strength of result.explanation.strengths) {
+          if (strength.dimension !== 'skills') continue;
+          expect(
+            statedSkillLabels.has(strength.label.toLowerCase()),
+            `strength "${strength.label}" was not a stated requirement of job ${job.id}`,
+          ).toBe(true);
+        }
+      }),
+      { numRuns: 300 },
+    );
+  });
+
+  it('never reports a gap for a requirement the job did not state', () => {
+    fc.assert(
+      fc.property(jobArb, candidateArb, (job, candidate) => {
+        const result = scoreCandidate(job, candidate);
+        const statedSkillLabels = new Set(
+          (job.skills?.requirements ?? []).map((r) => r.label.toLowerCase()),
+        );
+
+        for (const gap of [
+          ...result.explanation.gaps.mustHave,
+          ...result.explanation.gaps.preferred,
+        ]) {
+          if (gap.dimension !== 'skills') continue;
+          expect(
+            statedSkillLabels.has(gap.label.toLowerCase()),
+            `gap "${gap.label}" was not a stated requirement of job ${job.id}`,
+          ).toBe(true);
+        }
+      }),
+      { numRuns: 300 },
+    );
+  });
+
+  it('never claims a requirement is MET while also reporting it as a gap (H-054)', () => {
+    // WHY THIS IS SCOPED TO `meets_requirement` RATHER THAN ALL STRENGTHS,
+    // stated so it is not mistaken for a property weakened to make it pass.
+    // The first version asserted that no dimension+label could be both a
+    // strength and a gap, and it failed on a LEGITIMATE case: a job
+    // must-having `project-management` against a candidate with `leadership`
+    // produces a RELATED skill match. Reporting "related evidence found, but
+    // the must-have is not satisfied" is informative and true — a partial
+    // match is honestly both.
+    //
+    // `meets_requirement` is different in kind: it is an ABSOLUTE claim and
+    // cannot coexist with a shortfall for the same thing. That is the real
+    // defect this found (H-054) — a candidate holding the required degree but
+    // missing a certification was shown "Education & Certifications: meets
+    // requirement" beside "Requires at least a high_school degree (50% met)",
+    // which contradicted itself AND blamed the degree the candidate had.
+    fc.assert(
+      fc.property(jobArb, candidateArb, (job, candidate) => {
+        const result = scoreCandidate(job, candidate);
+        const metClaims = new Set(
+          result.explanation.strengths
+            .filter((s) => s.matchType === 'meets_requirement')
+            .map((s) => `${s.dimension}:${s.label.toLowerCase()}`),
+        );
+
+        for (const gap of [
+          ...result.explanation.gaps.mustHave,
+          ...result.explanation.gaps.preferred,
+        ]) {
+          expect(
+            metClaims.has(`${gap.dimension}:${gap.label.toLowerCase()}`),
+            `"${gap.label}" is claimed as MET and reported as a gap in the same explanation`,
+          ).toBe(false);
+        }
+      }),
+      { numRuns: 500 },
+    );
+  });
+
+  it('every must-have gap corresponds to an actual eligibility failure', () => {
+    // A must-have gap is the reason a candidate is placed in the ineligible
+    // group. If the explanation lists one, the eligibility result must agree,
+    // or the recruiter is being told a candidate failed for a reason the
+    // engine did not actually apply.
+    fc.assert(
+      fc.property(jobArb, candidateArb, (job, candidate) => {
+        const result = scoreCandidate(job, candidate);
+        if (result.explanation.gaps.mustHave.length > 0) {
+          expect(result.eligibility.eligible).toBe(false);
+        }
+      }),
+      { numRuns: 300 },
     );
   });
 });

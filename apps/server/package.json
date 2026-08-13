@@ -17,6 +17,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "9.6.0"
+    "@types/better-sqlite3": "9.6.0",
+    "fast-check": "^4.9.0"
   }
 }

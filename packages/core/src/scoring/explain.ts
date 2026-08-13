@@ -1,6 +1,7 @@
+import { DEGREE_LADDER } from './types.js';
 import type { SourceSpan } from '../extraction/types.js';
 import { quantize, roundHalfUp } from '../numeric/round.js';
-import type { SkillRequirementMatch } from './dimensions.js';
+import { bestDegreeLevel, type SkillRequirementMatch } from './dimensions.js';
 import type {
   Candidate,
   DimensionContribution,
@@ -88,7 +89,15 @@ function otherDimensionStrengthsAndGaps(
     if (dim.dimension === 'skills') continue;
     const evidence = representativeSpan(candidate, dim.dimension);
 
-    if (dim.subscore > 0) {
+    // `meets_requirement` is a CLAIM, and it must only be made when the
+    // requirement is actually met (H-054). The previous condition was
+    // `subscore > 0`, so any partially-met dimension was emitted as BOTH a
+    // strength asserting "meets_requirement" AND a gap describing the
+    // shortfall — the same label, contradicting itself, in the text a
+    // recruiter reads to justify a decision to a candidate. A partial
+    // subscore still reaches the score through `composition`; what is
+    // withdrawn here is only the false claim.
+    if (dim.subscore >= 1) {
       strengths.push({
         dimension: dim.dimension,
         label: dimensionLabel(dim.dimension),
@@ -101,7 +110,7 @@ function otherDimensionStrengthsAndGaps(
       gaps.push({
         dimension: dim.dimension,
         label: dimensionLabel(dim.dimension),
-        reason: shortfallReason(job, dim),
+        reason: shortfallReason(job, candidate, dim),
       });
     }
   }
@@ -120,7 +129,18 @@ function dimensionLabel(dimension: NonSkillDimensionId): string {
   }
 }
 
-function shortfallReason(job: Job, dim: DimensionContribution): string {
+/**
+ * Explains WHICH part of a dimension fell short.
+ *
+ * The education/certifications dimension averages a degree subscore and a
+ * certification subscore, so a candidate who holds the required degree but
+ * lacks a required certification scores 0.5 on it. The reason text used to
+ * report that as `Requires at least a high_school degree (50% met)` — naming
+ * the degree, which was FULLY met, as the shortfall (H-054). A recruiter
+ * reading that would conclude the candidate's education was deficient when
+ * the actual gap was a certification, already listed separately.
+ */
+function shortfallReason(job: Job, candidate: Candidate, dim: DimensionContribution): string {
   const percent = roundHalfUp(dim.subscore * 100, 0);
   if (dim.dimension === 'experience_relevance' && job.experience !== undefined) {
     return `Requires ${String(job.experience.requirement.minYears)}+ years of experience (${String(percent)}% met).`;
@@ -129,7 +149,15 @@ function shortfallReason(job: Job, dim: DimensionContribution): string {
     return `Requires ${job.seniority.requirement.level} level (${String(percent)}% met).`;
   }
   if (dim.dimension === 'education_certs' && job.educationCerts !== undefined) {
-    return `Requires at least a ${job.educationCerts.requirement.minDegreeLevel} degree (${String(percent)}% met).`;
+    const required = job.educationCerts.requirement.minDegreeLevel;
+    const held = bestDegreeLevel(candidate.attributes);
+    const degreeMet =
+      held !== null && DEGREE_LADDER.indexOf(held) >= DEGREE_LADDER.indexOf(required);
+
+    if (degreeMet) {
+      return `Holds the required degree; a required certification is missing (${String(percent)}% met).`;
+    }
+    return `Requires at least a ${required} degree (${String(percent)}% met).`;
   }
   return `${String(percent)}% met.`;
 }

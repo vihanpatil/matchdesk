@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import { detectLanguageHeuristic, findNonEnglishSegments } from './languageDetection.js';
@@ -320,43 +321,89 @@ describe('mixed-language veto — held-out validation of the 15-word floor (ADR-
     expect(findNonEnglishSegments(oneFrenchParagraph).hasNonEnglishSegment).toBe(true);
   });
 
-  it('R-L1 · appending ANY non-English paragraph to ANY English CV leaves it unscoreable', () => {
-    // A metamorphic relation, not an example: across every combination of the
-    // ten held-out English CVs and eight non-English paragraphs, adding text
-    // we cannot read must never leave the document in a scoreable state. No
-    // expected value is authored anywhere — the relation is "adding
-    // unreadable text cannot make a document readable".
+  it('R-L1 · inserting a non-English paragraph ANYWHERE in an English CV leaves it unscoreable', () => {
+    // WAS A NESTED LOOP (H-051). It iterated 10 CVs x 8 languages at one fixed
+    // insertion point — the end — which is the easiest position for a
+    // segment-based veto to catch. The defect this relation exists for
+    // (H-043) was precisely a POSITION/LENGTH effect: two-sentence
+    // Scandinavian paragraphs fell below the word floor and were discarded.
+    // A relation that cannot vary where the foreign text lands cannot test
+    // that class of defect, so insertion point is now generated.
     //
     // "Unscoreable" is the disjunction extractText acts on: either the
     // whole-document verdict is already not-English, or the segment veto
-    // fires. Either one refuses; only both failing lets the document score.
-    const failures: string[] = [];
+    // fires. Only both failing lets a partly-unreadable document be scored.
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...Object.keys(HELD_OUT_ENGLISH_CVS)),
+        fc.constantFrom(...Object.keys(NON_ENGLISH_PARAGRAPHS)),
+        fc.nat({ max: 20 }),
+        (cvLabel, langLabel, insertAt) => {
+          const cv = HELD_OUT_ENGLISH_CVS[cvLabel] ?? '';
+          const paragraph = NON_ENGLISH_PARAGRAPHS[langLabel] ?? '';
 
-    for (const [cvLabel, cv] of Object.entries(HELD_OUT_ENGLISH_CVS)) {
-      for (const [langLabel, paragraph] of Object.entries(NON_ENGLISH_PARAGRAPHS)) {
-        const mixed = `${cv}\n${paragraph}`;
-        const refusedOutright = detectLanguageHeuristic(mixed).isEnglish === false;
-        const vetoed = findNonEnglishSegments(mixed).hasNonEnglishSegment;
-        if (!refusedOutright && !vetoed) failures.push(`${cvLabel} + ${langLabel}`);
-      }
-    }
+          // Insert at a generated LINE boundary rather than a character
+          // offset, so the foreign text stays a coherent paragraph instead of
+          // being spliced mid-sentence into an English one.
+          const lines = cv.split('\n');
+          const position = insertAt % (lines.length + 1);
+          const mixed = [...lines.slice(0, position), paragraph, ...lines.slice(position)].join(
+            '\n',
+          );
 
-    expect(failures).toEqual([]);
+          const refusedOutright = detectLanguageHeuristic(mixed).isEnglish === false;
+          const vetoed = findNonEnglishSegments(mixed).hasNonEnglishSegment;
+
+          expect(
+            refusedOutright || vetoed,
+            `${cvLabel} + ${langLabel} inserted at line ${String(position)} was left scoreable`,
+          ).toBe(true);
+        },
+      ),
+      { numRuns: 300 },
+    );
   });
 
-  it('R-L2 · the veto is monotone: removing the non-English passage makes the document scoreable again', () => {
-    // The other direction, which stops the relation above from being
-    // satisfied by a detector that simply refuses everything.
-    const failures: string[] = [];
+  it('R-L2 · the veto is monotone: an English CV with nothing foreign in it stays scoreable', () => {
+    // The converse, so R-L1 cannot be satisfied by a detector that simply
+    // refuses everything. Generated over the corpus rather than looped, for
+    // the same reason.
+    fc.assert(
+      fc.property(fc.constantFrom(...Object.keys(HELD_OUT_ENGLISH_CVS)), (cvLabel) => {
+        const cv = HELD_OUT_ENGLISH_CVS[cvLabel] ?? '';
+        const scoreable =
+          detectLanguageHeuristic(cv).isEnglish === true &&
+          !findNonEnglishSegments(cv).hasNonEnglishSegment;
 
-    for (const [cvLabel, cv] of Object.entries(HELD_OUT_ENGLISH_CVS)) {
-      const scoreable =
-        detectLanguageHeuristic(cv).isEnglish === true &&
-        !findNonEnglishSegments(cv).hasNonEnglishSegment;
-      if (!scoreable) failures.push(cvLabel);
-    }
+        expect(scoreable, `${cvLabel} must remain scoreable`).toBe(true);
+      }),
+      { numRuns: 100 },
+    );
+  });
 
-    expect(failures).toEqual([]);
+  it('R-L3 · adding MORE non-English text can never make a document scoreable again', () => {
+    // Monotonicity in the direction that matters for C7: if one foreign
+    // paragraph makes a document unscoreable, two cannot undo it. This is the
+    // shape of defect where a detector "recovers" because the added text
+    // shifts an aggregate back over a threshold.
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...Object.keys(HELD_OUT_ENGLISH_CVS)),
+        fc.constantFrom(...Object.keys(NON_ENGLISH_PARAGRAPHS)),
+        fc.integer({ min: 1, max: 4 }),
+        (cvLabel, langLabel, copies) => {
+          const cv = HELD_OUT_ENGLISH_CVS[cvLabel] ?? '';
+          const paragraph = NON_ENGLISH_PARAGRAPHS[langLabel] ?? '';
+          const mixed = [cv, ...Array.from({ length: copies }, () => paragraph)].join('\n');
+
+          const refusedOutright = detectLanguageHeuristic(mixed).isEnglish === false;
+          const vetoed = findNonEnglishSegments(mixed).hasNonEnglishSegment;
+
+          expect(refusedOutright || vetoed).toBe(true);
+        },
+      ),
+      { numRuns: 200 },
+    );
   });
 
   it('KNOWN BLIND SPOT: abstains entirely on terse CVs, so a terse bilingual CV still passes', () => {

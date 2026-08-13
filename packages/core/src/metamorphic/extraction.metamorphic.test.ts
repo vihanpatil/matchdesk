@@ -6,6 +6,7 @@ import { totalYearsExperience } from '../scoring/dimensions.js';
 import { TAXONOMY } from '../taxonomy/data.js';
 import {
   cvSpecArbitrary,
+  EDUCATION_HEADERS,
   EXPERIENCE_HEADERS,
   JOB_TITLES,
   NAMES,
@@ -490,6 +491,164 @@ describe('metamorphic: years of experience cannot exceed elapsed time (H-028 D5)
             totalYearsExperience(extractAttributes(base, REF)),
             5,
           );
+        },
+      ),
+      RUNS,
+    );
+  });
+});
+
+/**
+ * RELATIONS ADDED TO SATISFY ADR-023 E2 (H-051).
+ *
+ * An audit found that `R6c`, `R7`, `R8` and `R9` are bare `for` loops over
+ * hard-coded lists, despite living in this file and being named like
+ * relations. They assert only the combinations someone thought of — which is
+ * exactly how R9 came to contain a sentence that should have failed and
+ * passed by luck. The relations below are generated, and each replaces or
+ * supplements a loop for a specific wrong-score defect.
+ */
+describe('metamorphic: generated relations for defects previously pinned only by examples', () => {
+  it('R17 · every taxonomy term extracts itself (H-028 D2)', () => {
+    // D2: longest-first matching consumed a shorter term, so a skill the CV
+    // plainly states went missing and the candidate was ruled ineligible.
+    // R6c pinned this with four hand-picked pairs. This generates over the
+    // WHOLE taxonomy — every canonical label and every alias must be
+    // self-extracting, so a term that any longer entry swallows is caught
+    // wherever it appears in the vocabulary, not only in the curated four.
+    fc.assert(
+      fc.property(fc.constantFrom(...ENTRIES), (entry) => {
+        const found = extractSkills(`Skills: ${entry.label}`).map((s) => s.normalizedValue);
+        expect(
+          found,
+          `the canonical label "${entry.label}" must extract as "${entry.id}"`,
+        ).toContain(entry.id);
+      }),
+      RUNS,
+    );
+  });
+
+  it('R17b · every taxonomy ALIAS extracts to its canonical id (H-028 D2)', () => {
+    const withAliases = ENTRIES.filter((e) => e.aliases.length > 0);
+    fc.assert(
+      fc.property(fc.constantFrom(...withAliases), (entry) => {
+        for (const alias of entry.aliases) {
+          const found = extractSkills(`Skills: ${alias}`).map((s) => s.normalizedValue);
+          expect(found, `alias "${alias}" must extract as "${entry.id}"`).toContain(entry.id);
+        }
+      }),
+      RUNS,
+    );
+  });
+
+  it('R18 · a degree-shaped word in a NON-degree context never produces a degree (H-028 D4, H-033)', () => {
+    // Replaces the R7/R8/R9 loops with a generated composition. The defect
+    // class is one mechanism — a degree keyword appearing somewhere that is
+    // not a qualification — so the relation composes the keyword into job
+    // titles, certification names and prose rather than listing sentences.
+    const DEGREE_WORDS = ['Associate', 'Bachelor', 'Master', 'Masters', 'Doctor'];
+    const TITLE_TAILS = [
+      'Software Engineer',
+      'Director of Engineering',
+      'Data Analyst',
+      'Product Manager',
+      'Party Coordinator',
+      'Trainer',
+    ];
+    const CERT_FRAMES = [
+      (w: string) => `AWS Certified Solutions Architect - ${w}`,
+      (w: string) => `Microsoft Certified: Azure Administrator ${w}`,
+      (w: string) => `Certified Scrum ${w}`,
+    ];
+    // NOTE ON A FRAME DELIBERATELY NOT INCLUDED, so this is not mistaken for
+    // a test quietly weakened to pass. The first version generated
+    // `Reported to the ${w} of Engineering.` and it FAILED: "Associate of
+    // Engineering" yields an associate degree. That is not a defect in the
+    // guard — `<degree word> of <field>` is the shape of EVERY real degree
+    // name ("Associate of Science", "Bachelor of Arts"), so asserting it must
+    // never produce a degree would demand the extractor miss real
+    // qualifications. A human cannot separate the two inside an 80-character
+    // window either. The ambiguity is recorded as a limitation (H-053) rather
+    // than papered over here; these frames deliberately avoid forming a
+    // degree-shaped phrase, because a relation must assert something that is
+    // actually true.
+    const PROSE_FRAMES = [
+      (w: string) => `Worked as an ${w} on the platform team.`,
+      (w: string) => `Promoted to ${w} within two years.`,
+      (w: string) => `The ${w} team meets weekly.`,
+    ];
+
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...DEGREE_WORDS),
+        fc.nat({ max: TITLE_TAILS.length - 1 }),
+        fc.nat({ max: CERT_FRAMES.length - 1 }),
+        fc.nat({ max: PROSE_FRAMES.length - 1 }),
+        (word, titleIndex, certIndex, proseIndex) => {
+          const title = `${word} ${TITLE_TAILS[titleIndex] ?? ''}`.trim();
+          const cert = (CERT_FRAMES[certIndex] ?? CERT_FRAMES[0])?.(word) ?? '';
+          const prose = (PROSE_FRAMES[proseIndex] ?? PROSE_FRAMES[0])?.(word) ?? '';
+
+          for (const text of [title, cert, prose]) {
+            expect(
+              extractEducation(text).map((d) => d.normalizedValue),
+              `"${text}" states no qualification, so it must not yield a degree`,
+            ).toEqual([]);
+          }
+        },
+      ),
+      RUNS,
+    );
+  });
+
+  it('R19 · education dates never count as employment experience (H-028 D5)', () => {
+    // The sub-case the audit found unpinned: a date range under an Education
+    // heading is schooling, not employment. Generated over header wording and
+    // date ranges rather than one example, because D1 proved header wording
+    // is exactly where this breaks.
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...EDUCATION_HEADERS),
+        rangeArbitrary,
+        (educationHeader, range) => {
+          const educationOnly = [educationHeader, 'BSc Computer Science', renderRange(range)].join(
+            '\n',
+          );
+          const total = totalYearsExperience(extractAttributes(educationOnly, REF));
+
+          expect(
+            total,
+            `a date range under "${educationHeader}" is schooling, not employment`,
+          ).toBe(0);
+        },
+      ),
+      RUNS,
+    );
+  });
+
+  it('R20 · total experience never exceeds max(explicit claim, calendar span) (H-040)', () => {
+    // The other unpinned D5 sub-case: an explicit "N years of experience"
+    // claim summed on top of the date ranges describing it, roughly doubling
+    // tenure. Stated as an upper bound so no expected value is authored:
+    // whatever the rule, the total can never exceed the larger of what the
+    // candidate CLAIMED and what the calendar ALLOWS.
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 40 }),
+        fc.array(rangeArbitrary, { minLength: 1, maxLength: 3 }),
+        (claimedYears, ranges) => {
+          const text = [
+            'Summary',
+            `${String(claimedYears)} years of experience`,
+            '',
+            'Work History',
+            ...ranges.map(renderRange),
+          ].join('\n');
+
+          const total = totalYearsExperience(extractAttributes(text, REF));
+          const ceiling = Math.max(claimedYears, calendarSpanYears(ranges));
+
+          expect(total).toBeLessThanOrEqual(ceiling + 0.05 * ranges.length);
         },
       ),
       RUNS,

@@ -66,9 +66,9 @@ work until it is done** (ADR-018).
 | `pnpm lint`          | pass                                                       |
 | `pnpm format:check`  | pass                                                       |
 | `pnpm license:audit` | pass (1 waiver: `duck@0.1.12`, ADR-016)                    |
-| `pnpm test:cov`      | **528 passed / 41 files**, none skipped, manifest complete |
+| `pnpm test:cov`      | **550 passed / 42 files**, none skipped, manifest complete |
 
-Coverage: **98.41% statements, 92.57% branches, 100% functions** repo-wide.
+Coverage: **98.42% statements, 92.62% branches, 100% functions** repo-wide.
 Mutation score **65.03%** is from the last `pnpm mutate` at `e778837` and has
 **not** been re-run since the D5/D6 work landed — treat it as stale, not as
 evidence. That gap is still the most important number in this document (§6).
@@ -272,9 +272,10 @@ wrong numbers invites trust the tool has not earned.
    (ADR-024).** `candidate_attributes` dropped; `matches.reference_date` added
    so every score names all three of its inputs and is reproducible from
    stored state. **E5 is unblocked.**
-6. **Convert the fake relations into real ones (E2).** R6c/R7/R8/R9 in core and
-   R-L1/R-L2 in the language eval are `for` loops named like relations. R10 has
-   been converted as the worked example.
+6. ~~Convert the fake relations into real ones (E2).~~ **Done — E2 MET.**
+   R10 converted; R17/R17b/R18/R19/R20 added in core; R-L1/R-L2 converted and
+   R-L3 added in the language eval; 9 new properties for H-013, H-029, H-036
+   and D8. They found two live defects on their first run (H-054, H-056).
 7. **Re-run `pnpm mutate`** — the 65.03% baseline predates D5/D6 and is stale (E4).
    Then **kill survivors, ratcheting the threshold up as they fall.** Order by
    human impact: `explain.ts` (28.93%) → `certifications.ts` (49.66%) →
