@@ -1434,3 +1434,162 @@ $ ls packages/core/dist/index.js -> absent
 
 An import then fails loudly instead of succeeding against last week's code.
 Prediction recorded in H-020, fired exactly as written, closed with evidence.
+
+---
+
+## 2026-08-12 — Adversarial verification round (ADR-015), judged against ADR-023
+
+Three Opus verifiers were dispatched and **all three died immediately on an
+account spend limit**, having produced nothing. The round was re-run with
+Sonnet agents on mechanical, enumerable tasks and the lead taking the
+judgement-heavy attacks directly. Recorded because "the verifier ran" and "the
+verifier produced findings" are different claims, and only the second counts.
+
+**The round found five defects. Four are fixed below; the fifth is open and
+blocks the UI.**
+
+### H-048 · The invisible-character set was a hand-written list of six. Sixteen more break it identically.
+
+**Severity:** wrong-score. Fabricates a skill the candidate never claimed.
+
+H-042 fixed invisible-character fabrication with a closed list of six code
+points. Enumerating characters OUTSIDE that list found sixteen more producing
+the identical failure — `Java<CHAR>Script` extracting `java`:
+
+```
+U+200E LRM   U+200F RLM   U+202A LRE   U+202C PDF   U+2066 LRI   U+2069 PDI
+U+2061 FA    U+2062 ITIMES U+2063 ISEP U+2064 IPLUS U+FFF9 IAA
+U+034F CGJ   U+180E MVS   U+FE00 VS1   U+FE0F VS16  U+E0061 TAG
+```
+
+The lesson is about SHAPE, not coverage: a hand-maintained list cannot track
+what document producers emit. The set is defined by a Unicode PROPERTY, so the
+pattern now is one — `\p{Cf}` plus variation selectors, U+034F and U+180E.
+
+**A second bug found while fixing it, worse than the first.** The strip loop
+iterated UTF-16 CODE UNITS. Unicode tag characters are astral and arrive as
+surrogate pairs, so testing each half matched nothing — a code-unit loop
+silently fails on exactly the characters hardest to notice. Now iterates code
+points.
+
+**What is deliberately NOT stripped, and why it is not an oversight.** Five of
+the twenty-one characters the enumeration reported are _visible whitespace_
+(U+00A0, U+202F, U+2009, U+200A, U+2007). A human reading `Java<NBSP>Script`
+sees "Java Script" — two words — so extracting `java` agrees with the page.
+Stripping them would join genuinely separate words and invent skills no reader
+can see: this module's own failure mode, pointing the other way. The
+enumeration grouped all twenty-one together; that grouping was wrong and the
+distinction is the whole design.
+
+`\p{Mn}` is likewise not swept, though variation selectors live in it, because
+the rest of `Mn` is real diacritics — sweeping it would rewrite "Rémi".
+
+### H-049 · C7 was enforced on the candidate only. An unreadable JOB scored candidates 100/100.
+
+**Severity:** wrong-score. Every number under such a job was untraceable.
+
+The pipeline (H-045) checked candidate readability and never checked the job.
+Probe: ingest a FRENCH document as a job description, then score an English
+candidate against it.
+
+```
+job stored with parseStatus="needs_attention" language=null
+scoreStoredPair -> score 100, persisted match row, no warning
+```
+
+The requirements being scored against came from a document the tool could not
+read. This is the same C7 failure ADR-006 and ADR-022 close on the candidate
+side, on the axis nobody thought to test — and I wrote three end-to-end tests
+asserting refusals, all three on the candidate axis.
+
+Both scoring entry points now assert job readability, plus a guard for a job id
+that does not exist at all. **Guarding only one entry point would have left the
+batch path as a bypass**, which is how the original hole existed.
+
+### H-050 · A negative dimension weight scored a candidate 100 out of 100
+
+**Severity:** wrong-score, latent. Closes H-028 D8's first item.
+
+`docs/PRODUCT_DECISIONS.md` requires weights to be non-negative; nothing
+enforced it. `skills.weight = -5` through the pipeline produced 100/100,
+persisted. A negative weight inverts a dimension: the candidate is rewarded for
+NOT matching, and the result is shown as a match score.
+
+`scoreCandidate` now throws on negative or non-finite weights. **Throws rather
+than clamping** — a negative weight means the caller's configuration is wrong,
+and a tool whose premise is traceable numbers must not silently reinterpret a
+job's definition. Zero remains legal: it is how a dimension is disabled.
+
+### H-051 · E2 FAILS: 9 of 12 wrong-score defects have no property or metamorphic test
+
+**Severity:** process, and it blocks the UI under ADR-023 E5.
+
+An audit of every wrong-score defect in this log against the four property and
+metamorphic test files found that **most are pinned only by example tests, or
+by nothing.**
+
+The sharpest finding is self-inflicted. `R6c`, `R7`, `R8`, `R9` and `R10` live
+in `extraction.metamorphic.test.ts`, are named like relations, and are credited
+in this log with finding real bugs — but every one is a bare `for` loop over a
+hard-coded list with no `fc.property` anywhere. **R10 is mine, written this
+session, and I described it as a relation in a commit message.** Naming a loop
+`R10` and filing it under "metamorphic" does not make it one.
+
+R10 is now a genuine generated property: it varies field, lead-in, tail AND
+the amount of preceding filler, which is what H-033 is actually about — the
+guard's 80-character context window. A test that cannot vary context length
+cannot test a context-length defect.
+
+**Still failing E2** — recorded as work, not resolved: H-013, H-028 D2, H-028
+D4 (job titles and cert names, R7/R8/R9 still example-only), H-028 D5/H-040
+(the double-counting and header-leak sub-cases; only the quantity-range case
+is genuinely pinned), H-028 D6/H-043 (language detection has no generated
+relation — R-L1/R-L2 are nested loops over fixed corpora, mine, same mistake),
+H-028 D7, H-028 D8, H-029, H-036.
+
+**E1-E5 verdict for this round:**
+
+| Criterion                                             | Verdict                                          |
+| ----------------------------------------------------- | ------------------------------------------------ |
+| E1 two consecutive clean adversarial rounds           | **NOT MET** — this round found 5 defects         |
+| E2 every wrong-score defect pinned by a property test | **NOT MET** — 9 of 12 fail                       |
+| E3 Section 9.2 fixture corpus                         | **NOT MET** — does not exist                     |
+| E4 mutation ratchet ≥ 75, no module below 60          | **CANNOT ASSESS** — baseline stale since e778837 |
+| E5 zero open wrong-score entries                      | **NOT MET** — H-052 open                         |
+
+**No UI work. The gate is closed, and now it is closed for stated reasons.**
+
+### H-052 · OPEN, wrong-score: stored evidence drifts from the score it justifies
+
+**Severity:** wrong-score. NOT FIXED. This is the round's open finding.
+
+`candidate_attributes` rows are written once at ingest, using the
+`referenceDate` of that moment. Scoring RE-DERIVES attributes on every call
+with the caller's current `referenceDate`. For any CV containing an open-ended
+range ("Jan 2019 – Present"), the two diverge permanently:
+
+```
+ingest at referenceDate 2026-01 -> stored years_experience = 7
+score  at referenceDate 2040-01 -> scored on years_experience = 21
+stored rows still say 7
+```
+
+Measured, not hypothetical. The recruiter is shown evidence saying 7 years
+beside a score computed from 21. **The guiding principle of this product is
+that every number traces to highlighted evidence in the source; here the
+evidence and the number disagree, and nothing detects it.**
+
+This is not only a re-upload edge case: it happens to every stored candidate
+with a current role, simply by time passing between ingest and re-score.
+
+**Not fixed in this round because the fix is a data-model decision, not a
+patch** — either attributes carry the `referenceDate` they were derived under
+and are refreshed when it changes, or they stop being persisted and are always
+derived on demand. Choosing wrong here would make the evidence trail worse.
+Recorded as the blocking item for E5.
+
+**Also recorded:** my first probe for this was VACUOUS — it used a fixture with
+no `years_experience` attributes at all, so "no divergence" proved nothing. The
+finding only appeared after rebuilding the probe with a CV containing an
+open-ended range. A negative result from a probe that cannot fire is not
+evidence, and I nearly filed one as such.

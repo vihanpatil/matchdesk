@@ -66,9 +66,9 @@ work until it is done** (ADR-018).
 | `pnpm lint`          | pass                                                       |
 | `pnpm format:check`  | pass                                                       |
 | `pnpm license:audit` | pass (1 waiver: `duck@0.1.12`, ADR-016)                    |
-| `pnpm test:cov`      | **502 passed / 42 files**, none skipped, manifest complete |
+| `pnpm test:cov`      | **527 passed / 42 files**, none skipped, manifest complete |
 
-Coverage: **98.14% statements, 92.12% branches, 100% functions** repo-wide.
+Coverage: **98.34% statements, 92.4% branches, 100% functions** repo-wide.
 Mutation score **65.03%** is from the last `pnpm mutate` at `e778837` and has
 **not** been re-run since the D5/D6 work landed — treat it as stale, not as
 evidence. That gap is still the most important number in this document (§6).
@@ -181,6 +181,8 @@ accident:
 | H-036 | **607 mutation survivors**                    | `explain.ts` 28.93% — the recruiter-facing reasoning is unverified       |
 | H-040 | Tenure understated when ranges don't parse    | A 3-year parsed role beats a 20-year claim. Needs an `explain.ts` caveat |
 | H-041 | Mixed-language veto abstains on terse CVs     | A terse BILINGUAL CV is still scored. 4 of 10 held-out CVs are silent    |
+| H-051 | **E2 FAILS — 9 of 12 defects unpinned**       | R6c/R7/R8/R9 and R-L1/R-L2 are LOOPS, not relations, despite the names   |
+| H-052 | **Stored evidence drifts from the score**     | Ingest-time attributes vs re-derived scoring: 7 years shown, 21 scored   |
 | H-044 | Manifest completeness is unverifiable         | Floor guard blocks the accident; a hand-edited manifest still passes     |
 
 **From H-028, still open:** D7 audit-log `REPLACE` bypass; D8 (negative weights
@@ -258,21 +260,28 @@ wrong numbers invites trust the tool has not earned.
 3. ~~Wire `core` ↔ `apps/server`.~~ **Done (ADR-023)** — there had never been a
    path from a document to a score (H-045). Also closed H-020 (H-047) and the
    matrix half of H-008 (H-046).
-4. **Re-run the Opus adversarial verifier** over the hardened slice (ADR-015),
-   now judged against **ADR-023's exit criteria E1-E5** rather than against an
-   undefined notion of "hardened". Only wrong-score findings block the UI;
-   false-refusals and coverage-gaps do not.
-5. **Re-run `pnpm mutate`** — the 65.03% baseline predates D5/D6 and is stale.
+4. ~~Run the adversarial verifier round.~~ **Done, and it failed the gate.**
+   Five defects (H-048..H-052); four fixed, **H-052 open and blocking**.
+   E1-E5 verdict: E1 NOT MET, E2 NOT MET (9 of 12), E3 NOT MET, E4 CANNOT
+   ASSESS, E5 NOT MET. **No UI work.**
+5. **Decide H-052** — the data-model question: do persisted attributes carry
+   the `referenceDate` they were derived under and get refreshed, or do they
+   stop being persisted and are always derived on demand? This is the single
+   blocking wrong-score item.
+6. **Convert the fake relations into real ones (E2).** R6c/R7/R8/R9 in core and
+   R-L1/R-L2 in the language eval are `for` loops named like relations. R10 has
+   been converted as the worked example.
+7. **Re-run `pnpm mutate`** — the 65.03% baseline predates D5/D6 and is stale (E4).
    Then **kill survivors, ratcheting the threshold up as they fall.** Order by
    human impact: `explain.ts` (28.93%) → `certifications.ts` (49.66%) →
    `skills.ts` (55.60%) → `education.ts` (65.47%). Note `experience.ts` also
    regressed to 84% branch coverage when D5 landed (H-040).
-6. **Section 9.2 fixture corpus**, ~12 focused fixtures (ADR-018/E3): one per
+8. **Section 9.2 fixture corpus**, ~12 focused fixtures (ADR-018/E3): one per
    known defect class plus clean baselines.
-7. **Then** `apps/web`: Jobs, Candidates, Shortlist. React 19 + Vite +
+9. **Then** `apps/web`: Jobs, Candidates, Shortlist. React 19 + Vite +
    Tailwind 4 + Radix, TanStack Query/Table.
-8. Fastify API over the pipeline; launcher script (ADR-013); then the remaining
-   directive phases (matrix, PDF report, optional LLM narrative, hardening).
+10. Fastify API over the pipeline; launcher script (ADR-013); then the
+    remaining directive phases (matrix, PDF report, LLM narrative, hardening).
 
 ---
 
