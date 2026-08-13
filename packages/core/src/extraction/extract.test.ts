@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { totalYearsExperience } from '../scoring/dimensions.js';
 import { assertValidSpan } from './span.js';
 import { extractAttributes } from './extract.js';
 
@@ -78,5 +79,31 @@ describe('extractAttributes', () => {
   it('is deterministic across repeated calls', () => {
     const text = '5 years of experience with PostgreSQL. Bachelor of Science. PMP certified.';
     expect(extractAttributes(text, REF)).toEqual(extractAttributes(text, REF));
+  });
+});
+
+describe('H-028 D5 end-to-end: years of experience is not double-counted', () => {
+  it('D5b: an explicit "10 years" claim plus the date ranges it describes does not roughly double the total', () => {
+    const text = [
+      'Summary',
+      '10 years of experience',
+      '',
+      'Work History',
+      'Jan 2016 - Present',
+      'Jan 2012 - Dec 2015',
+    ].join('\n');
+    const ref = { referenceDate: { year: 2026, month: 1 } };
+    const attrs = extractAttributes(text, ref);
+    const total = totalYearsExperience(attrs);
+    // Old (buggy) behaviour summed 10 + 10 + 3.9 = 23.9. Correct behaviour
+    // uses the merged, non-overlapping date-range coverage: ~13.9-14y.
+    expect(total).toBeLessThan(15);
+    expect(total).toBeGreaterThan(13);
+  });
+
+  it('D5c: "Managed a budget of 2000 - 2024 USD" does not yield 24 years of experience', () => {
+    const text = ['Work History', 'Managed a budget of 2000 - 2024 USD'].join('\n');
+    const attrs = extractAttributes(text, REF);
+    expect(totalYearsExperience(attrs)).toBe(0);
   });
 });

@@ -32,7 +32,7 @@ function skill(canonicalId: string, matchType: 'exact' | 'alias' = 'exact'): Ski
   };
 }
 
-function years(n: number): YearsExperienceAttribute {
+function years(n: number, isExplicitStatement = false): YearsExperienceAttribute {
   return {
     kind: 'years_experience',
     value: `${String(n)} years`,
@@ -40,6 +40,7 @@ function years(n: number): YearsExperienceAttribute {
     confidence: 0.9,
     sourceSpan: { start: 0, end: 5 },
     years: n,
+    isExplicitStatement,
   };
 }
 
@@ -135,6 +136,30 @@ describe('totalYearsExperience', () => {
 
   it('is 0 when there is no years_experience attribute', () => {
     expect(totalYearsExperience([skill('postgresql')])).toBe(0);
+  });
+
+  // H-028 D5b: an explicit "N years of experience" statement and the date
+  // ranges it describes must not both be added to the total — computed
+  // tenure from date ranges wins when both are present, and the explicit
+  // claim is treated as corroboration rather than an addend.
+  it('prefers computed tenure from date ranges over an explicit statement when both are present', () => {
+    const attrs: readonly ExtractedAttribute[] = [
+      years(10, true), // "10 years of experience" (explicit claim)
+      years(10, false), // Jan 2016 - Present
+      years(3.9, false), // Jan 2012 - Dec 2015
+    ];
+    // True merged tenure is 10 + 3.9 = 13.9, NOT 10 + 10 + 3.9 = 23.9.
+    expect(totalYearsExperience(attrs)).toBeCloseTo(13.9, 5);
+  });
+
+  it('falls back to the explicit statement when no date range is present', () => {
+    const attrs: readonly ExtractedAttribute[] = [years(10, true)];
+    expect(totalYearsExperience(attrs)).toBe(10);
+  });
+
+  it('takes the max, not the sum, of multiple explicit statements with no date ranges', () => {
+    const attrs: readonly ExtractedAttribute[] = [years(5, true), years(8, true)];
+    expect(totalYearsExperience(attrs)).toBe(8);
   });
 });
 

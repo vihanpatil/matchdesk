@@ -39,6 +39,15 @@ export interface YearsExperienceAttribute extends BaseAttribute {
   readonly kind: 'years_experience';
   /** Parsed, quantized number of years this piece of evidence represents. */
   readonly years: number;
+  /**
+   * `true` when this evidence is an explicit "N years of experience"
+   * statement rather than a parsed employment date range. Absent/`false` for
+   * date-range evidence. Consumers use this to avoid double-counting: an
+   * explicit claim and the date ranges it describes should not both be added
+   * to a total (HONESTY_LOG H-028 D5b) — see `totalYearsExperience` in
+   * `../scoring/dimensions.js`.
+   */
+  readonly isExplicitStatement?: boolean;
 }
 
 /**

@@ -67,14 +67,32 @@ export function skillsSubscore(matches: readonly SkillRequirementMatch[]): numbe
 // concurrent roles. See docs caveats surfaced through `./explain.ts`.
 // -------------------------------------------------------------------------
 
+/**
+ * H-028 D5b: an explicit "N years of experience" statement and the
+ * employment date ranges it describes must not both be added to the total —
+ * that roughly doubles the candidate's apparent tenure. Computed tenure from
+ * date ranges wins when any is present (date ranges are independently
+ * verifiable evidence spans; overlap between ranges is already merged by
+ * `extractYearsExperience`), and explicit statements are treated as
+ * corroboration rather than an addend. When no date range is present at
+ * all, the explicit statement is the only signal, so it is used directly —
+ * and if more than one such statement exists, the MAX is used (not the
+ * sum), since multiple statements are read as restating the same fact
+ * ("10 years of experience" in the summary and again in a cover paragraph),
+ * not as additive claims.
+ */
 export function totalYearsExperience(attributes: readonly ExtractedAttribute[]): number {
-  const sum = attributes
-    .filter(
-      (a): a is Extract<ExtractedAttribute, { kind: 'years_experience' }> =>
-        a.kind === 'years_experience',
-    )
-    .reduce((acc, a) => acc + a.years, 0);
-  return quantize(sum);
+  const yearsAttrs = attributes.filter(
+    (a): a is Extract<ExtractedAttribute, { kind: 'years_experience' }> =>
+      a.kind === 'years_experience',
+  );
+  const rangeYears = yearsAttrs.filter((a) => a.isExplicitStatement !== true);
+  const rangeTotal = rangeYears.reduce((acc, a) => acc + a.years, 0);
+  if (rangeTotal > 0) return quantize(rangeTotal);
+
+  const explicitYears = yearsAttrs.filter((a) => a.isExplicitStatement === true);
+  const explicitMax = explicitYears.reduce((acc, a) => Math.max(acc, a.years), 0);
+  return quantize(explicitMax);
 }
 
 export function experienceRelevanceSubscore(

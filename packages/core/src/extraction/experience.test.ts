@@ -108,4 +108,57 @@ describe('extractYearsExperience', () => {
   it('returns an empty array when there is no experience signal at all', () => {
     expect(extractYearsExperience('A short bio with no numbers or dates.', REF)).toEqual([]);
   });
+
+  // H-028 D5c: a bare YYYY - YYYY range describing a quantity (budget, user
+  // count, ...) is not an employment date range and must not be counted.
+  it('does not parse "budget of 2000 - 2024 USD" as an employment date range (D5c)', () => {
+    const attrs = extractYearsExperience('Managed a budget of 2000 - 2024 USD.', REF);
+    expect(attrs.some((a) => a.value.includes('2000'))).toBe(false);
+  });
+
+  it('does not parse "Grew active users from 2015 - 2019" as an employment date range (D5c)', () => {
+    const attrs = extractYearsExperience('Grew active users from 2015 - 2019.', REF);
+    expect(attrs.some((a) => a.value.includes('2015'))).toBe(false);
+  });
+
+  it('still parses a genuine bare-year employment range with no quantity context', () => {
+    const text = 'Work History\nSoftware Engineer, Acme Corp\n2016 - 2019';
+    const attrs = extractYearsExperience(text, REF);
+    expect(attrs.some((a) => a.value.includes('2016'))).toBe(true);
+  });
+
+  // H-028 D5b (interval-merge half): concurrent/overlapping roles must not
+  // each contribute their full duration to the total.
+  it('does not double-count two overlapping employment date ranges', () => {
+    const text = [
+      'Senior Engineer, Acme Corp, Jan 2019 - Jan 2022',
+      'Consultant, Beta Inc, Jun 2020 - Jun 2021',
+    ].join('\n');
+    const attrs = extractYearsExperience(text, REF);
+    const total = attrs.reduce((acc, a) => acc + a.years, 0);
+    // True merged coverage is Jan 2019 - Jan 2022 = 3 years, NOT 3 + 1 = 4.
+    expect(total).toBe(3);
+  });
+
+  it('credits the full duration of two non-overlapping (adjacent) ranges', () => {
+    const text = ['Jan 2012 - Dec 2015', 'Jan 2016 - Jan 2020'].join('\n');
+    const attrs = extractYearsExperience(text, REF);
+    const total = attrs.reduce((acc, a) => acc + a.years, 0);
+    expect(total).toBeCloseTo(3.9 + 4, 1);
+  });
+
+  it('rejects a range that starts in the future relative to the reference date', () => {
+    const attrs = extractYearsExperience('Engineer, Acme Corp, Jan 2030 - Jan 2032', REF);
+    expect(attrs).toHaveLength(0);
+  });
+
+  it('marks an explicit "years of experience" statement as such', () => {
+    const attrs = extractYearsExperience('I have 6 years of experience.', REF);
+    expect(attrs[0]?.isExplicitStatement).toBe(true);
+  });
+
+  it('does not mark a parsed date range as an explicit statement', () => {
+    const attrs = extractYearsExperience('Engineer, Acme Corp, Jan 2019 - Jan 2022', REF);
+    expect(attrs.every((a) => a.isExplicitStatement !== true)).toBe(true);
+  });
 });
