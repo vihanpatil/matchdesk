@@ -315,6 +315,66 @@ const MIN_WORDS_FOR_SEGMENT_JUDGEMENT = 15;
 const PARAGRAPH_BOUNDARY = /\n+/;
 const SENTENCE_BOUNDARY = /\n+|(?<=[.!?])\s+/;
 
+/**
+ * THIRD granularity: a window over CONSECUTIVE LINES (H-041 remedy, ADR-029).
+ *
+ * The two granularities above both failed on ordinary CVs, and H-068 measured
+ * why: paragraph and sentence boundaries in a CV coincide with the line, CV
+ * lines run 8-13 words, the 15-word floor discards every one of them, and
+ * `judgedSegmentCount` comes back 0 on most real documents. **This is the same
+ * "fragmenting the evidence below the floor discarded it" failure the comment
+ * above records — one level up.** Grouping consecutive lines until they clear
+ * the floor restores the evidence instead of throwing it away.
+ *
+ * **Why a sliding line window and not blank-line-delimited runs.** Measured
+ * both. Blank-line runs give 0 false refusals but **fail on the PDF path at
+ * every foreign proportion below ~49%**, because PDF extraction loses blank
+ * lines (H-062/H-065) so the whole document collapses into one run and
+ * dilutes. PDF is the dominant real-world format, so that variant is not
+ * viable. The line window is format-independent and caught the defect down to
+ * 11.2% foreign content on the PDF path.
+ */
+
+/**
+ * A window is only judged if it reads as PROSE.
+ *
+ * Without this the line window costs one false refusal in ten held-out English
+ * CVs — `logistics_headers`, whose opening window is a name, an email address
+ * and comma-separated proper nouns ("Warehouse Management, SAP, Forecasting,
+ * Route Planning"), which the n-gram profile reads as French. That is exactly
+ * the coin-flip case {@link MIN_WORDS_FOR_SEGMENT_JUDGEMENT} already warns
+ * about, and H-041's own calibration rejected a setting that cost 1 in 10.
+ *
+ * Prose in ANY language is mostly plain lowercase words; header and label soup
+ * is Title Case, acronyms and punctuation. Measured separation:
+ *
+ *     header soup (the false refusal)   0.00
+ *     English prose                     0.81
+ *     French prose                      0.90
+ *
+ * Every threshold in [0.30, 0.70] gives 0 false refusals, keeps all four
+ * held-out non-English CVs refused, and catches the bilingual defect at every
+ * proportion tested. **Unlike the word floor, whose viable window was a narrow
+ * 12-18, these two classes separate with a large gap**, so 0.5 is mid-gap
+ * rather than tuned to an edge.
+ *
+ * Known limit, not measured away: a CV written in heavy Title Case prose
+ * ("Managed Warehouse Operations And Route Planning") scores lower on this
+ * ratio and could fall below the gate, in which case the window is skipped and
+ * this check is silent for that window — the conservative direction.
+ */
+const MIN_PROSE_RATIO = 0.5;
+const MAX_LINES_PER_WINDOW = 12;
+const EMAIL_OR_URL = /\S+@\S+|https?:\/\/\S+/g;
+const LOWERCASE_WORD = /^[a-zà-ÿ'’-]+[.,;:!?]?$/;
+
+/** Share of tokens that are plain lowercase words, ignoring emails and URLs. */
+function proseRatio(text: string): number {
+  const tokens = text.replace(EMAIL_OR_URL, ' ').split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return 0;
+  return tokens.filter((t) => LOWERCASE_WORD.test(t)).length / tokens.length;
+}
+
 export interface NonEnglishSegment {
   /** The offending text, trimmed. */
   readonly text: string;
@@ -363,14 +423,65 @@ function splitWithOffsets(text: string, boundary: RegExp): TextSegment[] {
   return found;
 }
 
-/** Segments at both granularities, de-duplicated by span so a single-sentence
- *  paragraph is judged once rather than twice. */
+/** Non-blank lines with their offsets into the original text. */
+function linesWithOffsets(text: string): TextSegment[] {
+  const found: TextSegment[] = [];
+  let cursor = 0;
+  for (const raw of text.split('\n')) {
+    const trimmed = raw.trim();
+    if (trimmed.length > 0) {
+      const start = text.indexOf(trimmed, cursor);
+      if (start !== -1) found.push({ text: trimmed, start, end: start + trimmed.length });
+    }
+    cursor += raw.length + 1;
+  }
+  return found;
+}
+
+/**
+ * Windows over consecutive lines, each grown until it clears the word floor.
+ *
+ * Only prose-looking windows are emitted — see {@link MIN_PROSE_RATIO} for the
+ * measured reason. Emitting the window here rather than gating it later keeps
+ * `findNonEnglishSegments` a single uniform loop.
+ */
+function lineWindows(text: string): TextSegment[] {
+  const lines = linesWithOffsets(text);
+  const found: TextSegment[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    for (let j = i; j < lines.length && j - i < MAX_LINES_PER_WINDOW; j++) {
+      const first = lines[i];
+      const last = lines[j];
+      if (first === undefined || last === undefined) break;
+
+      const slice = text.slice(first.start, last.end);
+      // `wordsOf` is the detector's own tokenizer, reused deliberately: a
+      // second word count here could drift from the one the floor is
+      // calibrated against.
+      if (wordsOf(slice).length < MIN_WORDS_FOR_SEGMENT_JUDGEMENT) continue;
+
+      // Cleared the floor: this is the window for `i`. Judge it only if it
+      // reads as prose, then stop growing — a longer window would dilute.
+      if (proseRatio(slice) >= MIN_PROSE_RATIO) {
+        found.push({ text: slice, start: first.start, end: last.end });
+      }
+      break;
+    }
+  }
+
+  return found;
+}
+
+/** Segments at all three granularities, de-duplicated by span so a
+ *  single-sentence paragraph is judged once rather than twice. */
 function segmentsOf(text: string): TextSegment[] {
   const bySpan = new Map<string, TextSegment>();
 
   for (const segment of [
     ...splitWithOffsets(text, PARAGRAPH_BOUNDARY),
     ...splitWithOffsets(text, SENTENCE_BOUNDARY),
+    ...lineWindows(text),
   ]) {
     bySpan.set(`${String(segment.start)}:${String(segment.end)}`, segment);
   }

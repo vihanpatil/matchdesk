@@ -2758,3 +2758,82 @@ argument for doing them together.
 Zero unclassified.** The registry's job is done — the untriaged set is empty
 and every remaining blocker is a defect with a measurement attached, not a
 question about a definition.
+
+### H-077 · The obvious implementation of the H-041 fix was killed by measurement
+
+The cheap fix for H-041 is to group **blank-line-delimited runs** of short
+lines until they clear the word floor. It measures beautifully: **0 false
+refusals** on the ten held-out English CVs, all four non-English still refused,
+and the bilingual defect caught.
+
+**It does not work, and the reason is H-062/H-065.** PDF extraction loses blank
+lines. With no blank lines the whole document is one run, which dilutes exactly
+like the whole-document classifier it was meant to improve on. Measured on the
+PDF path with the blank lines stripped:
+
+```
+foreign 49.0%  runs=1  VETOED   <- only because the whole doc flips at 49%
+foreign 33.0%  runs=1  missed
+foreign 24.9%  runs=1  missed
+foreign 20.0%  runs=1  missed
+foreign 14.3%  runs=1  missed
+foreign 11.2%  runs=1  missed
+```
+
+**My first PDF measurement passed and was misleading.** I tested at 49% foreign,
+where the whole-document classifier refuses anyway, and briefly recorded the
+PDF path as working. It only survived scrutiny because I re-ran it across
+proportions. A single-point measurement at a favourable value is how a design
+gets adopted and then fails on real documents — and PDF is the dominant format,
+so this would have shipped broken for most users.
+
+The sliding line window is format-independent and catches it at every
+proportion tested. It cost one false refusal until the prose gate was added.
+
+**Both numbers were needed to choose.** Either measurement alone picks the
+wrong design: false refusals alone picks blank-line runs, PDF coverage alone
+picks the ungated window.
+
+### H-078 · The H-041 fix is a narrowing, and I nearly recorded it as a closure
+
+The line window takes held-out CVs with no judgeable segment from **4 of 10 to
+1 of 10**, at **zero** false refusals. My first measurement said all four were
+fixed, and I wrote that down.
+
+**It was measured before the prose gate existed.** With the gate,
+`logistics_headers` — a name, an email address and comma-separated proper
+nouns, with no prose line anywhere — has every window fall below the gate and
+stays unjudged. The test I had just written asserting `silent === []` failed,
+which is the only reason the overstatement did not reach the record.
+
+```
+chef_terse          0 -> 5 judged
+electrician_terse   0 -> 5 judged
+driver_very_terse   0 -> 3 judged
+logistics_headers   0 -> 0 judged   <- still silent
+```
+
+**So a pure-header CV written bilingually is still scored, and H-041 stays
+wrong-score.** The gate is not closed by this commit.
+
+Recorded because the failure mode is specific and repeatable: **a measurement
+taken before the last component landed, then quoted as if it described the
+finished thing.** It is H-074's shape — a number carried across a change —
+compressed into a single session instead of three.
+
+### Session record — what landed and what did not
+
+**Landed:** the prose-gated line window (ADR-029), H-073's fixture corrected to
+assert the refusal and its cause, E4 re-verified at **80.96%** after H-076's
+change to `round.ts` (survivors 368, ratchet 79). `pnpm verify` exit 0, 823
+tests.
+
+**Two tests changed from asserting the defect to asserting the fix**, both with
+the reasoning written in place per §7: `languageDetection.test.ts`'s terse-CV
+blind spot and the eval's four-silent-CVs assertion. **The old expectations
+encoded a defect, not a boundary** — abstaining did not mean staying silent, it
+meant the document was scored unchecked.
+
+**NOT landed:** H-040 is untouched, and H-041's residual is open. Both wait on
+one product question — refuse, or score with a caveat — which has measured
+costs on both sides and is not the lead's call.

@@ -1272,3 +1272,107 @@ so it is not rubber-stamping anything.
 - **A checklist can be gamed by writing narrow rows.** The rows are derived
   from defects already found, not invented, and rows may only be marked covered
   by pasted output. This is a real residual risk and is not fully closed.
+
+---
+
+## ADR-029 — One principle for both silent-number defects; the line window lands
+
+**Date:** 2026-08-13 · **Status:** Accepted, **with one product question open**
+
+H-040 and H-041 are the same defect wearing different clothes. In both, **the
+engine holds evidence that its own output may be unaccounted-for, and drops it
+silently:**
+
+- **H-041** knows it judged zero segments, and concludes "English".
+- **H-040** extracts an explicit 20-year claim, discards it, and reports 2.9.
+
+### Decision 1 — the principle
+
+**A number must not be presented as complete while the engine holds
+unaccounted-for evidence. The burden is on the engine to show the gap does not
+matter, never on the reader to notice.**
+
+Both defects invert that today: they assume immateriality by default. This is
+C7 restated for the case where the engine _half_-read something, and it is the
+generalisation of ADR-027's "abstention is not refusal".
+
+Materiality is computable for H-040 (recompute eligibility using the discarded
+claim) and not for H-041 (we cannot know what the unjudged text says), which is
+why the two need different enforcement but the same rule.
+
+### Decision 2 — a prose-gated line window closes most of H-041
+
+Segments were taken at paragraph and sentence granularity. On a CV both
+coincide with the line, CV lines run 8-13 words, the 15-word floor discarded
+every one, and `judgedSegmentCount` came back 0 on most real documents. **This
+is the "fragmenting the evidence below the floor discarded it" failure the
+module already documents at sentence granularity — one level up.**
+
+A third granularity now groups consecutive lines until they clear the floor.
+
+**Measured, and the measurements chose the design:**
+
+| Variant                      | False refusals /10 | PDF path                     |
+| ---------------------------- | ------------------ | ---------------------------- |
+| Blank-line-delimited runs    | 0                  | **fails below ~49% foreign** |
+| Sliding line window          | 1                  | catches down to 11.2%        |
+| Line window **+ prose gate** | **0**              | **catches down to 11.2%**    |
+
+Blank-line runs were the cheaper implementation and are **not viable**: PDF
+extraction loses blank lines (H-062/H-065), so a PDF collapses to one run and
+dilutes. PDF is the dominant real format. That is a design killed by
+measurement, and it would not have been visible from reading the code.
+
+The prose gate exists because the raw window costs one false refusal —
+`logistics_headers`, whose opening window is a name, an email and
+comma-separated proper nouns, read as French. That is the coin-flip case
+`MIN_WORDS_FOR_SEGMENT_JUDGEMENT` already warns about, and H-041's own
+calibration rejected a setting costing 1 in 10. Measured separation:
+
+```
+header soup   0.00      English prose   0.81      French prose   0.90
+```
+
+Every threshold in [0.30, 0.70] gives the same result, so **0.5 is mid-gap, not
+tuned to an edge** — unlike the word floor, whose viable window was a narrow
+12-18.
+
+**Result, stated precisely and not rounded up.** Held-out CVs left unjudged:
+**4 of 10 → 1 of 10.** False refusals: **0**. All four held-out non-English
+CVs still refused. The bilingual defect is caught in French and Spanish, in
+both PDF and DOCX, down to 11.2% foreign content.
+
+**H-041 is NARROWED, NOT CLOSED.** `logistics_headers` is pure header soup with
+no prose line anywhere, so every window falls below the gate and the check is
+silent. **A CV of that shape, written bilingually, is still scored.** It stays
+classified wrong-score.
+
+### Decision 3 — H-073 is closed on the way past
+
+The documented-gap fixture was titled "a 35%-French full-length CV is SCORED"
+and never computed a score. It now asserts the refusal, the refusal _reason_,
+and that the veto fired **because a passage was judged** rather than because
+the whole-document classifier happened to flip — so a future regression cannot
+keep it green while the remedy rots.
+
+### What is deliberately still open
+
+**The residual of H-041 and the whole of H-040 hinge on one product question:
+when the engine cannot account for something, does it refuse, or does it score
+and surface a caveat?** Refusing is gate-safe (ADR-023: false-refusal does not
+block) and costs the recruiter manual review; a caveat keeps throughput but
+leaves a wrong eligibility verdict on screen next to a warning. That is a
+product call with measured costs on both sides, and it is not the lead's to
+make. Recorded here rather than resolved.
+
+### Costs, accepted
+
+- **A CV in heavy Title Case prose** scores lower on the prose ratio and may
+  fall below the gate, in which case that window is skipped and the check is
+  silent for it. Conservative direction, but unmeasured — the corpus has no
+  such CV.
+- **The window is O(lines × window size)** per document. Bounded by
+  `MAX_LINES_PER_WINDOW = 12`, and measured at no perceptible cost on the
+  corpus, but it is more work than the previous two-granularity split.
+- **`logistics_headers` remains unjudged**, and with it the residual
+  wrong-score path above.

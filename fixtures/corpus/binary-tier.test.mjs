@@ -4,6 +4,10 @@ import { describe, expect, it } from 'vitest';
 // Relative, because `@matchdesk/server` is a private app with no exports map —
 // it is not a library and should not become one just to be tested from here.
 import { extractText } from '../../apps/server/src/ingestion/extractText.js';
+import {
+  detectLanguageHeuristic,
+  findNonEnglishSegments,
+} from '../../apps/server/src/ingestion/languageDetection.js';
 
 import { buildFixtureDocx, buildFixturePdf } from '../../scripts/lib/fixture-docs.mjs';
 import { CORPUS, CORPUS_REFERENCE_DATE, REFUSAL_CORPUS } from './definitions.mjs';
@@ -217,7 +221,15 @@ describe('corpus · binary tier · DOCUMENTED GAP (H-041 / H-068)', () => {
     'Encadrement d’une équipe de six personnes et gestion des recrutements.',
   ];
 
-  it('a 35%-French full-length CV is SCORED, not refused', async () => {
+  it('a 35%-French full-length CV is REFUSED, in both containers', async () => {
+    // WAS a documented-gap fixture asserting `parseStatus: 'ok'` — the defect
+    // itself, pinned so it could not be skipped by accident (H-068). ADR-029
+    // fixed it, so this now asserts the correct behaviour.
+    //
+    // It also closes H-073: the old version was titled "is SCORED" and never
+    // computed a score, so the word SCORED was asserted by nothing. This
+    // version checks the refusal reason AND that the veto actually fired,
+    // which is the cause the comment above claims.
     const pdf = await extractText(
       await buildFixturePdf({ lines: BILINGUAL_SHORT_PASSAGES }),
       'bilingual.pdf',
@@ -227,13 +239,28 @@ describe('corpus · binary tier · DOCUMENTED GAP (H-041 / H-068)', () => {
       'bilingual.docx',
     );
 
-    // The defect, stated: not refused, and marked scoreable.
-    expect(pdf.parseStatus).toBe('ok');
-    expect(pdf.language).toBe('en');
-    expect(pdf.reason).toBeNull();
+    expect(pdf.parseStatus).toBe('needs_attention');
+    expect(pdf.reason).toBe('mixed_language_content');
+    expect(pdf.language).toBeNull();
 
-    // Identical in both containers, so this is not a format artefact.
-    expect(docx.parseStatus).toBe('ok');
-    expect(docx.language).toBe('en');
+    // Identical in both containers. PDF loses blank lines (H-062/H-065), and
+    // the blank-line-delimited variant of this fix FAILED on the PDF path for
+    // exactly that reason — so format parity here is load-bearing evidence
+    // that the line window is format-independent, not a nicety.
+    expect(docx.parseStatus).toBe('needs_attention');
+    expect(docx.reason).toBe('mixed_language_content');
+    expect(docx.language).toBeNull();
+  });
+
+  it('the veto fired because a passage was JUDGED, not because the whole doc flipped', async () => {
+    // The cause named in the comment above, asserted rather than described.
+    // Without this, a future change that made the whole-document classifier
+    // refuse the document for an unrelated reason would keep the test above
+    // green while the actual remedy rotted.
+    const text = BILINGUAL_SHORT_PASSAGES.join('\n');
+    const veto = findNonEnglishSegments(text);
+    expect(veto.judgedSegmentCount).toBeGreaterThan(0);
+    expect(veto.hasNonEnglishSegment).toBe(true);
+    expect(detectLanguageHeuristic(text).isEnglish).toBe(true);
   });
 });

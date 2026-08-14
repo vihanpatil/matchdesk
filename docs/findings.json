@@ -240,7 +240,7 @@
       "id": "H-041",
       "severity": "wrong-score",
       "status": "open",
-      "note": "DECIDED IN ADR-027. Mixed-language veto silent below 15-word lines; partly-non-English CV scored on its English half. 56/ineligible vs 100/eligible for the same person. THE reason E5 fails."
+      "note": "NARROWED but still WRONG-SCORE (ADR-029). The prose-gated line window took held-out CVs with no judgeable segment from 4/10 to 1/10 at zero false refusals, and the bilingual defect is now caught in PDF and DOCX down to 11.2% foreign content. RESIDUAL: a pure-header CV (no prose line anywhere, e.g. logistics_headers) is still unjudged and therefore still scored if bilingual. Closing it needs the refuse-vs-caveat product decision, not a detector change."
     },
     {
       "id": "H-042",
@@ -414,8 +414,8 @@
     {
       "id": "H-073",
       "severity": "process",
-      "status": "open",
-      "note": "Gap fixture asserts 'is SCORED' without computing a score. Fix belongs with the H-041 remediation."
+      "status": "closed",
+      "note": "CLOSED by ADR-029: the fixture now asserts the refusal, the refusal reason, and that the veto fired because a passage was JUDGED rather than because the whole-document classifier flipped."
     },
     {
       "id": "H-074",
@@ -440,6 +440,18 @@
       "severity": "integrity",
       "status": "closed",
       "note": "quantize/roundHalfUp used `10 ** decimals`, ECMAScript's only implementation-approximated operation in the whole scoring path — inside the very function ADR-009 added to mitigate H-002. Replaced with a 16-entry table of exact literals, verified equal to 10**n across the accepted [0,15] domain. Found by the arch test written to pin H-002."
+    },
+    {
+      "id": "H-077",
+      "severity": "process",
+      "status": "closed",
+      "note": "The blank-line-delimited variant of the H-041 fix measured 0 false refusals but FAILED on the PDF path at every proportion below ~49%, because PDF loses blank lines. Killed by measurement. My first PDF check passed only because I tested at a favourable single point."
+    },
+    {
+      "id": "H-078",
+      "severity": "process",
+      "status": "closed",
+      "note": "The H-041 fix is a narrowing (4/10 -> 1/10 unjudged), not a closure. I measured it before the prose gate landed and briefly recorded it as fixing all four; a test I had just written caught the overstatement."
     }
   ]
 }

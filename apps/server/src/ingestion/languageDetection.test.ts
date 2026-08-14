@@ -163,17 +163,39 @@ describe('findNonEnglishSegments (mixed-language veto, ADR-022)', () => {
     expect(result.hasNonEnglishSegment).toBe(false);
   });
 
-  it('KNOWN BLIND SPOT: says nothing at all about a terse bullet CV', () => {
-    // No segment reaches the floor, so the veto abstains rather than
-    // guessing. A terse BILINGUAL CV therefore still gets through — this
-    // narrows the C7 gap, it does not close it (HONESTY_LOG H-041).
+  it('BLIND SPOT CLOSED: a terse bullet CV is now actually judged', () => {
+    // WAS: `judgedSegmentCount` 0 — "the veto abstains rather than guessing",
+    // asserted as a known blind spot (H-041). **The new expectation is the
+    // correct one and the old one was asserting a defect**: abstaining did
+    // not mean staying silent, it meant the document was SCORED, and a
+    // bilingual CV in this shape got a wrong number (H-069, ADR-027).
+    //
+    // The line window (ADR-029) groups consecutive lines until they clear the
+    // word floor, so this CV now has judgeable evidence. It is English, so it
+    // is still not vetoed — which is the half of the assertion that must not
+    // change, and the reason this is a fix rather than a trade.
     const terse = `Kwabena Boateng - HGV Driver
 Class 1 licence, clean record, twelve years
 Long distance and multi-drop experience
 Digital tachograph and drivers hours compliant`;
     const result = findNonEnglishSegments(terse);
-    expect(result.judgedSegmentCount).toBe(0);
+    expect(result.judgedSegmentCount).toBeGreaterThan(0);
     expect(result.hasNonEnglishSegment).toBe(false);
+  });
+
+  it('a terse BILINGUAL CV is now caught — the defect H-041 left open', () => {
+    // The case that made H-041 wrong-score: ordinary 8-13 word CV lines, half
+    // of them French, previously judged 0 segments and scored on the English
+    // half.
+    const bilingual = `Kwabena Boateng - HGV Driver
+Class 1 licence, clean record, twelve years
+Long distance and multi-drop experience
+Conception et exploitation de services distribues pour les paiements
+Responsable de la migration des bases de donnees vers une architecture
+Encadrement d une equipe de six personnes et gestion des recrutements`;
+    const result = findNonEnglishSegments(bilingual);
+    expect(result.judgedSegmentCount).toBeGreaterThan(0);
+    expect(result.hasNonEnglishSegment).toBe(true);
   });
 
   it('returns an empty result for empty text rather than throwing', () => {

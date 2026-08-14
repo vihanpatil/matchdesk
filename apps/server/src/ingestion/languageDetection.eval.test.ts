@@ -406,21 +406,38 @@ describe('mixed-language veto — held-out validation of the 15-word floor (ADR-
     );
   });
 
-  it('KNOWN BLIND SPOT: abstains entirely on terse CVs, so a terse bilingual CV still passes', () => {
-    // FOUR of the ten held-out CVs are terse enough that no segment reaches
-    // the floor — down from five once paragraph granularity was added
-    // (`paralegal_mixed_shape` has one line of two short sentences, which is
-    // judgeable as a paragraph and was not as sentences). The veto narrows
-    // the C7 gap; it does not close it. Asserted as current behaviour so the
-    // limit is a known number, not a discovery (HONESTY_LOG H-041).
+  it('BLIND SPOT NARROWED 4 -> 1, and the remaining one is stated, not hidden', () => {
+    // WAS: four of the ten — chef_terse, electrician_terse, logistics_headers,
+    // driver_very_terse — had no judgeable segment, asserted as a known limit
+    // (H-041). **The old expectation encoded a defect, not a boundary.**
+    // Abstaining meant those documents were SCORED unchecked, so a bilingual
+    // CV in any of those shapes got a wrong number (H-069, ADR-027).
+    //
+    // The line window (ADR-029) gives three of the four judgeable evidence.
+    // `logistics_headers` is pure header soup — a name, an email and
+    // comma-separated proper nouns, with no prose line anywhere — so every
+    // window falls below the prose gate and is skipped rather than
+    // coin-flipped.
+    //
+    // **This is NOT the blind spot closed.** A CV of that exact shape, written
+    // bilingually, is still scored. The residual is one in ten instead of four
+    // in ten, and closing it needs a product decision (refuse documents whose
+    // language could not be verified at all), not a detector change.
     const silent = Object.entries(HELD_OUT_ENGLISH_CVS)
       .filter(([, cv]) => findNonEnglishSegments(cv).judgedSegmentCount === 0)
       .map(([label]) => label);
-    expect(silent).toEqual([
-      'chef_terse',
-      'electrician_terse',
-      'logistics_headers',
-      'driver_very_terse',
-    ]);
+    expect(silent).toEqual(['logistics_headers']);
+  });
+
+  it('and closing it costs ZERO false refusals on the held-out corpus', () => {
+    // The number that decided the design. Blank-line-delimited runs were the
+    // cheaper implementation but failed on the PDF path; the line window works
+    // on PDF and cost one false refusal until the prose gate was added.
+    // This is that gate's regression test — if it ever fires, the gate moved
+    // or the corpus grew a shape it does not handle.
+    const falselyRefused = Object.entries(HELD_OUT_ENGLISH_CVS)
+      .filter(([, cv]) => findNonEnglishSegments(cv).hasNonEnglishSegment)
+      .map(([label]) => label);
+    expect(falselyRefused).toEqual([]);
   });
 });
