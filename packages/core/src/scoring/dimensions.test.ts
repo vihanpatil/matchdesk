@@ -9,6 +9,7 @@ import type {
 } from '../extraction/types.js';
 import {
   bestDegreeLevel,
+  discardedTenureClaim,
   educationCertsSubscore,
   experienceRelevanceSubscore,
   hasCertification,
@@ -316,5 +317,50 @@ describe('scoring vocabulary is pinned (H-057)', () => {
     expect(ALIAS_SUBSCORE).toBeGreaterThan(RELATED_SUBSCORE);
     expect(RELATED_SUBSCORE).toBeGreaterThan(NONE_SUBSCORE);
     expect(NONE_SUBSCORE).toBe(0);
+  });
+});
+
+describe('discardedTenureClaim (H-040, ADR-029)', () => {
+  const span = { start: 0, end: 1 };
+  const yearsAttr = (years: number, explicit: boolean): YearsExperienceAttribute => ({
+    kind: 'years_experience',
+    years,
+    isExplicitStatement: explicit,
+    value: String(years),
+    normalizedValue: String(years),
+    confidence: 1,
+    sourceSpan: span,
+  });
+
+  it('reports the claim when ranges won and the claim is larger', () => {
+    // The measured H-040 case: 20 claimed, 2.9 verified from dated roles.
+    const result = discardedTenureClaim([yearsAttr(20, true), yearsAttr(2.9, false)]);
+    expect(result).toEqual({ claimed: 20, computed: 2.9 });
+  });
+
+  it('reports nothing when no range parsed — the claim was USED, not discarded', () => {
+    // This is the distinction that makes the reservation meaningful: with no
+    // ranges, totalYearsExperience falls back to the explicit claim, so there
+    // is no disagreement to surface.
+    expect(discardedTenureClaim([yearsAttr(20, true)])).toBeNull();
+  });
+
+  it('reports nothing when the ranges already meet or exceed the claim', () => {
+    expect(discardedTenureClaim([yearsAttr(5, true), yearsAttr(9, false)])).toBeNull();
+    expect(discardedTenureClaim([yearsAttr(9, true), yearsAttr(9, false)])).toBeNull();
+  });
+
+  it('reports nothing when there is no explicit claim at all', () => {
+    expect(discardedTenureClaim([yearsAttr(9, false)])).toBeNull();
+  });
+
+  it('sums multiple ranges before comparing, and takes the largest claim', () => {
+    const result = discardedTenureClaim([
+      yearsAttr(20, true),
+      yearsAttr(12, true),
+      yearsAttr(2, false),
+      yearsAttr(1.5, false),
+    ]);
+    expect(result).toEqual({ claimed: 20, computed: 3.5 });
   });
 });

@@ -10,6 +10,7 @@ export type { SkillRequirementMatch } from './dimensions.js';
 export {
   SENIORITY_YEAR_THRESHOLDS,
   bestDegreeLevel,
+  discardedTenureClaim,
   educationCertsSubscore,
   experienceRelevanceSubscore,
   hasCertification,
@@ -37,6 +38,7 @@ export type {
   Job,
   MatchType,
   RankedCandidates,
+  Reservation,
   ScoreComposition,
   ScoreResult,
   SeniorityDimensionSpec,

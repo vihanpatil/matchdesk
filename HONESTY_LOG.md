@@ -2910,3 +2910,46 @@ wrong-score path for German-style header CVs**. It stays wrong-score and E5
 stays blocked on it. The next move is a better discriminator for
 language-neutral versus language-bearing tokens, not a refusal rule — because
 the refusal rule contradicts an existing requirement.
+
+### H-081 · H-040 closed: the engine now refuses rather than asserting a number the document contradicts
+
+The remedy the user chose: when an explicit tenure claim is discarded and that
+claim **would change the eligibility verdict**, refuse to score rather than
+publish the number.
+
+**Materiality is computed, not guessed.** `discardedTenureClaim` reports what
+`totalYearsExperience` threw away; `scoreCandidate` re-runs the experience gate
+using it, and the reservation blocks only when the verdict actually flips. On
+the measured H-040 case — 20 claimed, 2.9 verified, 9-year must-have — it
+blocks. Raise the verified figure above the bar, or drop the must-have, and it
+reports without blocking.
+
+**Why the pipeline throws instead of storing a flagged row.** `matches` has no
+"provisional" column, and adding one would put a number in the database that
+something downstream eventually reads without its caveat. H-066's `confidence`
+is the precedent — computed, read by nothing, a trap for the next consumer. A
+row nobody filters is the same trap inverted.
+
+**Stated residual, because "non-blocking" is not "harmless".** A reservation
+that does not flip eligibility can still move the SCORE, and therefore rank
+order, silently. Refusing on any score movement would fire constantly, so this
+is surfaced rather than refused — but it is a real gap and it is written into
+the `Reservation` type where the next reader will find it.
+
+**Trigger rate, measured before implementing:** 1 of 13 corpus fixtures has
+both an explicit claim and parsed ranges, and **0** would trigger the
+materiality test. This does not fire on clean CVs.
+
+**Four things lint and the type system caught in my own work**, recorded
+because each was a real defect in the change rather than a style nit:
+
+1. Test fixtures used `evidence` where the attribute type has `sourceSpan`.
+   The `dimensions` tests passed anyway — they never build an explanation —
+   so only the `score` tests exposed it.
+2. Test fixtures used `as unknown as`, which Section 0.2.3 forbids outright.
+   Replaced with properly typed `YearsExperienceAttribute` values.
+3. `requirement !== undefined && requirement.mustHave === true` where an
+   optional chain was required.
+4. Inserting the helper left `scoreCandidate`'s doc comment orphaned above
+   `reservationsFor`, so the documentation described the wrong function.
+   Nothing would have failed; it would simply have been wrong.

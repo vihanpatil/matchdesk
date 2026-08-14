@@ -273,6 +273,26 @@ export function scoreStoredPair(
 
   const result = scoreCandidate(job, scoringCandidate);
 
+  // ADR-029 / H-040: a blocking reservation means the engine holds evidence it
+  // could not reconcile AND that evidence would change the eligibility
+  // verdict. Persisting the number here is exactly the failure H-040 records —
+  // a confident 66/ineligible for a candidate the document says has twenty
+  // years, decided by a date format the parser cannot read.
+  //
+  // This throws rather than storing a flagged row on purpose: `matches` has no
+  // column for "provisional", and inventing one would put a number in the
+  // database that something downstream will eventually read without the
+  // caveat. H-066's `confidence` is the precedent — a field computed and read
+  // by nothing is a trap, and a row nobody filters is the same trap inverted.
+  const blocking = result.reservations.filter((r) => r.blocking);
+  if (blocking.length > 0) {
+    throw new Error(
+      `scoreStoredPair: refusing to score candidate ${candidate.id} against job ${job.id}. ` +
+        blocking.map((r) => r.detail).join(' ') +
+        ' Scoring it would assert a number the document contradicts (C7, ADR-029).',
+    );
+  }
+
   upsertMatch(db, {
     jobId: job.id,
     candidateId: candidate.id,

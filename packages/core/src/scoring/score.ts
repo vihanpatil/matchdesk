@@ -2,6 +2,7 @@ import type { SkillAttribute } from '../extraction/types.js';
 import { quantize, roundHalfUp } from '../numeric/round.js';
 import type { SemanticMatcher } from './cascade.js';
 import {
+  discardedTenureClaim,
   educationCertsSubscore,
   experienceRelevanceSubscore,
   matchAllSkillRequirements,
@@ -17,6 +18,7 @@ import type {
   DimensionId,
   Job,
   RankedCandidates,
+  Reservation,
   ScoreResult,
 } from './types.js';
 
@@ -171,9 +173,52 @@ function contributionsFor(active: readonly ActiveDimension[]): readonly Dimensio
 }
 
 /**
+ * Reservations for this pair (ADR-029, closes H-040).
+ *
+ * Today there is exactly one: an explicit tenure claim that
+ * {@link totalYearsExperience} discarded in favour of parsed date ranges.
+ * Discarding it is the correct rule — a verifiable range should beat a
+ * self-reported total — but doing it silently produced a wrong number about a
+ * real person, decided by nothing more than the date format a previous
+ * employer happened to use.
+ *
+ * **Materiality is computed, not guessed.** Re-run the experience gate using
+ * the discarded claim; if the eligibility verdict differs, the number cannot
+ * be presented as complete and the reservation blocks. If it does not differ,
+ * the reservation is still surfaced so the recruiter can see both figures.
+ */
+function reservationsFor(job: Job, candidate: Candidate): Reservation[] {
+  const discarded = discardedTenureClaim(candidate.attributes);
+  if (discarded === null) return [];
+
+  const requirement = job.experience?.requirement;
+
+  // Eligibility can only turn on tenure when the job makes it a must-have.
+  // Without one, the claim cannot flip the verdict — but it can still move the
+  // score, so this is reported rather than dropped.
+  const gates = requirement?.mustHave === true;
+  const flips =
+    gates && requirement.minYears > discarded.computed && requirement.minYears <= discarded.claimed;
+
+  return [
+    {
+      kind: 'unverified_tenure_claim',
+      blocking: flips,
+      detail:
+        `Verified ${String(discarded.computed)} years from dated roles, but the document ` +
+        `states ${String(discarded.claimed)}. Some employment dates could not be read, so ` +
+        `the tenure figure is a lower bound rather than a total.`,
+      claimed: discarded.claimed,
+      computed: discarded.computed,
+    },
+  ];
+}
+
+/**
  * Scores one candidate against one job (Section 6.2-6.7). Combines the
  * eligibility partition (ADR-007), the renormalized weighted sum over
- * job-active dimensions (ADR-005), and the explanation object.
+ * job-active dimensions (ADR-005), the explanation object, and any
+ * {@link Reservation} the engine could not reconcile (ADR-029).
  */
 export function scoreCandidate(
   job: Job,
@@ -212,6 +257,7 @@ export function scoreCandidate(
     eligibility,
     dimensions,
     explanation,
+    reservations: reservationsFor(job, candidate),
   };
 }
 

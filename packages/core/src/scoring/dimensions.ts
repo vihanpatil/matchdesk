@@ -95,6 +95,54 @@ export function totalYearsExperience(attributes: readonly ExtractedAttribute[]):
   return quantize(explicitMax);
 }
 
+/**
+ * The explicit tenure claim that {@link totalYearsExperience} DISCARDED, when
+ * one exists and it materially exceeds what the date ranges accounted for.
+ *
+ * **Why this exists (H-040, ADR-029).** The D5b rule above is deliberate: if
+ * any range parses, ranges win and every explicit "N years" claim is dropped
+ * as unverifiable corroboration. That rule is defensible. What was not
+ * defensible is doing it **silently** — measured, the same person with the
+ * same dates scored 19.6 years / 100 / eligible when an old employer wrote
+ * `Mar 2006 - Aug 2016`, and 2.9 years / 66 / INELIGIBLE when they wrote
+ * `03.2006 - 08.2016`, which is ordinary European numeric notation the
+ * English-only month table cannot read. The recruiter was shown "Requires at
+ * least 9 years of experience; found 2.9" about someone with twenty.
+ *
+ * The engine is not missing the information — it extracts the claim and throws
+ * it away. This surfaces what was thrown away so a caller can refuse rather
+ * than assert a number it cannot support.
+ *
+ * Returns `null` when there is nothing to report: no explicit claim, no parsed
+ * ranges (in which case the claim was USED, not discarded), or a claim that
+ * does not exceed the computed total.
+ */
+export function discardedTenureClaim(
+  attributes: readonly ExtractedAttribute[],
+): { readonly claimed: number; readonly computed: number } | null {
+  const yearsAttrs = attributes.filter(
+    (a): a is Extract<ExtractedAttribute, { kind: 'years_experience' }> =>
+      a.kind === 'years_experience',
+  );
+
+  const rangeTotal = yearsAttrs
+    .filter((a) => a.isExplicitStatement !== true)
+    .reduce((acc, a) => acc + a.years, 0);
+
+  // No ranges parsed means the explicit claim was used, not discarded.
+  if (rangeTotal <= 0) return null;
+
+  const claimed = yearsAttrs
+    .filter((a) => a.isExplicitStatement === true)
+    .reduce((acc, a) => Math.max(acc, a.years), 0);
+  if (claimed <= 0) return null;
+
+  const computed = quantize(rangeTotal);
+  if (claimed <= computed) return null;
+
+  return { claimed, computed };
+}
+
 export function experienceRelevanceSubscore(
   requirement: ExperienceRequirement,
   totalYears: number,

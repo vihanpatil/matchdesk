@@ -165,6 +165,31 @@ export interface Explanation {
   readonly caveats: readonly string[];
 }
 
+/**
+ * Something the engine could not fully account for while producing this score
+ * (ADR-029). The engine must never present a number as complete while it holds
+ * evidence it could not reconcile — the burden is on the engine to show the gap
+ * does not matter, never on the reader to notice.
+ *
+ * `blocking` means the unaccounted-for evidence would CHANGE THE ELIGIBILITY
+ * VERDICT, which is computable: re-run eligibility using the discarded value
+ * and compare. A caller that persists or displays a score must refuse to do so
+ * when a blocking reservation is present.
+ *
+ * **Stated residual:** a non-blocking reservation can still move the SCORE
+ * (and therefore rank order) without flipping eligibility. That is surfaced,
+ * not refused, because refusing on any score movement would fire constantly —
+ * but it means "non-blocking" is not the same as "harmless".
+ */
+export interface Reservation {
+  readonly kind: 'unverified_tenure_claim';
+  readonly blocking: boolean;
+  /** Recruiter-facing sentence naming both numbers. */
+  readonly detail: string;
+  readonly claimed: number;
+  readonly computed: number;
+}
+
 export interface ScoreResult {
   readonly candidateId: string;
   readonly createdAt: string;
@@ -175,6 +200,8 @@ export interface ScoreResult {
   readonly eligibility: EligibilityResult;
   readonly dimensions: readonly DimensionContribution[];
   readonly explanation: Explanation;
+  /** Empty when the engine could account for everything it read (ADR-029). */
+  readonly reservations: readonly Reservation[];
 }
 
 export interface RankedCandidates {

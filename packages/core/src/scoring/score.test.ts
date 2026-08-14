@@ -452,3 +452,97 @@ describe('weight validation (H-050)', () => {
     ).not.toThrow();
   });
 });
+
+describe('reservations (H-040, ADR-029)', () => {
+  const attrs = (claimed: number, verified: number): YearsExperienceAttribute[] => [
+    {
+      kind: 'years_experience',
+      years: claimed,
+      isExplicitStatement: true,
+      value: `${String(claimed)} years`,
+      normalizedValue: String(claimed),
+      confidence: 1,
+      sourceSpan: { start: 0, end: 1 },
+    },
+    {
+      kind: 'years_experience',
+      years: verified,
+      isExplicitStatement: false,
+      value: 'Jan 2023 - Dec 2025',
+      normalizedValue: String(verified),
+      confidence: 1,
+      sourceSpan: { start: 2, end: 3 },
+    },
+  ];
+
+  const candidate = (claimed: number, verified: number): Candidate => ({
+    id: 'c1',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    attributes: attrs(claimed, verified),
+  });
+
+  it('BLOCKS when the discarded claim would flip a must-have eligibility verdict', () => {
+    // The measured H-040 case: verified 2.9 fails a 9-year must-have, the
+    // document says 20, and the recruiter was shown "found 2.9" as the reason.
+    const job: Job = {
+      id: 'j1',
+      experience: { weight: 1, requirement: { minYears: 9, mustHave: true } },
+    };
+    const result = scoreCandidate(job, candidate(20, 2.9));
+    const blocking = result.reservations.filter((r) => r.blocking);
+
+    expect(blocking).toHaveLength(1);
+    expect(blocking[0]?.kind).toBe('unverified_tenure_claim');
+    expect(blocking[0]?.claimed).toBe(20);
+    expect(blocking[0]?.computed).toBe(2.9);
+    // Names both numbers, so the recruiter can see the disagreement itself
+    // rather than a bare "provisional" flag.
+    expect(blocking[0]?.detail).toContain('2.9');
+    expect(blocking[0]?.detail).toContain('20');
+  });
+
+  it('does NOT block when the claim would not change the verdict', () => {
+    // Verified tenure already clears the bar, so the discarded claim cannot
+    // flip anything. Still reported — a non-blocking reservation can move the
+    // SCORE without moving eligibility, which is stated, not hidden.
+    const job: Job = {
+      id: 'j1',
+      experience: { weight: 1, requirement: { minYears: 2, mustHave: true } },
+    };
+    const result = scoreCandidate(job, candidate(20, 2.9));
+    expect(result.reservations).toHaveLength(1);
+    expect(result.reservations[0]?.blocking).toBe(false);
+  });
+
+  it('does NOT block when tenure is not a must-have, because eligibility cannot turn on it', () => {
+    const job: Job = {
+      id: 'j1',
+      experience: { weight: 1, requirement: { minYears: 9 } },
+    };
+    const result = scoreCandidate(job, candidate(20, 2.9));
+    expect(result.reservations[0]?.blocking).toBe(false);
+  });
+
+  it('is empty for a candidate whose dates all parsed', () => {
+    const job: Job = {
+      id: 'j1',
+      experience: { weight: 1, requirement: { minYears: 9, mustHave: true } },
+    };
+    const clean: Candidate = {
+      id: 'c2',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      attributes: [
+        {
+          kind: 'years_experience',
+          years: 12,
+          isExplicitStatement: false,
+          value: 'Jan 2014 - Jan 2026',
+          normalizedValue: '12',
+          confidence: 1,
+          sourceSpan: { start: 0, end: 1 },
+        } satisfies YearsExperienceAttribute,
+      ],
+    };
+    expect(scoreCandidate(job, clean).reservations).toEqual([]);
+  });
+});

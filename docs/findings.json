@@ -233,8 +233,8 @@
     {
       "id": "H-040",
       "severity": "wrong-score",
-      "status": "open",
-      "note": "TRIAGED 2026-08-13 as WRONG-SCORE. Measured, same person and same dates, only the date FORMAT differing: earlier roles as 'Mar 2006 - Aug 2016' give 19.6 years, score 100, eligible; the identical roles as '03.2006 - 08.2016' (standard European numeric, unparseable) give 2.9 years, score 66, INELIGIBLE, with 'Requires at least 9 years of experience; found 2.9.' shown as the reason. The engine EXTRACTS the explicit 20-year claim (isExplicitStatement=true) and discards it. Nothing warns the recruiter, and the one caveat that touches this says tenure counts 'explicit statements AND parsed ranges' — which misdescribes what happened. Same remedy family as H-041: make the silence visible."
+      "status": "closed",
+      "note": "CLOSED by ADR-029/H-081. When a discarded explicit tenure claim would flip the eligibility verdict, scoreCandidate reports a blocking Reservation and scoreStoredPair refuses to persist a match. Materiality is computed by re-running the experience gate with the discarded claim, not guessed. Residual, stated: a non-blocking reservation can still move the score and rank order."
     },
     {
       "id": "H-041",
@@ -464,6 +464,12 @@
       "severity": "process",
       "status": "closed",
       "note": "Refusing on zero language evidence closes the German residual but costs 3/18 English CVs and violates the eval's standing requirement that headers_plus_tech_only passes. I quoted 10% to the user from the held-out set alone before checking the in-corpus set."
+    },
+    {
+      "id": "H-081",
+      "severity": "process",
+      "status": "closed",
+      "note": "The H-040 remedy, and four defects lint/types caught in my own change."
     }
   ]
 }
