@@ -3390,3 +3390,35 @@ bundle.
 **The decision now belongs to the user, per Task A's own rule.** See
 `docs/NEXT_PHASE.md` for the three options and the precedent that constrains
 them.
+
+---
+
+### H-093 · Test manifest regenerated and the floor raised, with the reason on record
+
+`assert-no-skipped-tests.mjs` refused the Task B commit:
+
+```
+1 test(s) in the committed manifest no longer exist:
+  - education.test.ts :: ... DOCUMENTED GAP: a bare B.E./M.E. with an
+    unrecognised field is still missed
+```
+
+**Correct refusal, and the removal is intentional.** That test asserted the
+wrong behaviour on purpose so the H-088 residual could not be lost. Task B.1
+expanded `FIELD_VOCAB`, so the gap is closed and the test was flipped to
+`FIXED (B.1): a bare B.E./M.E. in an Indian engineering field is now
+recognised`. The engineer confirmed it failed before the fix — the old
+wrong-on-purpose assertion produced
+`expected [] to equal, received ["bachelor/electronics-communication"]`.
+
+Manifest regenerated: **913 test identities**. `minTests` raised **844 → 913**,
+measured from a full-repo run rather than carried forward from a scoped one
+(trap 3).
+
+**Worth noting what this check bought.** The rename was invisible in every
+scoped run the engineer did, and invisible in the diff summary. Only a
+whole-repo integrity check that compares against a committed manifest could
+see it. It is the second gate this session to catch something a subagent's own
+green run did not — `pnpm typecheck` was the first, failing on
+`fixtures/corpus/text-tier.test.mjs` implicit-`any` errors that
+`pnpm typecheck:tests` does not cover.

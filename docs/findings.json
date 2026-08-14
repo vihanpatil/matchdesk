@@ -5,7 +5,7 @@
     "Why it exists (ADR-028): E5 says 'zero open wrong-score entries'. Until this",
     "file, nothing carried a classification, so evaluating E5 meant a fresh session",
     "re-reading 74 prose entries and forming an opinion. Different session, different",
-    "opinion — E5 flipped MET/NOT MET three times without the code changing once.",
+    "opinion \u2014 E5 flipped MET/NOT MET three times without the code changing once.",
     "",
     "HONESTY_LOG.md remains the append-only narrative and is still where the",
     "reasoning lives. This file is the index the gate is computed from.",
@@ -16,7 +16,7 @@
     "  coverage-gap  an input not yet understood. Product scope. Does not block.",
     "  integrity     cannot produce a wrong score, but corrupts or bypasses stored state.",
     "  process       about how the work is done, not about product behaviour.",
-    "  unclassified  NEVER TRIAGED. Blocks E5 by design — see ADR-028 Decision 1.",
+    "  unclassified  NEVER TRIAGED. Blocks E5 by design \u2014 see ADR-028 Decision 1.",
     "",
     "status: open | closed",
     "",
@@ -34,7 +34,7 @@
       "id": "H-002",
       "severity": "coverage-gap",
       "status": "open",
-      "note": "TRIAGED 2026-08-13, NOT wrong-score today, and this is the one call that LOOSENS the gate. H-002's stated mechanism is ONNX Runtime float kernels — measured: there is no ORT, no embedding model, and no transcendental or approximated float operation anywhere in packages/core. Only IEEE-754 + - * / (correctly rounded on every conforming platform) and exact Math.max/min/abs/round/floor. So no mechanism exists by which two conforming machines can differ. PINNED by determinism.arch.test.ts, which fails if a transcendental, an exponentiation operator or an inference runtime enters core — that failure is the signal to RE-TRIAGE, not to relax the test. Becomes live wrong-score risk the moment cascade step 4 (embeddings) lands."
+      "note": "TRIAGED 2026-08-13, NOT wrong-score today, and this is the one call that LOOSENS the gate. H-002's stated mechanism is ONNX Runtime float kernels \u2014 measured: there is no ORT, no embedding model, and no transcendental or approximated float operation anywhere in packages/core. Only IEEE-754 + - * / (correctly rounded on every conforming platform) and exact Math.max/min/abs/round/floor. So no mechanism exists by which two conforming machines can differ. PINNED by determinism.arch.test.ts, which fails if a transcendental, an exponentiation operator or an inference runtime enters core \u2014 that failure is the signal to RE-TRIAGE, not to relax the test. Becomes live wrong-score risk the moment cascade step 4 (embeddings) lands."
     },
     {
       "id": "H-003",
@@ -298,7 +298,7 @@
       "id": "H-052",
       "severity": "wrong-score",
       "status": "closed",
-      "note": "Closed by ADR-024 — derived attributes are never persisted."
+      "note": "Closed by ADR-024 \u2014 derived attributes are never persisted."
     },
     {
       "id": "H-053",
@@ -332,7 +332,7 @@
       "id": "H-058",
       "severity": "process",
       "status": "open",
-      "note": "Branch coverage not reproducible run to run; no fast-check seed pinned. Deliberate — pinning would cost the property that found the Remi Dubois defect."
+      "note": "Branch coverage not reproducible run to run; no fast-check seed pinned. Deliberate \u2014 pinning would cost the property that found the Remi Dubois defect."
     },
     {
       "id": "H-059",
@@ -353,7 +353,7 @@
       "id": "H-062",
       "severity": "coverage-gap",
       "status": "open",
-      "note": "PDF line model rests entirely on pdfjs hasEOL, no vertical-gap fallback. Unmeasured. A merged header could delete a section (D1 shape) — re-examine if a PDF fixture ever loses a section."
+      "note": "PDF line model rests entirely on pdfjs hasEOL, no vertical-gap fallback. Unmeasured. A merged header could delete a section (D1 shape) \u2014 re-examine if a PDF fixture ever loses a section."
     },
     {
       "id": "H-063",
@@ -386,7 +386,7 @@
       "id": "H-068",
       "severity": "wrong-score",
       "status": "closed",
-      "note": "Measurement folded into H-041, which is the tracked entry. Its 'property of CVs' framing was an overstatement — corrected in ADR-027."
+      "note": "Measurement folded into H-041, which is the tracked entry. Its 'property of CVs' framing was an overstatement \u2014 corrected in ADR-027."
     },
     {
       "id": "H-069",
@@ -398,7 +398,7 @@
       "id": "H-070",
       "severity": "process",
       "status": "open",
-      "note": "R-L1 cannot generate the defect it names. This is what E2 fails on — tracked by E2, not E5."
+      "note": "R-L1 cannot generate the defect it names. This is what E2 fails on \u2014 tracked by E2, not E5."
     },
     {
       "id": "H-071",
@@ -427,7 +427,7 @@
       "id": "D7",
       "severity": "integrity",
       "status": "open",
-      "note": "audit_log INSERT OR REPLACE bypass. Cannot produce a wrong score; corrupts the audit trail. Not tracked in HONESTY_LOG as its own heading — it is an H-028 sub-item."
+      "note": "audit_log INSERT OR REPLACE bypass. Cannot produce a wrong score; corrupts the audit trail. Not tracked in HONESTY_LOG as its own heading \u2014 it is an H-028 sub-item."
     },
     {
       "id": "H-075",
@@ -439,7 +439,7 @@
       "id": "H-076",
       "severity": "integrity",
       "status": "closed",
-      "note": "quantize/roundHalfUp used `10 ** decimals`, ECMAScript's only implementation-approximated operation in the whole scoring path — inside the very function ADR-009 added to mitigate H-002. Replaced with a 16-entry table of exact literals, verified equal to 10**n across the accepted [0,15] domain. Found by the arch test written to pin H-002."
+      "note": "quantize/roundHalfUp used `10 ** decimals`, ECMAScript's only implementation-approximated operation in the whole scoring path \u2014 inside the very function ADR-009 added to mitigate H-002. Replaced with a 16-entry table of exact literals, verified equal to 10**n across the accepted [0,15] domain. Found by the arch test written to pin H-002."
     },
     {
       "id": "H-077",
@@ -536,6 +536,12 @@
       "severity": "process",
       "status": "open",
       "note": "eld Phase-1: 64 configurations swept, NO configuration meets the bar. Window granularity = 0/23 false refusals but 0-1/13 Germanic; line granularity + reliable = 13/13 Germanic but 2/23 false refusals. The gap is GEOMETRY, not library accuracy - a trailing sub-floor line never forms a window. Valuable side result: eld at window granularity subsumes the whole Cavnar & Trenkle apparatus plus MAX_ENGLISH_MEAN_WORD_LENGTH, ENGLISH_INSTITUTION_WORDS and MIN_FOREIGN_MARGIN at zero measured regression. Decision belongs to the user."
+    },
+    {
+      "id": "H-093",
+      "severity": "process",
+      "status": "closed",
+      "note": "Test manifest regenerated (913 identities) and minTests raised 844 -> 913 after the H-088 documented-gap test was deliberately flipped by Task B.1. Reason recorded as the integrity check demands. Notable: this check and pnpm typecheck each caught something a subagent's own scoped green run did not."
     }
   ]
 }
