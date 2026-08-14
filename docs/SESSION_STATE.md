@@ -4,52 +4,81 @@
 the end of every working session. If this file disagrees with the code, **the
 code is right and this file is a bug** — fix it.
 
-**Last updated:** 2026-08-13 · **HEAD at last update:** `f6ed49f` (the commit
-recording this file follows it). Working tree clean, `pnpm verify` exit 0,
-re-run twice on this date — see H-058 before quoting any branch-coverage figure.
+**Last updated:** 2026-08-13 · **HEAD at last update:** `1d63547` (the commit
+recording this file follows it). Working tree clean, `pnpm verify` exit 0 —
+see H-058 before quoting any branch-coverage figure.
 
-**Current work: the E3 fixture corpus. Phases 1-4 of 6 COMPLETE.**
+**Current work: remediating H-041. The E3 corpus is finished (all 6 phases
+re-planned below).**
 
-**START HERE — the next session's first task is a DECISION, not code.**
+**START HERE — the E5 decision has been TAKEN. Do not re-litigate it.**
 
-E3 is **MET**. E1's two adversarial rounds are the remaining work — but do not
-start them yet. **E5's status is genuinely in question**, and running E1 rounds
-while E5 is unsettled wastes them: the gate cannot open on four of five
-criteria.
+**H-041 is classified wrong-score. E5 is NOT MET. E2 is NOT MET.** Decided by
+an independent ADR-015 verifier, re-measured a third time by the lead, and
+recorded in **ADR-027** — which also corrects a contradiction in ADR-023's
+severity split and is binding. Read **ADR-027** first; H-069 and H-070 carry
+the measurements behind it.
 
-**The decision to make first:** is **H-041 an open wrong-score entry?**
-ADR-023 names _"a half-French CV scored on its English half"_ as wrong-score,
-which BLOCKS. H-068 measured a **35%-French, full-length, non-terse CV being
-scored** — `parseStatus: ok`, `language: en`. If that is the same class, E5 is
-NOT MET and the corpus/gate work is not finished. If it is not, write down why.
-H-063 raised the same shape for H-028's D8 items; those are now triaged
-(H-066), and H-041 is the one left. **Nobody has ever made this call
-explicitly** — H-055 asserted E5 on the assumption that H-052 was the only open
-wrong-score entry, and that assumption was never checked.
+**Why it blocks:** the same candidate, same facts, scores **56 and ineligible**
+when their earlier role and degree are written in Spanish and **100 and
+eligible** in English — and the recruiter is told "Requires at least 9 years of
+experience; found 4.8" about someone with 9.1 years. `warnings: []`.
 
-Read, in order: **H-068**, then **H-063**, then **H-066**, then ADR-023's
-severity split.
+**The next session's first task IS code: choose and measure a remediation.**
+This was deliberately left open (user's call — "classify now, choose the fix
+next"). The three candidates, none yet measured:
 
-| Phase                                         | State                                |
-| --------------------------------------------- | ------------------------------------ |
-| 1 · ADR-025 (E1 contingency) + ADR-026 (deps) | **Done** — `1e6cd96`                 |
-| 2 · Deterministic fixture generator           | **Done** — `24eba4b`                 |
-| 3 · Text tier, 13 fixtures                    | **Done** — `075b908`                 |
-| 4 · Binary tier + D8 triage → **E3 MET**      | **Done** — this commit               |
-| 5 · Adversarial round 1 (E1)                  | **Blocked on the E5 decision above** |
-| 6 · Adversarial round 2 (E1)                  | Not started                          |
+1. **Aggregate consecutive short lines** until they clear the 15-word floor,
+   then judge the block with the existing n-gram method. Cheapest; reuses the
+   method; the codebase already did this once at sentence granularity (see the
+   comment at `languageDetection.ts:300-307`).
+2. **Refuse whenever the veto abstained** (`judgedSegmentCount === 0`), perhaps
+   gated on a cheap secondary signal. Converts a silent wrong score into a
+   visible refusal, which ADR-023 says does not block — but buys it with a
+   false-refusal rate that **must be measured**, not assumed.
+3. **Per-segment identification for ~8-word fragments.** What H-041 says is
+   actually needed; a different method and probably a new dependency under
+   ADR-016.
 
-**E1-E5 as of now:** E1 NOT MET (counter 0), E2 MET, E3 **MET**, E4 MET
-(80.42%, not re-run since Phase 1 — Phase 4 changed `score.ts`, `explain.ts`
-and `migrate.ts`, so **`pnpm mutate` should be re-run before asserting E4**),
-E5 **DISPUTED — see above.**
+**The floor is not a free parameter.** 12-18 is the measured window, 20 catches
+nothing, 10 falsely refuses a real CV. Any change trades a wrong score for
+false refusals at a rate nobody has measured on 8-13-word segments.
 
-**Agreed working constraints (user, this session):** both fixture tiers; hybrid
-pass criteria (targeted assertions **plus** committed snapshots); binaries
-generated deterministically, never committed; commit per milestone; **push to
-GitHub only at the end, with explicit confirmation first** — 25 commits are
-currently unpushed; full ADR-004 team for the adversarial rounds, with an
-independent verifier that did not author the corpus.
+**E2 must be closed too, and it is not the same work.** R-L1 cannot generate
+the failing input (H-070) — it names length as the defect axis and holds length
+constant. A fix to the veto does not fix the relation that was supposed to pin
+it.
+
+| Phase                                         | State                                       |
+| --------------------------------------------- | ------------------------------------------- |
+| 1 · ADR-025 (E1 contingency) + ADR-026 (deps) | **Done** — `1e6cd96`                        |
+| 2 · Deterministic fixture generator           | **Done** — `24eba4b`                        |
+| 3 · Text tier, 13 fixtures                    | **Done** — `075b908`                        |
+| 4 · Binary tier + D8 triage → **E3 MET**      | **Done** — `1d63547`                        |
+| 5 · **E5 decision (ADR-027)**                 | **Done** — this commit. E5 + E2 NOT MET     |
+| 6 · **H-041 remediation → E5**                | **NEXT.** Measure, choose, fix, re-classify |
+| 7 · **Length-generating relation → E2**       | Blocked on 6 (H-070)                        |
+| 8 · Adversarial round 1 (E1)                  | Blocked on 6 and 7                          |
+| 9 · Adversarial round 2 (E1)                  | Not started                                 |
+
+**E1-E5 as of now:** E1 NOT MET (counter 0), **E2 NOT MET (H-070)**, E3 MET,
+E4 see §2 (`pnpm mutate` re-run this session), **E5 NOT MET (ADR-027).**
+**Three of five fail.** This is a correction to the record, not a regression in
+the code — the measurements already existed and were classified wrong.
+
+**Agreed working constraints (user):** both fixture tiers; hybrid pass criteria
+(targeted assertions **plus** committed snapshots); binaries generated
+deterministically, never committed; commit per milestone; full ADR-004 team for
+the adversarial rounds, with an independent verifier that did not author the
+corpus. **When a judgement call decides a gate, it goes to the independent
+verifier — and the verifier is not told the lead's view.**
+
+**Push status: 26 commits unpushed, and the user explicitly HELD the push on
+2026-08-13** until the E2/E5 re-plan is settled. An ADR-014 content scan has
+already been run and is **clean**: no real CV or job-description content, all
+fixture names synthetic, and the single absolute path in `PROJECT_STATUS.md` is
+already public in this file, so it adds no new exposure. **Do not push without
+asking again.**
 
 **Where the corpus lives:** `fixtures/corpus/definitions.mjs` (data, shared by
 both tiers), `text-tier.test.mjs`, `binary-tier.test.mjs`,
@@ -101,7 +130,7 @@ work until it is done** (ADR-018).
 | `packages/core`             | Taxonomy, extraction, cascade 1-3, eligibility, explanation                                                                                                                                   |
 | `apps/server`               | SQLite, migrations, repositories, dedup, file store, PDF/DOCX                                                                                                                                 |
 | Metamorphic relations       | 22 R-named in core + 3 R-L in the language eval, all green (ADR-019). **4 of the core 22 (`R6c`/`R7`/`R8`/`R9`) are still `for` loops, not generated properties — H-051.** Counted 2026-08-13 |
-| Mutation testing            | Ratchet at **79** in `stryker.config.json` (ADR-020), measured 80.42%                                                                                                                         |
+| Mutation testing            | Ratchet at **79** in `stryker.config.json` (ADR-020), measured **80.89%** (re-run 2026-08-13 after Phase 4)                                                                                   |
 | Pipeline (core ↔ server)    | **Connected (ADR-023)** — document → score, **15** end-to-end tests                                                                                                                           |
 | `apps/web`                  | **NOT STARTED** — blocked behind extraction hardening                                                                                                                                         |
 | Embeddings (cascade step 4) | Deferred; typed seam exists                                                                                                                                                                   |
@@ -117,16 +146,27 @@ work until it is done** (ADR-018).
 | `pnpm license:audit` | pass (1 waiver: `duck@0.1.12`, ADR-016)                    |
 | `pnpm test:cov`      | **794 passed / 45 files**, none skipped, manifest complete |
 
-Coverage after Phase 4: **98.90% statements, ~93.1-93.4% branches, 100%
-functions** repo-wide. **The branch figure is a range on purpose (H-058):** no
-`fast-check` seed is pinned, so property tests reach a slightly different branch
-set each run — 638/684 and 639/684 were both observed on 2026-08-13 from an
-unchanged tree. Do not quote it as an exact number. Mutation score **80.42%**
-(measured 2026-08-13, ratchet raised 64 → 79); mutation has **not** been re-run
-since, and Phase 2 added `scripts/lib/fixture-docs.mjs`, which is **outside**
-Stryker's `packages/core` scope and therefore carries no mutation number at all.
-Every extraction and scoring module clears the E4 floor of 60; the weakest is
-`experience.ts` at 68.50%. Survivors 629 → 378 (H-057).
+Coverage, re-measured 2026-08-13 after the E5 decision: **98.9% statements,
+~93.0-93.2% branches, 100% functions, 99.22% lines** repo-wide. **The branch
+figure is a range on purpose (H-058):** no `fast-check` seed is pinned, so
+property tests reach a slightly different branch set each run — **642/690 and
+643/690** were both observed from an unchanged tree. Do not quote it as an
+exact number.
+
+**The denominator moved, and the old figure was stale, not wrong-at-the-time
+(H-074).** This paragraph previously said 638/684 and 639/684. That total was
+measured in Phase 1; Phases 2-4 added files inside the coverage scope, so the
+measured branch set grew to 690 and nobody re-ran it. **Compare totals, not
+just percentages** — a stable-looking percentage over a changed denominator is
+a different measurement wearing the same number.
+
+Mutation score **80.89%**, re-run 2026-08-13 after Phase 4 (ratchet 79, break
+threshold cleared). Survivors **369** (was 378). Every extraction and scoring
+module clears the E4 floor of 60; the weakest is `experience.ts` at **70.33%**,
+then `certifications.ts` at 72.97% and `explain.ts` at 74.76%. **E4 MET.**
+The run took **14 min 19 s**, not the ~8.5 min recorded earlier — the suite
+grew with the corpus. `scripts/lib/fixture-docs.mjs` is still **outside**
+Stryker's `packages/core` scope and carries no mutation number at all.
 
 **An earlier revision of this section claimed the tree did not typecheck and
 that D6's refusal gate was unimplemented. Both were false — see H-037.** Never
@@ -153,11 +193,20 @@ copy a gate result forward; run it.
    English. `findNonEnglishSegments` now vetoes it and `extractText` refuses
    with `mixed_language_content`. Veto-only, so it cannot manufacture an
    English verdict. Floor validated against a held-out ten-CV corpus outside
-   the software domain (**H-041**, which also records what it still misses).
+   the software domain. **It does not work on ordinary CVs.** The veto only
+   judges 15+-word passages and CV lines run 8-13, so it is silent on most
+   real documents and a partly-non-English CV is still scored — classified
+   **wrong-score** in **ADR-027**, and the reason E5 fails. See H-069.
 
 **Still absent:** D7 `PRAGMA recursive_triggers` and audit-log mutation
-coverage; the `explain.ts` mutation-survivor backlog; a _consumer_ of the
-language verdict (no scoring pipeline or API exists yet to act on it).
+coverage; the `explain.ts` mutation-survivor backlog.
+
+**An earlier revision of this section listed "a _consumer_ of the language
+verdict" as still absent. That was false** — `pipeline.ts:100` gates
+`isScoreable` on `extraction.language === 'en'`, and lines 260 and 326 do the
+same. The sentence mattered: it is what made the "nothing acts on it yet"
+defence of H-041 look plausible. H-066 had already rejected that defence in
+principle; at HEAD it also fails on the facts.
 
 **If resuming cold: run `git status` and `git log` first, then `pnpm verify`.**
 Re-verify any claim in this file against live behaviour rather than trusting it.
@@ -179,7 +228,7 @@ cd /Users/vihanpatil/personal/projects/Resume-Match/matchdesk
 | `pnpm test:manifest` | Regenerate the test identity manifest — **required after adding tests** |
 | `pnpm license:audit` | Two-tier license gate                                                   |
 
-| `pnpm mutate` | Stryker, ~8.5 min, scoped to `packages/core` |
+| `pnpm mutate` | Stryker, **~14.5 min** (was ~8.5 before the corpus landed), scoped to `packages/core` |
 
 **After adding tests you MUST** run `pnpm test:manifest` and bump `minTests` in
 `scripts/test-floor.json`, or CI fails.
@@ -228,31 +277,39 @@ accident:
 
 ## 5. Open items — nothing here is signed off
 
-| ID    | Item                                          | Why it matters                                                               |
-| ----- | --------------------------------------------- | ---------------------------------------------------------------------------- |
-| H-002 | Cross-machine determinism not guaranteed      | Limits C4; mitigated by 6dp quantization, not solved                         |
-| H-007 | Section 7 LLM validator can't do what's asked | Catches fabricated entities, not fabricated relations                        |
-| H-008 | OCR budget unmeasured (matrix half CLOSED)    | Matrix first fill measured at 0.34 s (H-046). OCR + embeddings untouched     |
-| H-015 | `--no-verify` bypasses hooks                  | Unfixable client-side; CI is the backstop                                    |
-| H-020 | ~~Stale `dist/` survives a failing compile~~  | **CLOSED** — went live on the first import, mitigated + verified (H-047)     |
-| H-033 | ~~Degree guard context-window dependent~~     | **CLOSED** — lower-case "as" rejected; pinned by R10 (H-042)                 |
-| H-034 | ~~Invisible characters~~                      | **CLOSED** — they FABRICATED skills, not just broke extraction (H-042)       |
-| H-036 | 378 mutation survivors (was 607)              | `explain.ts` 28.93% → 73.68%; 55 survivors left, still the largest block     |
-| H-040 | Tenure understated when ranges don't parse    | A 3-year parsed role beats a 20-year claim. Needs an `explain.ts` caveat     |
-| H-041 | Mixed-language veto abstains on terse CVs     | A terse BILINGUAL CV is still scored. 4 of 10 held-out CVs are silent        |
-| H-051 | ~~E2 FAILS — 9 of 12 defects unpinned~~       | **CLOSED** — R10/R17-R20, R-L1-R-L3 and 9 new properties (H-055)             |
-| H-052 | ~~Stored evidence drifts from the score~~     | **CLOSED** — attributes never persisted; scores reproducible (ADR-024)       |
-| H-053 | `<degree> of <field>` is ambiguous            | "Associate of Engineering" has the same shape as a real degree               |
-| H-056 | `roundHalfUp` bound breaks above ~1e9         | Outside the scoring domain; do NOT reuse this function elsewhere             |
-| H-058 | Branch coverage not reproducible run to run   | No `fast-check` seed pinned. Every recorded figure is ±1 branch minimum      |
-| H-059 | Fixture determinism needed 3 fixes, not 1     | `docx` SILENTLY IGNORES `created`/`modified`; only `checkJs` caught it       |
-| H-060 | A negative test that could not fire           | 21-byte buffer never entered the scan it tested. H-052's shape again         |
-| H-061 | `PDFDocument.load` restamps dates on read     | Defaults `updateMetadata: true`. Assert with it OFF, never on raw bytes      |
-| H-062 | PDF line model rests entirely on `hasEOL`     | No vertical-gap fallback. A merged header deletes a section = D1. Unmeasured |
-| H-063 | **E5's basis was never established**          | D8 sub-items never triaged under ADR-023's split. E5 is an assumption        |
-| H-064 | Snapshot claimed to include spans, did not    | Only the span TEXT. A span sliding between identical words was invisible     |
-| D7    | audit_log `INSERT OR REPLACE` bypass          | Integrity defect, not wrong-score — E2 does not apply. Still open            |
-| H-044 | Manifest completeness is unverifiable         | Floor guard blocks the accident; a hand-edited manifest still passes         |
+| ID    | Item                                                      | Why it matters                                                               |
+| ----- | --------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| H-002 | Cross-machine determinism not guaranteed                  | Limits C4; mitigated by 6dp quantization, not solved                         |
+| H-007 | Section 7 LLM validator can't do what's asked             | Catches fabricated entities, not fabricated relations                        |
+| H-008 | OCR budget unmeasured (matrix half CLOSED)                | Matrix first fill measured at 0.34 s (H-046). OCR + embeddings untouched     |
+| H-015 | `--no-verify` bypasses hooks                              | Unfixable client-side; CI is the backstop                                    |
+| H-020 | ~~Stale `dist/` survives a failing compile~~              | **CLOSED** — went live on the first import, mitigated + verified (H-047)     |
+| H-033 | ~~Degree guard context-window dependent~~                 | **CLOSED** — lower-case "as" rejected; pinned by R10 (H-042)                 |
+| H-034 | ~~Invisible characters~~                                  | **CLOSED** — they FABRICATED skills, not just broke extraction (H-042)       |
+| H-036 | 369 mutation survivors (was 607)                          | `explain.ts` 74.76%; 52 survivors left, still the largest single block       |
+| H-040 | Tenure understated when ranges don't parse                | A 3-year parsed role beats a 20-year claim. Needs an `explain.ts` caveat     |
+| H-041 | **WRONG-SCORE — BLOCKS. Veto silent below 15-word lines** | **Same person = 56/ineligible in Spanish, 100/eligible in English.** ADR-027 |
+| H-051 | ~~E2 FAILS — 9 of 12 defects unpinned~~                   | **CLOSED** — R10/R17-R20, R-L1-R-L3 and 9 new properties (H-055)             |
+| H-052 | ~~Stored evidence drifts from the score~~                 | **CLOSED** — attributes never persisted; scores reproducible (ADR-024)       |
+| H-053 | `<degree> of <field>` is ambiguous                        | "Associate of Engineering" has the same shape as a real degree               |
+| H-056 | `roundHalfUp` bound breaks above ~1e9                     | Outside the scoring domain; do NOT reuse this function elsewhere             |
+| H-058 | Branch coverage not reproducible run to run               | No `fast-check` seed pinned. Every recorded figure is ±1 branch minimum      |
+| H-059 | Fixture determinism needed 3 fixes, not 1                 | `docx` SILENTLY IGNORES `created`/`modified`; only `checkJs` caught it       |
+| H-060 | A negative test that could not fire                       | 21-byte buffer never entered the scan it tested. H-052's shape again         |
+| H-061 | `PDFDocument.load` restamps dates on read                 | Defaults `updateMetadata: true`. Assert with it OFF, never on raw bytes      |
+| H-062 | PDF line model rests entirely on `hasEOL`                 | No vertical-gap fallback. A merged header deletes a section = D1. Unmeasured |
+| H-063 | ~~E5's basis was never established~~                      | **CLOSED** — D8 triaged (H-066), H-041 classified (ADR-027). E5 NOT MET      |
+| H-064 | Snapshot claimed to include spans, did not                | Only the span TEXT. A span sliding between identical words was invisible     |
+| H-067 | PDF generator can't render non-WinAnsi text               | Invisible-character fixtures excluded from the PDF tier. Needs embedded font |
+| H-068 | Mixed-language blind spot wider than H-041                | Superseded in part by ADR-027 — "a property of CVs" was an OVERSTATEMENT     |
+| H-069 | **H-041 is wrong-score — E5 NOT MET**                     | Independent verifier + third re-measurement. Spanish silent at 53.3%         |
+| H-070 | **R-L1 can't generate its own defect — E2 NOT MET**       | Names LENGTH as the axis, then holds it constant. H-004/H-013/H-060 again    |
+| H-071 | Two handoff docs disagreed on a gate result               | PROJECT_STATUS said E5 MET, SESSION_STATE said DISPUTED. Corrected           |
+| H-072 | "Five of the ten" stale in source + ADR-022               | Eval asserts FOUR. Overstates the blind spot in the comment engineers read   |
+| H-074 | Branch total carried forward 3 phases                     | 684 → 690; percentage barely moved. Quote `n/total`, never the % alone       |
+| H-073 | Gap fixture doesn't test its own title                    | Says "is SCORED"; never calls `scoreCandidate`. Fix belongs with remediation |
+| D7    | audit_log `INSERT OR REPLACE` bypass                      | Integrity defect, not wrong-score — E2 does not apply. Still open            |
+| H-044 | Manifest completeness is unverifiable                     | Floor guard blocks the accident; a hand-edited manifest still passes         |
 
 **From H-028, still open:** D7 audit-log `REPLACE` bypass; D8 (negative weights
 unvalidated, `confidence` computed but never read, evidence spans
@@ -384,19 +441,35 @@ wrong numbers invites trust the tool has not earned.
     never established** — read it before asserting the gate), **H-064** (the
     snapshot claimed to include spans and did not), **H-065** (corrects H-059's
     blank-line reasoning: blank lines are inert, sections skip them).
-11. **Binary tier + E3** — Phase 4. `scripts/build-fixtures.mjs` (the CLI, still
-    unwritten), ~5 real PDF/DOCX fixtures through the FULL pipeline, plus
-    documented-refusal fixtures. **Also owed here: the PDF-vs-DOCX format-parity
-    metamorphic relation** — measured to hold on 2026-08-13, agreed with the
-    user, not yet written. **E3 is MET at the end of Phase 4.**
-12. **Adversarial rounds (E1)** — Phases 5-6. An independent Opus verifier that
-    did not author the corpus, attacking the engine plus the corpus, triaged by
-    ADR-023's three-way severity split. Two consecutive clean rounds meet E1;
-    any wrong-score finding resets the counter to zero. If both find defects,
-    **ADR-025 fires.**
-13. **Then** `apps/web`: Jobs, Candidates, Shortlist. React 19 + Vite +
+11. ~~Binary tier + E3.~~ **Done — Phase 4.** `scripts/build-fixtures.mjs`, the
+    binary tier, three C7 refusal fixtures, the PDF-vs-DOCX format-parity
+    relation, and the D8 triage (H-066). **E3 MET.** Also H-067 and H-068.
+12. ~~Decide whether H-041 is wrong-score.~~ **Done — ADR-027. It is, and E5 is
+    NOT MET.** Put to an independent ADR-015 verifier rather than decided by
+    the lead, then re-measured a third time (H-069). ADR-023's severity split
+    is **corrected**: it filed this finding in two classes at once, and its
+    false-refusal entry contradicted its own definition and discriminator.
+    **Abstention is not refusal** — classify by what the SYSTEM does when a
+    guard stays silent, not by what the guard did. The decision also cost
+    **E2** (H-070): R-L1 names length as its defect axis and then holds length
+    constant, so the class was never pinned. Three of five criteria now fail.
+13. **Remediate H-041 → E5.** **NEXT, and it is code.** Three candidate fixes
+    are listed in the START HERE block; none is measured yet. Measure the
+    false-refusal cost against the held-out ten-CV corpus **before** choosing
+    — the 15-word floor has a measured window of 12-18 and nobody has measured
+    anything on 8-13-word segments. Then re-classify H-041 and re-assert E5.
+14. **A length-generating relation → E2.** Separate work from 13: R-L1 must
+    generate foreign passages that fall BELOW the floor, not only above it.
+    Fixing the veto does not fix the relation that failed to pin it. Also fix
+    H-073's fixture, whose assertion depends on what 13 decides.
+15. **Adversarial rounds (E1)** — blocked on 13 and 14. An independent Opus
+    verifier that did not author the corpus, attacking the engine plus the
+    corpus, triaged by ADR-023's three-way split **as corrected by ADR-027**.
+    Two consecutive clean rounds meet E1; any wrong-score finding resets the
+    counter to zero. If both find defects, **ADR-025 fires.**
+16. **Then** `apps/web`: Jobs, Candidates, Shortlist. React 19 + Vite +
     Tailwind 4 + Radix, TanStack Query/Table.
-14. Fastify API over the pipeline; launcher script (ADR-013); then the
+17. Fastify API over the pipeline; launcher script (ADR-013); then the
     remaining directive phases (matrix, PDF report, LLM narrative, hardening).
 
 ---

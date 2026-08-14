@@ -662,13 +662,20 @@ the reference profiles and the original eval set are drawn from:
 15 sits mid-window rather than on an edge. The sweep is asserted in
 `languageDetection.eval.test.ts`, not merely described here.
 
-**Cost, accepted:** the veto abstains on terse CVs — five of the ten held-out
-documents have no segment long enough to judge — so a **terse bilingual CV
-still passes**. This narrows the C7 gap; it does not close it (H-041). A
-document with a legitimate short foreign-language quotation may also be
-refused; a false refusal costs the recruiter one manual review, while a false
-acceptance costs a candidate a wrong score, and that asymmetry is the whole
-argument for erring here.
+**Cost, accepted:** the veto abstains on terse CVs — ~~five~~ **four** of the
+ten held-out documents have no segment long enough to judge — so a **terse
+bilingual CV still passes**. This narrows the C7 gap; it does not close it
+(H-041). A document with a legitimate short foreign-language quotation may also
+be refused; a false refusal costs the recruiter one manual review, while a
+false acceptance costs a candidate a wrong score, and that asymmetry is the
+whole argument for erring here.
+
+**Corrected 2026-08-13 (H-072):** "five" was wrong — the eval asserts **four**,
+by name, and has since paragraph granularity was added. **Corrected the same
+day, and more seriously (ADR-027):** "a terse bilingual CV still passes"
+understates this cost by a wide margin. The veto is silent on **any** document
+whose lines fall below 15 words, which is most real CVs, terse or not. The
+finding is classified **wrong-score** and it blocks the gate.
 
 ---
 
@@ -997,3 +1004,156 @@ output is the evidence.
 - **Both libraries embed creation timestamps by default**, which would make
   every regeneration look like a change and destroy the byte-identical check.
   Suppressing that is a hard requirement on the generator, not a nicety.
+
+---
+
+## ADR-027 — H-041 is wrong-score; ADR-023's severity split is corrected
+
+**Date:** 2026-08-13 · **Status:** Accepted ·
+**Supersedes:** ADR-023 Decision 1's false-refusal example list
+
+H-041/H-068 recorded that the ADR-022 mixed-language veto is silent on
+documents whose lines fall below its 15-word floor, so a partly-non-English CV
+is scored on its English part. **Whether that is a wrong-score finding under
+ADR-023's severity split had never been decided by anyone.** H-055 asserted E5
+on the assumption that H-052 was the only open wrong-score entry, and H-063
+recorded that the assumption was never checked. This ADR makes the call.
+
+The call was put to an independent ADR-015 verifier that did not author the
+corpus, and the verdict was then re-measured a third time by the lead on a
+third document in a fourth language. All three measurements agree.
+
+### Decision 1 — H-041 is classified **wrong-score**
+
+The finding is not that the tool reads less text. It is that the tool reports a
+different number about the same person depending on which language their
+history is written in, and justifies it with a claim that is false.
+
+Measured three times, independently, on three different documents:
+
+```
+FIXTURE (H-068)   35% French, prose CV      -> parseStatus ok, language en, SCORED
+VERIFIER          37% French, own document  -> score  51, ineligible  vs  100, eligible
+LEAD              53% Spanish, own document -> score  56, ineligible  vs  100, eligible
+```
+
+The lead's run, same candidate and same facts with only the language of the
+earlier role and the degree changed:
+
+```
+earlier role + degree in SPANISH   totalYearsExperience = 4.8   SCORE 56   eligible=false
+    unmet: Requires at least 9 years of experience; found 4.8.
+    unmet: Requires at least a bachelor degree.
+earlier role + degree in ENGLISH   totalYearsExperience = 9.1   SCORE 100  eligible=true
+```
+
+`whole-document isEnglish = true`, `judgedSegmentCount = 0`, `warnings: []`.
+**"Requires at least 9 years of experience; found 4.8" is a fabricated claim
+about a real person, presented to the recruiter as evidence.** That satisfies
+both clauses of ADR-023's wrong-score definition — "reports a number that is
+wrong, **or fabricates evidence for it**" — and its discriminator, "only the
+first class can harm a candidate silently."
+
+Three further facts that the classification does not depend on but which bear
+on any future fix:
+
+- **The trigger is segment word count, not proportion.** Identical French
+  content as two 9-word lines is scored; joined into one 18-word line it is
+  refused. A single 18-word foreign sentence is caught at 16% non-English; a
+  37% block of 9-word lines is not caught at all.
+- **The whole-document backstop is language-dependent.** French flips it
+  between 37% and 44% (document-dependent); **Spanish was still classified
+  English at 53.3%.**
+- **Both existing framings in the log are wrong, in opposite directions.**
+  H-041's "terse CVs — pure bullets, skills lists" understates it: 9-12-word
+  full sentences are not terse and are never judged. H-068's "it is a property
+  of CVs" overstates it: a CV written in 17-18-word prose bullets gets seven
+  segments judged and the veto works. **The correct statement is that the veto
+  is silent on any document whose lines fall below 15 words** — most CV
+  formatting, but not all of it.
+
+### Decision 2 — ADR-023's false-refusal example list is corrected
+
+ADR-023 Decision 1 lists _"The terse-CV blind spot"_ as an example of
+**false-refusal**. That is wrong, and it is wrong in a way that matters,
+because it is the entry that made this finding look non-blocking for a month.
+
+- The false-refusal **definition** is "the tool declines to score something it
+  could have read." The tool does not decline — measured `parseStatus: ok`,
+  score persisted to `matches`. And the text it skipped is text it explicitly
+  could **not** read. Both halves of the definition fail.
+- The false-refusal **rationale** is "the recruiter sees the refusal and the
+  document in front of them, so the failure is visible and recoverable." There
+  is no refusal to see: `warnings: []`.
+- The **discriminator** — "only the first class can harm a candidate silently"
+  — is contradicted outright, since this item is in the second class and harms
+  a candidate silently.
+
+The same phenomenon was also listed, correctly, under wrong-score as _"a
+half-French CV scored on its English half."_ **ADR-023 filed one finding in two
+classes**, one of them self-contradictory. Written the day after ADR-022, it
+appears to have read the veto's abstention as a refusal.
+
+**Correction, binding from now:** strike _"The terse-CV blind spot"_ from the
+false-refusal list. The second example there — a foreign-language quotation
+triggering the veto — is a genuine false refusal and stays. The wrong-score
+list is unchanged and already names this finding.
+
+**The general rule this establishes, so the same error is not repeated:**
+**abstention is not refusal.** When a guard declines to judge, classify by what
+the _system_ then does, never by what the _guard_ did. A guard that says
+nothing and a system that then says `ok` is an acceptance.
+
+### Decision 3 — E5 is NOT MET, and E2 is NOT MET by entailment
+
+**E5** is "zero open HONESTY_LOG entries classified wrong-score." H-041 is open
+and is now classified wrong-score. **E5 is NOT MET.** `docs/PROJECT_STATUS.md`
+asserted "E5 — MET" and was false; it is corrected in the same commit.
+
+**E2** is "every wrong-score defect ever found is pinned by a metamorphic or
+property test, **not only an example test**." H-041's only pins are the
+binary-tier fixture — an example test, which E2 excludes by its own wording,
+and which does not assert a score at all — and R-L1/R-L3, which **cannot
+construct the failing input**: they draw the foreign text from a fixed set of
+long multi-sentence paragraphs, described in the source as _"each long enough
+to clear the segment floor."_ **E2 is NOT MET.**
+
+R-L1's own comment states that the defect it exists for "was precisely a
+POSITION/LENGTH effect." It generates the CV, the language and the insertion
+position, and holds **length** — the axis it names — constant. This is the
+vacuous-check pattern of H-004, H-013 and H-060, in a relation written to fix
+H-051's vacuity. **A relation that names its defect axis and then does not
+generate it is not a pin.**
+
+### What this ADR deliberately does NOT decide
+
+**The remediation is not chosen here.** The 15-word floor is not a free
+parameter — 12-18 is the measured window, 20 catches nothing, 10 falsely
+refuses a real CV (H-041) — so lowering it trades a wrong score for a false
+refusal at a rate nobody has measured on 8-13-word segments, which is exactly
+where the failure lives. Choosing between per-segment identification that works
+on short fragments, conservative refusal when the veto abstained, and
+aggregating consecutive short lines to clear the floor requires measurement
+this session did not do, and is the next session's first task.
+
+### Costs, accepted
+
+- **The gate moves backwards, from one disputed criterion to two failed
+  ones.** E1 was already NOT MET, so three of five now fail. This is the
+  correct reading of evidence that already existed; the previous position was
+  more optimistic than the measurements supported.
+- **E1's two adversarial rounds are deferred again.** They cannot certify an
+  engine with a known open wrong-score defect, and running them now would spend
+  rate-limited Opus rounds on a gate that cannot open regardless of outcome.
+- **This re-opens a question ADR-023 was written to close.** ADR-023 exists so
+  hardening terminates rather than blocking on every gap forever. Classifying a
+  finding as wrong-score moves it into the blocking class, which is the
+  mechanism ADR-023 warns can make the gate unopenable. **The boundary that
+  keeps coverage-gap non-empty:** a coverage gap is an input the product
+  accepts as in scope and promises nothing about (UK vocational
+  qualifications, non-English degree names). This is an input
+  `docs/PRODUCT_DECISIONS.md` commits to **refusing** — "partly-English
+  documents are refused, not partly scored" — by a guard built for the purpose
+  that does not fire. Failing an existing product commitment in the direction
+  of a confident wrong number is soundness, not scope. That line is checkable,
+  and it leaves every existing coverage-gap item where ADR-023 put it.

@@ -382,13 +382,36 @@ function segmentsOf(text: string): TextSegment[] {
  * Finds substantial segments that are not English, for use as a refusal veto
  * on a document the whole-document check already called English (ADR-022).
  *
- * **Blind spot, stated rather than discovered later:** on a terse CV — pure
- * bullets, skills lists, header-and-technology layouts — no segment reaches
- * the word floor, `judgedSegmentCount` is 0, and this check is silent. Five
- * of the ten held-out English CVs are that shape. A terse BILINGUAL CV
- * therefore still passes. This narrows the C7 gap; it does not close it, and
- * closing it needs per-segment detection that works on ~8-word fragments,
- * which this method cannot do (see the eval file's measured limitation).
+ * **BLIND SPOT — CLASSIFIED WRONG-SCORE, BLOCKS THE GATE (ADR-027, H-069).**
+ * This check is silent on ANY document whose lines fall below the 15-word
+ * floor — `judgedSegmentCount` comes back 0 and nothing is judged. Ordinary CV
+ * lines run 8-13 words, so that is most real CVs, **not just terse ones**.
+ * A partly-non-English CV is therefore scored on its English part.
+ *
+ * Measured, same candidate and same facts, earlier role and degree translated:
+ *
+ *     stated in Spanish   totalYearsExperience 4.8   score  56, ineligible
+ *     stated in English   totalYearsExperience 9.1   score 100, eligible
+ *
+ * and the recruiter is shown "Requires at least 9 years of experience; found
+ * 4.8" — fabricated evidence about a real person, with `warnings: []`.
+ *
+ * The trigger is segment LENGTH, not proportion: the same French text as two
+ * 9-word lines is scored, joined into one 18-word line it is refused. The
+ * whole-document backstop is language-dependent and weaker than assumed — a
+ * **53.3% Spanish** document still classified English.
+ *
+ * Four of the ten held-out English CVs have no judgeable segment at all. (An
+ * earlier revision of this comment said five; the eval asserts four — H-072.)
+ *
+ * Closing this needs per-segment detection that works on ~8-word fragments,
+ * which this method cannot do, OR refusal when the veto abstained. **The
+ * remediation is not yet chosen and the floor is not a free parameter:** 12-18
+ * is the measured window, 20 catches nothing, 10 falsely refuses a real CV.
+ *
+ * **R-L1 does not pin this** (H-070, E2 NOT MET): it generates the CV, the
+ * language and the insertion position, but draws foreign text from a fixed set
+ * of paragraphs that all clear the floor by construction.
  */
 export function findNonEnglishSegments(text: string): MixedLanguageResult {
   const nonEnglishSegments: NonEnglishSegment[] = [];

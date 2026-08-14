@@ -2384,3 +2384,193 @@ plus refusals. **What E3 does NOT cover, in writing:** invisible characters
 through PDF (H-067), and any behaviour requiring non-WinAnsi text in a PDF.
 
 **E5 is now the open question, not E1.** See H-063 and H-068.
+
+## 2026-08-13 — The E5 decision, and what taking it uncovered
+
+**Lead with the failure: the gate went backwards.** E5 was recorded as MET in
+one handoff document and DISPUTED in another. It is neither. It is **NOT MET**,
+and taking the decision properly also cost **E2**, which nobody had questioned.
+Three of five criteria now fail. No code was fixed this session; the record was
+corrected to match measurements that already existed.
+
+### H-069 · H-041 is wrong-score — the call nobody had made
+
+The question H-063 and H-068 both refused to answer unilaterally has been
+answered: **H-041 is wrong-score, E5 is NOT MET** (ADR-027).
+
+**How it was decided, because the method matters more than the verdict.** The
+user chose to put it to an independent ADR-015 verifier rather than let the
+lead rule on it. The verifier was given the sources and the question and
+**deliberately not given the lead's opinion**, which had already formed —
+anchoring it would have destroyed the only thing an independent verdict is for.
+It reached wrong-score at high confidence, on its own document, and went
+further than its brief by running the real pipeline.
+
+The lead then re-measured a third time rather than relaying the report (§7:
+verify agent reports). Third document, fourth language, different job spec:
+
+```
+--- SAME PERSON — earlier role + degree stated in SPANISH
+  whole-document: isEnglish=true  veto: judgedSegmentCount=0
+  totalYearsExperience = 4.8
+  SCORE = 56   eligible = false
+    unmet: Requires at least 9 years of experience; found 4.8.
+    unmet: Requires at least a bachelor degree.
+--- SAME PERSON — earlier role + degree stated in ENGLISH
+  totalYearsExperience = 9.1
+  SCORE = 100  eligible = true
+```
+
+**56 and rejected, or 100 and hired, decided by which language the candidate
+wrote their previous job in.** The rejection reason shown to the recruiter —
+"found 4.8" for someone with 9.1 years — is fabricated. `warnings: []`.
+
+**What the measurements corrected in the existing record.** Both prior framings
+were wrong, in opposite directions. H-041's "terse CVs — pure bullets, skills
+lists" understates it: 9-12-word full sentences are not terse and are never
+judged. **H-068's "it is a property of CVs" overstates it**, and that was this
+lead's own sentence in the previous session — a CV in 17-18-word prose bullets
+gets seven segments judged and the veto works correctly. The true statement is
+narrower than both: **the veto is silent on any document whose lines fall below
+15 words.**
+
+Two measurements nobody had taken:
+
+- **The trigger is segment length, not proportion.** Identical French content
+  as two 9-word lines is scored; joined into one 18-word line it is refused.
+  One 18-word foreign sentence is caught at 16% non-English; a 37% block of
+  9-word lines is never caught.
+- **Spanish is worse than French.** The whole-document backstop flips on French
+  somewhere between 37% and 44%. **A 53.3% Spanish document still classified
+  English.** Every prior measurement of this defect used French, so the
+  backstop looked stronger than it is.
+
+**The reachability defence is dead on the facts, not just on principle.**
+"Nothing consumes the language verdict yet" is false at HEAD:
+`pipeline.ts:100` gates `isScoreable` on `extraction.language === 'en'`, and
+lines 260 and 326 do the same. The verifier ingested the document through the
+real pipeline and `scoreStoredPair` persisted a row. H-066 rejected this
+defence when the defect was reachable only from a test; here it is reachable
+through the shipped entry point.
+
+### H-070 · The relation that pins mixed language cannot generate the defect
+
+**This is the H-004/H-013/H-060 pattern again, and this time inside a relation
+written specifically to fix a previous vacuity (H-051).**
+
+R-L1 is the property that pins the mixed-language class. Its own comment says:
+
+> The defect this relation exists for (H-043) was precisely a POSITION/LENGTH
+> effect: two-sentence Scandinavian paragraphs fell below the word floor and
+> were discarded.
+
+It then generates the CV, the language, and the insertion **position** — and
+draws the foreign text from `NON_ENGLISH_PARAGRAPHS`, a fixed `constantFrom`
+set whose own comment reads _"each long enough to clear the segment floor."_
+**It names length as the defect axis and holds length constant.** Every input
+it can construct clears the floor, so it cannot reach the failure — and it
+would pass unchanged if the veto were deleted for all sub-15-word content,
+which is precisely what the veto does.
+
+**Consequence, entailed rather than judged:** E2 requires every wrong-score
+defect to be pinned by a metamorphic or property test, "not only an example
+test." H-041 is now wrong-score. Its pins are this relation, which cannot reach
+it, and a binary-tier fixture, which is an example test that E2 excludes by its
+own wording. **E2 is NOT MET.** Decided with the user rather than by the lead,
+since it is a semantics call on what "pinned" means.
+
+**The rule worth carrying:** a relation that names its defect axis and then
+does not generate it is not a pin. H-051 converted `for` loops into generated
+properties; this is the subtler version — a real property that generates the
+wrong variable.
+
+### H-071 · Two handoff documents disagreed about a gate criterion
+
+`docs/PROJECT_STATUS.md` said `| E5 | ... | **MET** — H-052 closed (ADR-024) |`.
+`docs/SESSION_STATE.md` said `E5 **DISPUTED**`. H-063 said its basis was never
+established. **Three documents, three positions, one criterion.** The one
+titled PROJECT_STATUS — the briefing document, the one a new reader is most
+likely to trust — held the most confident and the least true position.
+
+Corrected in this commit. The general failure is that a claim was copied into a
+second document and then only the first was maintained. **A gate result should
+live in exactly one place**; every copy is a divergence waiting to happen. Both
+files now point at ADR-027 rather than restating a verdict.
+
+### H-072 · A stale number in the source comment most likely to be read
+
+`languageDetection.ts:387` says **"Five of the ten held-out English CVs are
+that shape"** and ADR-022 says the same. The eval test asserts **four**, by
+name, and explains why it dropped when paragraph granularity was added.
+`SESSION_STATE.md` already had the correct 4.
+
+H-041 is append-only so its "five" is correct history. The source comment is
+not history — it is the thing an engineer reads while deciding whether this
+blind spot matters, and it overstates the blind spot by 25%. Corrected in the
+source and in ADR-022; H-041 left as written.
+
+**Noticed only because the verifier was asked for incidental findings.** It was
+not in its brief. Asking "what else did you see" is cheap and this is the third
+time it has returned something real.
+
+### H-073 · The documented-gap fixture does not test what its own name claims
+
+`fixtures/corpus/binary-tier.test.mjs:220` is titled **"a 35%-French
+full-length CV is SCORED, not refused"**. It calls `extractText` and asserts
+`parseStatus`, `language` and `reason`. It never calls `extractAttributes` or
+`scoreCandidate`. **No score is ever computed, so the word "SCORED" in the test
+name is asserted by nothing.**
+
+It also does not assert `judgedSegmentCount === 0`, though that is the cause
+named in the comment directly above it. If the floor were changed so segments
+were judged but all came back English, the fixture would still pass while its
+stated explanation became false.
+
+Written by this lead last session, while writing H-068, which is about a
+measurement being weaker than its description. **The fixture had the same
+defect as the thing it was documenting.** Recorded now; the fix belongs with
+the remediation, since the assertion it should make depends on what the fix
+does.
+
+### Session record — what was and was not done
+
+**Done:** the E5 classification (ADR-027), the ADR-023 correction, the E2
+entailment, four incidental findings above, and `pnpm mutate` re-run for E4.
+
+**NOT done, deliberately:** no fix for H-041. The user chose "classify now,
+choose the fix next" — the 15-word floor has a measured window of 12-18, so any
+change trades a wrong score for false refusals at a rate nobody has measured on
+8-13-word segments. Choosing a remediation needs measurement this session did
+not do.
+
+**NOT done:** the 25 commits are **still unpushed**. An ADR-014 content scan was
+run and is clean — no real CV or job-description content, fixture names are
+synthetic, the one absolute path in `PROJECT_STATUS.md` is already public in
+`SESSION_STATE.md` and adds no exposure. The user held the push so nothing goes
+public until the E2 re-plan is settled.
+
+### H-074 · A branch-coverage total carried forward across three phases
+
+`SESSION_STATE.md` recorded branch coverage as **638/684 and 639/684** under a
+heading reading "Coverage after Phase 4". Re-measured this session on an
+unchanged source tree: **642/690 and 643/690**.
+
+The numerator moving is H-058 and expected — no `fast-check` seed is pinned.
+**The denominator moving is not, and it is the more interesting half.** 684 was
+measured in Phase 1. Phases 2, 3 and 4 added files inside the coverage scope
+(`scripts/lib/fixture-docs.mjs` among them), the measured branch set grew to
+690, and the figure was never re-run — it was copied forward under a heading
+that claimed it was post-Phase-4.
+
+The percentage barely moved (93.2% → 93.0%), which is exactly why nobody
+noticed. **A stable percentage over a changed denominator is a different
+measurement wearing the same number.**
+
+This is H-004's shape — the measured file set quietly changing underneath a
+coverage figure — and it happened in the same file that says, four lines below
+it, _"Never copy a gate result forward; run it."_ Recording the rule is not the
+same as following it.
+
+**Rule:** when quoting coverage, quote **`n/total`**, never the percentage
+alone. A moving total is invisible in a percentage and is the thing most likely
+to mean the measurement changed underneath you.
