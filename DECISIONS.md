@@ -1157,3 +1157,118 @@ this session did not do, and is the next session's first task.
   that does not fire. Failing an existing product commitment in the direction
   of a confident wrong number is soundness, not scope. That line is checkable,
   and it leaves every existing coverage-gap item where ADR-023 put it.
+
+---
+
+## ADR-028 — The gate is computed, not read
+
+**Date:** 2026-08-13 · **Status:** Accepted ·
+**Amends:** ADR-023 Decision 1 (E1, E2, E5 mechanics; the severity split itself
+is unchanged apart from ADR-027's correction)
+
+**The problem, stated as evidence rather than as a feeling.** Tracing every
+gate assertion in `HONESTY_LOG.md`:
+
+| Criterion                         | History                       | Stable? |
+| --------------------------------- | ----------------------------- | ------- |
+| E3 · corpus exists and passes     | NOT MET → **MET**             | yes     |
+| E4 · mutation ≥ 75                | CANNOT ASSESS → **MET** → MET | yes     |
+| E2 · defects "pinned"             | NOT MET → MET → **NOT MET**   | **no**  |
+| E5 · zero open wrong-score        | MET → disputed → **NOT MET**  | **no**  |
+| E1 · two consecutive clean rounds | NOT MET, always               | **no**  |
+
+**The two criteria you settle by running a command converged and stayed
+converged. The three that require a human to form an opinion have never
+settled.** The source code did not change between most of those flips; the
+reader did.
+
+Why each unstable one was unstable:
+
+- **E5** counts "open HONESTY_LOG entries classified wrong-score" — but no
+  entry carried a classification. Evaluating E5 meant re-reading 74 narrative
+  entries and forming a judgement. Different session, different judgement.
+- **E2** required defects to be "pinned", which was never defined. It turned
+  out to admit two readings — "a property test exists for the class" versus "a
+  property test that can generate the failing input" (H-070). Two readings,
+  two verdicts, one flip.
+- **E1** required two consecutive adversarial rounds to find no new wrong-score
+  defect, with any finding resetting the counter. Against an unbounded
+  adversary on a codebase this size, that has no reachable end state.
+
+Two amplifiers: the method has an adversary whose job is to falsify and **no
+counterpart operation that closes anything**, so the open set only grows while
+E5 is defined as zero over it; and the criteria are coupled through
+classification, so one judgement moved both E5 and E2 on 2026-08-13 and looked
+like the gate collapsing.
+
+### Decision 1 — `docs/findings.json` is the registry, and it decides E5
+
+Every finding carries a machine-readable `severity` and `status`. `pnpm gate`
+counts them. **E5 is now a command's exit code, not a reading.**
+
+`HONESTY_LOG.md` remains the append-only narrative and is still where reasoning
+lives. The registry is the index the gate is computed from. Changing a gate
+result now requires editing a tracked file — a visible, reviewable act that
+shows up in a diff — rather than something that can happen by re-reading prose.
+
+**`severity: unclassified` is a first-class value and it BLOCKS E5.** A finding
+nobody has triaged is not evidence of safety; treating it as harmless is
+exactly the assumption H-055 made and H-063 caught. Blocking makes the
+untriaged set finite, named, and visible in one command instead of surfacing
+one entry per session.
+
+**It found two on its first run.** `H-002` (cross-machine determinism) and
+`H-040` (tenure understated when ranges do not parse — "a 3-year parsed role
+beats a 20-year claim") both have wrong-score shape, both predate ADR-023's
+split, and **neither had ever been triaged.** H-040 is the same shape as H-041.
+Under the old scheme they would have surfaced one per session over months.
+
+**The completeness check runs in both directions**, and that is the load-bearing
+part: a finding in the log but not the registry fails the gate. H-004 and H-044
+are both cases of a registry quietly covering less than it appeared to, and a
+gate computed from an incomplete index is worse than no gate, because it
+reports a number it did not earn.
+
+### Decision 2 — E2 is derived from E5, not tracked separately
+
+**"Pinned" now has one mechanical definition: a test that fails when the fix is
+reverted.** That is what mutation testing already measures, so E2 needs no new
+machinery.
+
+An OPEN wrong-score finding is by definition unfixed, so it cannot be pinned.
+**E2 therefore cannot pass while E5 fails, and is computed as `e2 = e5`.** One
+fewer criterion decided by opinion, and no loss of coverage: the thing E2
+protected — that a fix is held in place by a test rather than by an example —
+is exactly what E4's ratchet enforces.
+
+### Decision 3 — E1 becomes a finite checklist
+
+`docs/ATTACK_CHECKLIST.md` lists twelve attack classes drawn from every defect
+class this project has actually found. **E1 is met when every row has been
+executed and every wrong-score finding it produced is fixed and registered.**
+
+A round no longer resets on a finding. A genuinely new attack idea becomes a
+new row, added deliberately, and the gate is re-run against it.
+
+**This is not a weaker bar.** The old one was unreachable, and an unreachable
+bar protects nobody: it kept the UI blocked for the project's entire life while
+a real wrong-score defect (H-041) sat open and unclassified for a month,
+because attention went to the counter rather than to the defect. The checklist
+already shows three rows with open or untriaged findings and one never run —
+so it is not rubber-stamping anything.
+
+### Costs, accepted
+
+- **The registry can drift from the narrative.** Mitigated by the two-way
+  completeness check, which is itself tested (`gate-registry.test.mjs`,
+  including a test asserting the heading matcher does NOT match prose mentions
+  — otherwise the check would be vacuous, the H-060 shape).
+- **`unclassified` blocking E5 means the gate got harder today, not easier.**
+  Three findings block instead of one. That is the honest number and it is the
+  first time it has been computed rather than argued.
+- **Collapsing E2 into E5 loses an independent signal.** Accepted: it was not
+  independent in practice — it was decided by the same classification E5 uses,
+  which is why both flipped together.
+- **A checklist can be gamed by writing narrow rows.** The rows are derived
+  from defects already found, not invented, and rows may only be marked covered
+  by pasted output. This is a real residual risk and is not fully closed.

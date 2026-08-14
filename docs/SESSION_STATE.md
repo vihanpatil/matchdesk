@@ -11,7 +11,19 @@ see H-058 before quoting any branch-coverage figure.
 **Current work: remediating H-041. The E3 corpus is finished (all 6 phases
 re-planned below).**
 
-**START HERE — the E5 decision has been TAKEN. Do not re-litigate it.**
+**START HERE — run `pnpm gate` FIRST. It prints the gate; do not read one.**
+
+**The gate is now computed, not argued (ADR-028, H-075).** Three of the five
+criteria used to be opinions and never converged — E5 flipped MET → disputed →
+NOT MET and E2 flipped NOT MET → MET → NOT MET without the code changing once,
+while E3 and E4, the two you settle by running a command, converged and stayed
+converged. `docs/findings.json` now carries a `severity`/`status` per finding
+and `pnpm gate` counts them. **Changing a gate result requires editing a
+tracked file, which shows up in a diff.** Re-reading prose can no longer move
+it. If you find yourself re-deriving whether some entry is wrong-score, stop:
+that is the loop this replaced.
+
+**The E5 decision has been TAKEN (ADR-027). Do not re-litigate it.**
 
 **H-041 is classified wrong-score. E5 is NOT MET. E2 is NOT MET.** Decided by
 an independent ADR-015 verifier, re-measured a third time by the lead, and
@@ -24,9 +36,16 @@ when their earlier role and degree are written in Spanish and **100 and
 eligible** in English — and the recruiter is told "Requires at least 9 years of
 experience; found 4.8" about someone with 9.1 years. `warnings: []`.
 
-**The next session's first task IS code: choose and measure a remediation.**
-This was deliberately left open (user's call — "classify now, choose the fix
-next"). The three candidates, none yet measured:
+**Three findings block E5, not one.** `pnpm gate` surfaced two that had never
+been triaged at all: **H-002** (cross-machine determinism) and **H-040**
+(_"a 3-year parsed role beats a 20-year claim"_ — the same shape as H-041,
+open since before ADR-023 existed). **Triaging those two is cheaper than the
+H-041 fix and should go first**, because either could turn out to need the
+same remediation.
+
+**Then the code: choose and measure the H-041 remediation.** Deliberately left
+open (user's call — "classify now, choose the fix next"). The three candidates,
+none yet measured:
 
 1. **Aggregate consecutive short lines** until they clear the 15-word floor,
    then judge the block with the existing n-gram method. Cheapest; reuses the

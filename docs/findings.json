@@ -1,0 +1,439 @@
+{
+  "$comment": [
+    "THE GATE REGISTRY. This file, not a reading of HONESTY_LOG.md, decides E5.",
+    "",
+    "Why it exists (ADR-028): E5 says 'zero open wrong-score entries'. Until this",
+    "file, nothing carried a classification, so evaluating E5 meant a fresh session",
+    "re-reading 74 prose entries and forming an opinion. Different session, different",
+    "opinion — E5 flipped MET/NOT MET three times without the code changing once.",
+    "",
+    "HONESTY_LOG.md remains the append-only narrative and is still where the",
+    "reasoning lives. This file is the index the gate is computed from.",
+    "",
+    "severity: wrong-score | false-refusal | coverage-gap | integrity | process | unclassified",
+    "  wrong-score   the tool reports a number that is wrong, or fabricates evidence. BLOCKS.",
+    "  false-refusal declines something it could have read. Visible to the recruiter. Does not block.",
+    "  coverage-gap  an input not yet understood. Product scope. Does not block.",
+    "  integrity     cannot produce a wrong score, but corrupts or bypasses stored state.",
+    "  process       about how the work is done, not about product behaviour.",
+    "  unclassified  NEVER TRIAGED. Blocks E5 by design — see ADR-028 Decision 1.",
+    "",
+    "status: open | closed",
+    "",
+    "Adding an entry to HONESTY_LOG.md without adding it here fails `pnpm gate`.",
+    "That completeness check is the point: H-004 and H-044 are both cases of a",
+    "registry quietly covering less than it appeared to."
+  ],
+  "findings": [
+    {
+      "id": "H-001",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-002",
+      "severity": "unclassified",
+      "status": "open",
+      "note": "Cross-machine determinism not guaranteed (limits C4). Never triaged under ADR-023. Same score on two machines could differ, which has wrong-score SHAPE, but is mitigated by 6dp quantization and has never been measured across machines. Needs the H-041 treatment."
+    },
+    {
+      "id": "H-003",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-004",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-005",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-006",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-007",
+      "severity": "coverage-gap",
+      "status": "open",
+      "note": "Section 7 LLM validator catches fabricated entities, not fabricated relations. Not built; no scoring path depends on it."
+    },
+    {
+      "id": "H-008",
+      "severity": "coverage-gap",
+      "status": "open",
+      "note": "Matrix half CLOSED (H-046, 0.34s). OCR and embeddings budgets still unmeasured."
+    },
+    {
+      "id": "H-009",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-010",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-011",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-012",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-013",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-014",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-015",
+      "severity": "process",
+      "status": "open",
+      "note": "--no-verify bypasses hooks. Unfixable client-side; CI is the backstop."
+    },
+    {
+      "id": "H-016",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-017",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-018",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-019",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-020",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-021",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-022",
+      "severity": "wrong-score",
+      "status": "closed",
+      "note": "British degree abbreviations silently ignored. Fixed and pinned by R10."
+    },
+    {
+      "id": "H-023",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-024",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-025",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-026",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-027",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-028",
+      "severity": "wrong-score",
+      "status": "closed",
+      "note": "Umbrella entry for D1-D8. D1-D6 fixed; D7 tracked separately below; D8 triaged in H-066."
+    },
+    {
+      "id": "H-029",
+      "severity": "wrong-score",
+      "status": "closed",
+      "note": "Seniority thresholds unpinned. Closed by generated properties."
+    },
+    {
+      "id": "H-030",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-031",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-032",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-033",
+      "severity": "wrong-score",
+      "status": "closed",
+      "note": "Lower-case 'as' yielded an associate degree. Fixed, pinned by R10."
+    },
+    {
+      "id": "H-034",
+      "severity": "wrong-score",
+      "status": "closed",
+      "note": "Invisible characters FABRICATED skills. Fixed, pinned by R11/R12."
+    },
+    {
+      "id": "H-035",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-036",
+      "severity": "process",
+      "status": "open",
+      "note": "369 mutation survivors (was 607). explain.ts largest block at 74.76%. E4 passes regardless."
+    },
+    {
+      "id": "H-037",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-038",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-039",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-040",
+      "severity": "unclassified",
+      "status": "open",
+      "note": "BLOCKS E5 UNTIL TRIAGED. totalYearsExperience prefers parsed date ranges, so a 3-year parsed role beats an explicit 20-year claim. That understates tenure and can flip an eligibility gate — the same shape as H-041, and never triaged under ADR-023. Accepted as a deliberate tradeoff before the split existed."
+    },
+    {
+      "id": "H-041",
+      "severity": "wrong-score",
+      "status": "open",
+      "note": "DECIDED IN ADR-027. Mixed-language veto silent below 15-word lines; partly-non-English CV scored on its English half. 56/ineligible vs 100/eligible for the same person. THE reason E5 fails."
+    },
+    {
+      "id": "H-042",
+      "severity": "wrong-score",
+      "status": "closed"
+    },
+    {
+      "id": "H-043",
+      "severity": "wrong-score",
+      "status": "closed"
+    },
+    {
+      "id": "H-044",
+      "severity": "process",
+      "status": "open",
+      "note": "A hand-edited test manifest still passes. Floor guard blocks the accident, not the intent."
+    },
+    {
+      "id": "H-045",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-046",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-047",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-048",
+      "severity": "wrong-score",
+      "status": "closed"
+    },
+    {
+      "id": "H-049",
+      "severity": "wrong-score",
+      "status": "closed",
+      "note": "An unreadable JOB scored candidates 100/100. C7 now enforced on both sides."
+    },
+    {
+      "id": "H-050",
+      "severity": "wrong-score",
+      "status": "closed"
+    },
+    {
+      "id": "H-051",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-052",
+      "severity": "wrong-score",
+      "status": "closed",
+      "note": "Closed by ADR-024 — derived attributes are never persisted."
+    },
+    {
+      "id": "H-053",
+      "severity": "coverage-gap",
+      "status": "open",
+      "note": "'<degree> of <field>' is genuinely ambiguous. Product scope."
+    },
+    {
+      "id": "H-054",
+      "severity": "wrong-score",
+      "status": "closed"
+    },
+    {
+      "id": "H-055",
+      "severity": "process",
+      "status": "closed",
+      "note": "Asserted E5 on an unchecked assumption. Superseded by H-063 and ADR-027."
+    },
+    {
+      "id": "H-056",
+      "severity": "coverage-gap",
+      "status": "open",
+      "note": "roundHalfUp error bound breaks above ~1e9, outside the scoring domain. Do NOT reuse the function elsewhere."
+    },
+    {
+      "id": "H-057",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-058",
+      "severity": "process",
+      "status": "open",
+      "note": "Branch coverage not reproducible run to run; no fast-check seed pinned. Deliberate — pinning would cost the property that found the Remi Dubois defect."
+    },
+    {
+      "id": "H-059",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-060",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-061",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-062",
+      "severity": "coverage-gap",
+      "status": "open",
+      "note": "PDF line model rests entirely on pdfjs hasEOL, no vertical-gap fallback. Unmeasured. A merged header could delete a section (D1 shape) — re-examine if a PDF fixture ever loses a section."
+    },
+    {
+      "id": "H-063",
+      "severity": "process",
+      "status": "closed",
+      "note": "Closed by H-066 (D8 triaged) and ADR-027 (H-041 classified)."
+    },
+    {
+      "id": "H-064",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-065",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-066",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-067",
+      "severity": "coverage-gap",
+      "status": "open",
+      "note": "PDF generator cannot render non-WinAnsi text, so invisible-character fixtures are DOCX-only. Test-infrastructure gap, not product behaviour."
+    },
+    {
+      "id": "H-068",
+      "severity": "wrong-score",
+      "status": "closed",
+      "note": "Measurement folded into H-041, which is the tracked entry. Its 'property of CVs' framing was an overstatement — corrected in ADR-027."
+    },
+    {
+      "id": "H-069",
+      "severity": "process",
+      "status": "closed",
+      "note": "The record of the ADR-027 decision. The defect itself is tracked as H-041."
+    },
+    {
+      "id": "H-070",
+      "severity": "process",
+      "status": "open",
+      "note": "R-L1 cannot generate the defect it names. This is what E2 fails on — tracked by E2, not E5."
+    },
+    {
+      "id": "H-071",
+      "severity": "process",
+      "status": "closed",
+      "note": "Handoff docs disagreed on a gate result. Structurally prevented from recurring by this registry."
+    },
+    {
+      "id": "H-072",
+      "severity": "process",
+      "status": "closed"
+    },
+    {
+      "id": "H-073",
+      "severity": "process",
+      "status": "open",
+      "note": "Gap fixture asserts 'is SCORED' without computing a score. Fix belongs with the H-041 remediation."
+    },
+    {
+      "id": "H-074",
+      "severity": "process",
+      "status": "open",
+      "note": "Branch-coverage total carried forward across three phases. Quote n/total, never the percentage alone."
+    },
+    {
+      "id": "D7",
+      "severity": "integrity",
+      "status": "open",
+      "note": "audit_log INSERT OR REPLACE bypass. Cannot produce a wrong score; corrupts the audit trail. Not tracked in HONESTY_LOG as its own heading — it is an H-028 sub-item."
+    },
+    {
+      "id": "H-075",
+      "severity": "process",
+      "status": "closed",
+      "note": "The gate reform itself (ADR-028). Recorded, not open work."
+    }
+  ]
+}

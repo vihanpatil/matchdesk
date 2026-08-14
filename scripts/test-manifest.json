@@ -794,6 +794,26 @@
     "scripts/lib/fixture-docs.test.mjs :: writeZipDeterministic reads an archive larger than the maximum ZIP comment",
     "scripts/lib/fixture-docs.test.mjs :: writeZipDeterministic refuses duplicate entry names",
     "scripts/lib/fixture-docs.test.mjs :: writeZipDeterministic round-trips entries through readZipEntries",
-    "scripts/lib/fixture-docs.test.mjs :: writeZipDeterministic writes an empty archive without an entry"
+    "scripts/lib/fixture-docs.test.mjs :: writeZipDeterministic writes an empty archive without an entry",
+    "scripts/lib/gate-registry.test.mjs :: computeGate E2 cannot pass while E5 fails",
+    "scripts/lib/gate-registry.test.mjs :: computeGate E5 passes when nothing open is wrong-score or unclassified",
+    "scripts/lib/gate-registry.test.mjs :: computeGate an OPEN wrong-score finding blocks E5",
+    "scripts/lib/gate-registry.test.mjs :: computeGate an UNCLASSIFIED finding blocks E5 too",
+    "scripts/lib/gate-registry.test.mjs :: computeGate counts open findings by severity",
+    "scripts/lib/gate-registry.test.mjs :: computeGate false-refusal and coverage-gap never block, per ADR-023",
+    "scripts/lib/gate-registry.test.mjs :: headingIds does NOT match a prose mention of an id",
+    "scripts/lib/gate-registry.test.mjs :: headingIds picks up H- and D- headings in the log’s exact shape",
+    "scripts/lib/gate-registry.test.mjs :: headingIds tolerates tabs and extra spaces after the hashes",
+    "scripts/lib/gate-registry.test.mjs :: the REAL registry, as shipped E5 is NOT MET at HEAD, and says so for the reasons on record",
+    "scripts/lib/gate-registry.test.mjs :: the REAL registry, as shipped is sound — every log finding is registered and every entry is well-formed",
+    "scripts/lib/gate-registry.test.mjs :: the REAL registry, as shipped records H-041 as the open wrong-score finding ADR-027 made it",
+    "scripts/lib/gate-registry.test.mjs :: validateRegistry FAILS when the log has a finding the registry does not",
+    "scripts/lib/gate-registry.test.mjs :: validateRegistry FAILS when the registry has an entry with no log heading and no note",
+    "scripts/lib/gate-registry.test.mjs :: validateRegistry accepts a sound registry",
+    "scripts/lib/gate-registry.test.mjs :: validateRegistry allows a registry-only entry when it explains itself",
+    "scripts/lib/gate-registry.test.mjs :: validateRegistry rejects a duplicate id",
+    "scripts/lib/gate-registry.test.mjs :: validateRegistry rejects an unknown severity or status",
+    "scripts/lib/gate-registry.test.mjs :: validateRegistry reports an entry with no id rather than crashing",
+    "scripts/lib/gate-registry.test.mjs :: validateRegistry requires an unclassified entry to say why"
   ]
 }

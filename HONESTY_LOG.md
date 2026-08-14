@@ -2574,3 +2574,67 @@ same as following it.
 **Rule:** when quoting coverage, quote **`n/total`**, never the percentage
 alone. A moving total is invisible in a percentage and is the thing most likely
 to mean the measurement changed underneath you.
+
+### H-075 · The gate was unmeasurable, and that is why it never closed
+
+**Lead with the finding: three of the five exit criteria were opinions, and
+opinions do not converge.** Traced across every gate assertion in this file:
+
+| Criterion                         | History                   | Stable? |
+| --------------------------------- | ------------------------- | ------- |
+| E3 · corpus exists and passes     | NOT MET → MET             | yes     |
+| E4 · mutation ≥ 75                | CANNOT ASSESS → MET → MET | yes     |
+| E2 · defects "pinned"             | NOT MET → MET → NOT MET   | **no**  |
+| E5 · zero open wrong-score        | MET → disputed → NOT MET  | **no**  |
+| E1 · two consecutive clean rounds | NOT MET, always           | **no**  |
+
+**The two criteria you settle by running a command converged and stayed
+converged. The three requiring a human judgement have never settled — and the
+source code did not change between most of those flips. The reader did.**
+
+This is the answer to "why does every session re-solve the last session's
+work." It was not carelessness in any one session. E5 counted "entries
+classified wrong-score" while **no entry carried a classification**, so
+evaluating it meant re-reading 74 narrative entries and forming a fresh
+judgement each time. E2 turned on "pinned", never defined, which turned out to
+admit two readings (H-070). E1 required an unbounded adversary to find nothing
+twice in a row, with any finding resetting the counter — no reachable end
+state.
+
+Two amplifiers. The method has an adversary whose job is to falsify and **no
+counterpart operation that closes anything**, so the open set only grows while
+E5 is defined as zero over it. And the criteria are coupled through
+classification, so one judgement on 2026-08-13 moved both E5 and E2 and looked
+like the gate collapsing.
+
+**Fixed in ADR-028**, three changes, none elaborate:
+
+1. `docs/findings.json` is the registry. `pnpm gate` counts it. E5 is an exit
+   code. Changing a gate result now requires editing a tracked file — visible
+   in a diff — instead of happening by re-reading.
+2. E2 is derived: "pinned" means a test that fails when the fix is reverted,
+   which mutation testing already measures. An open wrong-score finding is
+   unfixed, so `e2 = e5`. One fewer opinion.
+3. E1 is `docs/ATTACK_CHECKLIST.md` — twelve classes drawn from defects
+   actually found. Finite, and it does not reset on a new idea.
+
+**The registry earned itself on the first run.** `pnpm gate` immediately named
+**two never-triaged findings with wrong-score shape**: `H-002` (cross-machine
+determinism) and `H-040` — _"a 3-year parsed role beats a 20-year claim"_,
+which is the same shape as H-041, has been sitting open since before ADR-023
+existed, and would have understated a candidate's tenure and flipped an
+eligibility gate. Under the old scheme these surface one per session over
+months. **This is the mechanism working: the untriaged set is now finite,
+named, and printed by one command.**
+
+**The gate got HARDER today, not easier.** Three findings block E5 instead of
+one, and the attack checklist shows one class (A5, PDF section segmentation)
+that has never been run at all. That is the first honest count this project has
+had, because it is the first one computed rather than argued.
+
+**What this costs, stated:** the registry can drift from the narrative. That is
+why the completeness check runs in both directions and is itself tested —
+including a test asserting the heading matcher does **not** match prose
+mentions of an id, because a matcher that did would make the check vacuous.
+That is the H-060 shape, and writing the guard without that test would have
+repeated it.
