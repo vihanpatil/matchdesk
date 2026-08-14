@@ -418,6 +418,170 @@ const MIN_FOREIGN_MARGIN = 0.03;
  */
 const MAX_ENGLISH_MEAN_WORD_LENGTH = 9.4;
 
+/**
+ * English institution and qualification vocabulary.
+ *
+ * **Why this exists (H-086).** {@link MAX_ENGLISH_MEAN_WORD_LENGTH} was
+ * calibrated on English, Romance and Germanic CVs and immediately falsely
+ * refused **2 of 5 synthetic Indian-English CVs**: "Visvesvaraya Technological
+ * University" measured 9.43 and read as Swedish, and an education section of
+ * Indian university names measured 9.54 and read as Italian. Long
+ * transliterated proper nouns look exactly like compound morphology.
+ *
+ * That matters concretely — this tool's recruiter works with Indian clients,
+ * so Indian degrees are a primary case, not an edge.
+ *
+ * A segment carrying two or more of these words is an English-structured
+ * education or institution line with long proper nouns embedded in it, not a
+ * foreign compound-noun list. The German, Dutch and Swedish header blocks this
+ * signal exists to catch contain **none** of them — they use `Universitaet`,
+ * `Hogeschool`, `Handelshoegskolan` — so the exemption does not weaken it.
+ *
+ * Measured: with this exemption, 0/18 English CVs, 0/5 Indian-English CVs and
+ * 0 regressions on DE/NL/SV detection. Raising the threshold to 10.0 instead
+ * was also measured clean, but was rejected: it would leave only 0.45 of
+ * headroom above the Swedish header block (10.45), and this rule is
+ * semantically correct rather than a threshold nudge.
+ *
+ * **Residual, stated:** an Indian institution name appearing with no English
+ * institution word anywhere in the same window would still fire. Indian
+ * university names almost always contain "University", "Institute" or
+ * "College", but this has been measured on five synthetic CVs, not a corpus.
+ */
+const ENGLISH_INSTITUTION_WORDS = new Set([
+  'university',
+  'institute',
+  'institution',
+  'college',
+  'school',
+  'academy',
+  'polytechnic',
+  'technology',
+  'technological',
+  'bachelor',
+  'master',
+  'masters',
+  'doctorate',
+  'diploma',
+  'degree',
+  'engineering',
+  'science',
+  'sciences',
+  'studies',
+  'education',
+  'faculty',
+  'campus',
+]);
+
+/**
+ * Function words common across the eight covered languages and rare or absent
+ * in English, used as a SUB-FLOOR signal (H-085 remedy).
+ *
+ * **Why a lexicon here when this module deliberately avoids them.** The
+ * n-gram method needs ~8 words to say anything. A foreign insert shorter than
+ * the window floor — a single line like "Licenciatura en Ciencias de la
+ * Computacion, Universidad de Salamanca", ~70 letters — is never isolated,
+ * because any window containing it is mostly English and dilutes. That line
+ * carries a DEGREE, which is the attribute that flipped eligibility in the
+ * original H-041 reproduction, so the gap is material rather than cosmetic.
+ *
+ * Measured across all 18 English CVs, per line: requiring **two distinct**
+ * hits gives **0 false positives in 70 lines**, while 1 hit gives 1. Two is
+ * therefore the floor, and the margin above the false-positive boundary is the
+ * whole reason this is safe.
+ *
+ * **This covers Romance inserts only, by construction.** Germanic
+ * compound-noun lines contain no function words at all — measured, 0 hits on
+ * German, Dutch and Swedish header lines. Mean word length cannot rescue them
+ * at line level either: English lines reach 11.3 there
+ * ("Additional: Conversational Portuguese"), so the classes do not separate on
+ * 3-5 words. **The Germanic sub-floor insert remains open** and is what the
+ * language-ID library is for.
+ *
+ * Deliberately small and deliberately not a language identifier — it answers
+ * only "does this short line carry non-English function words", which is the
+ * narrowest question that closes the measured gap.
+ */
+const NON_ENGLISH_FUNCTION_WORDS = new Set([
+  // French
+  'de',
+  'des',
+  'du',
+  'les',
+  'une',
+  'dans',
+  'pour',
+  'avec',
+  'sur',
+  'par',
+  'est',
+  'sont',
+  'aux',
+  'chez',
+  'ses',
+  'leur',
+  'la',
+  'le',
+  // Spanish / Italian
+  'el',
+  'los',
+  'las',
+  'una',
+  'para',
+  'con',
+  'por',
+  'del',
+  'su',
+  'sus',
+  'en',
+  'di',
+  'della',
+  'gli',
+  'nel',
+  'che',
+  // German / Dutch
+  'der',
+  'die',
+  'das',
+  'und',
+  'mit',
+  'von',
+  'den',
+  'dem',
+  'ein',
+  'eine',
+  'bei',
+  'auf',
+  'zur',
+  'zum',
+  'het',
+  'een',
+  'van',
+  'voor',
+  'aan',
+  'bij',
+  'door',
+  'naar',
+  // Scandinavian
+  'och',
+  'att',
+  'som',
+  'till',
+  'av',
+  'ett',
+  'har',
+  'hos',
+  'og',
+  'til',
+]);
+
+/** Two distinct hits: measured 0 false positives in 70 English lines; one hit
+ *  gives 1, so this margin is the safety. */
+const MIN_FUNCTION_WORD_HITS = 2;
+
+/** How many DISTINCT institution words a segment must carry to be exempt. */
+const MIN_INSTITUTION_WORDS_FOR_EXEMPTION = 2;
+
 const EMAIL_OR_URL = /\S+@\S+|https?:\/\/\S+/g;
 const ACRONYM = /^[A-Z][A-Z/&.-]{1,}$/;
 
@@ -450,6 +614,21 @@ function meanWordLength(text: string): number {
   const words = wordsOf(text);
   if (words.length === 0) return 0;
   return letterCount(text) / words.length;
+}
+
+/**
+ * True when a LINE carries enough non-English function words to be foreign,
+ * used below the window floor where the n-gram method cannot operate.
+ */
+function carriesNonEnglishFunctionWords(text: string): boolean {
+  const distinct = new Set(wordsOf(text).filter((w) => NON_ENGLISH_FUNCTION_WORDS.has(w)));
+  return distinct.size >= MIN_FUNCTION_WORD_HITS;
+}
+
+/** True when the segment reads as an English education/institution line. */
+function isEnglishInstitutionText(text: string): boolean {
+  const distinct = new Set(wordsOf(text).filter((w) => ENGLISH_INSTITUTION_WORDS.has(w)));
+  return distinct.size >= MIN_INSTITUTION_WORDS_FOR_EXEMPTION;
 }
 
 export interface NonEnglishSegment {
@@ -625,7 +804,11 @@ export function findNonEnglishSegments(text: string): MixedLanguageResult {
     // Signal 1 — morphology English does not have. This catches German, where
     // the n-gram profiles themselves return the WRONG verdict because a
     // compound-noun list is out-of-domain for profiles built from prose.
-    const compounding = meanWordLength(bearing) >= MAX_ENGLISH_MEAN_WORD_LENGTH;
+    // The institution exemption keeps Indian-English education lines out of the
+    // compounding signal (H-086) — long transliterated proper nouns are not
+    // foreign morphology.
+    const compounding =
+      meanWordLength(bearing) >= MAX_ENGLISH_MEAN_WORD_LENGTH && !isEnglishInstitutionText(bearing);
 
     // Signal 2 — a foreign verdict, but only when it is confident. An
     // unconfident foreign verdict on language-neutral text is a coin flip.
@@ -644,6 +827,31 @@ export function findNonEnglishSegments(text: string): MixedLanguageResult {
       text: segment.text,
       sourceSpan: { start: segment.start, end: segment.end },
       nearestLanguage: verdict.nearestOtherLanguage,
+    });
+  }
+
+  // SUB-FLOOR PASS (H-085). Everything above operates on windows of ~100+
+  // letters. A foreign insert shorter than that is never isolated, because any
+  // window containing it is mostly English and dilutes — measured, a one-line
+  // Spanish degree was scored. This pass looks at individual lines for
+  // non-English function words, which is the one signal that survives at 5-8
+  // words.
+  //
+  // Veto-only, like everything else here: it can add refusals and can never
+  // manufacture an English verdict.
+  for (const line of linesWithOffsets(text)) {
+    if (!carriesNonEnglishFunctionWords(line.text)) continue;
+    const alreadyReported = nonEnglishSegments.some(
+      (s) => s.sourceSpan.start <= line.start && s.sourceSpan.end >= line.end,
+    );
+    if (alreadyReported) continue;
+
+    nonEnglishSegments.push({
+      text: line.text,
+      sourceSpan: { start: line.start, end: line.end },
+      // The lexicon spans eight languages and deliberately does not identify
+      // which one, so this reports no nearest language rather than guessing.
+      nearestLanguage: null,
     });
   }
 

@@ -249,6 +249,53 @@ Digital tachograph and drivers hours compliant
 Manual handling trained`,
 };
 
+/**
+ * Indian-English CVs — a PRIMARY case for this product, not an edge.
+ *
+ * The recruiter this tool is built for works with Indian clients, so degrees
+ * from Indian universities are routine input. ADR-030's compounding signal
+ * falsely refused 2 of these 5 on its first run (H-086): long transliterated
+ * proper nouns like "Visvesvaraya Technological University" measure 9.43
+ * letters per word and read as Swedish; an education section of Indian
+ * university names measures 9.54 and reads as Italian.
+ *
+ * All synthetic (ADR-014). Kept as a permanent corpus so this cannot regress:
+ * neither of the other two English corpora contained a single Indian CV, which
+ * is exactly why the defect shipped.
+ */
+const INDIAN_ENGLISH_CVS: Record<string, string> = {
+  iit_prose: `Ananya Venkataraman is a backend engineer with six years of experience building payment systems.
+She has worked extensively with Java, Spring Boot and PostgreSQL at a large fintech company in Bengaluru.
+Ananya led the migration of the settlement service to an event driven architecture handling high volumes.
+Education: Bachelor of Technology in Computer Science, Indian Institute of Technology Kharagpur, 2018`,
+
+  vtu_headers: `Rajesh Thiruvananthapuram
+Contact: r.thiru@example.com
+Skills: Java, Spring, Hibernate, Microservices, Kafka, Docker, Kubernetes
+Experience: Senior Software Engineer, 2018-present
+Education: Bachelor of Engineering, Visvesvaraya Technological University, Belagavi
+Certifications: Oracle Certified Professional, AWS Solutions Architect`,
+
+  jntu_terse: `Lakshmi Narasimhan - Data Engineer
+- Built ingestion pipelines processing twelve million records daily
+- Reduced query latency by forty percent through partitioning
+- Mentored four junior engineers across two delivery teams
+Education: Master of Technology, Jawaharlal Nehru Technological University Hyderabad
+Previously: Savitribai Phule Pune University, Bachelor of Computer Applications`,
+
+  mixed_unis: `Priyanka Balasubramanian
+Education: B.Tech, Amrita Vishwa Vidyapeetham, Coimbatore, 2016
+Postgraduate: M.Tech, Vellore Institute of Technology, 2019
+Also attended: Birla Institute of Technology and Science Pilani, summer programme
+Experience: Platform Engineer building distributed services in Go and Python`,
+
+  uni_lines_only: `Education
+Indian Institute of Technology Kharagpur
+Visvesvaraya Technological University Belagavi
+Jawaharlal Nehru Technological University Hyderabad
+Amrita Vishwa Vidyapeetham Coimbatore`,
+};
+
 const HELD_OUT_NON_ENGLISH_CVS: Record<string, string> = {
   german_nurse: `Bernadette Achebe ist eine erfahrene Krankenschwester mit elf Jahren Erfahrung in der Herzintensivpflege. Sie hat Nachtschichten auf einer Station mit dreißig Betten übernommen und mit Fachärzten zusammengearbeitet.`,
   spanish_teacher: `Hollis Marchetti ha enseñado matemáticas en secundaria durante nueve años en dos institutos. Actualmente dirige el programa de refuerzo y trabaja con alumnos que llegan por debajo del nivel esperado.`,
@@ -473,5 +520,82 @@ describe('mixed-language veto — held-out validation of the 15-word floor (ADR-
       .filter(([, cv]) => findNonEnglishSegments(cv).hasNonEnglishSegment)
       .map(([label]) => label);
     expect(falselyRefused).toEqual([]);
+  });
+});
+
+describe('Indian-English CVs — a primary case, not an edge (H-086)', () => {
+  it('none of them is falsely refused', () => {
+    // ADR-030's compounding signal refused 2 of these 5 on its first run.
+    // Neither of the other English corpora contained an Indian CV, which is
+    // precisely why the defect shipped — H-022's shape for the third time.
+    const refused = Object.entries(INDIAN_ENGLISH_CVS)
+      .filter(([, cv]) => findNonEnglishSegments(cv).hasNonEnglishSegment)
+      .map(([label]) => label);
+    expect(refused).toEqual([]);
+  });
+
+  it('the institution exemption is what protects them, and it is load-bearing', () => {
+    // Asserts the MECHANISM, not just the outcome. Without this, someone could
+    // delete ENGLISH_INSTITUTION_WORDS, watch these CVs still pass for an
+    // unrelated reason, and reintroduce the defect later.
+    //
+    // An education block of Indian university names measures 10.0 letters per
+    // word — above the 9.4 compounding threshold, and higher than the Swedish
+    // header block (10.45) is above English. Only the institution exemption
+    // separates them.
+    const indianUniversities =
+      'Visvesvaraya Technological University Belagavi Jawaharlal Nehru Technological University Hyderabad';
+    const letters = (indianUniversities.match(/\p{L}/gu) ?? []).length;
+    const words = (indianUniversities.toLowerCase().match(/[\p{L}']+/gu) ?? []).length;
+    expect(letters / words).toBeGreaterThan(9.4);
+
+    // ...and yet it is not treated as foreign.
+    expect(findNonEnglishSegments(indianUniversities).hasNonEnglishSegment).toBe(false);
+  });
+
+  it('and the German block it exists to catch contains no English institution word', () => {
+    // Why the exemption does not weaken the signal it guards: German, Dutch and
+    // Swedish use Universitaet / Hogeschool / Handelshoegskolan.
+    const german = `Kenntnisse: Lagerverwaltung, Bedarfsplanung, Tourenplanung, Bestandskontrolle
+Ausbildung: Diplom Logistikmanagement, Universitaet Koeln`;
+    expect(findNonEnglishSegments(german).hasNonEnglishSegment).toBe(true);
+  });
+});
+
+describe('sub-floor foreign inserts (H-085)', () => {
+  const englishBody = [
+    'Marisol Okonkwo',
+    'Senior Data Engineer, Northwind Freight, Jan 2023 - Dec 2025',
+    'Built streaming pipelines in Python for shipment tracking and reconciliation.',
+    'Ran the Docker based deployment platform used by four delivery teams.',
+    'Owned the data quality programme covering nine downstream reporting systems.',
+  ];
+  const withInsert = (line: string) => [...englishBody, line].join('\n');
+
+  it('CLOSED for Romance: a one-line Spanish degree is caught', () => {
+    // ~70 letters — far below the ~100-letter window floor, so no window can
+    // isolate it. This is the exact attribute that flipped eligibility in the
+    // original H-041 reproduction, which is why it was worth closing.
+    const document = withInsert(
+      'Licenciatura en Ciencias de la Computacion, Universidad de Salamanca',
+    );
+    expect(findNonEnglishSegments(document).hasNonEnglishSegment).toBe(true);
+  });
+
+  it('CLOSED for Romance: a one-line French insert is caught', () => {
+    expect(
+      findNonEnglishSegments(withInsert('Encadrement d une equipe de six personnes')),
+    ).toHaveProperty('hasNonEnglishSegment', true);
+  });
+
+  it('DOCUMENTED GAP: a Germanic sub-floor insert is still SCORED', () => {
+    // Asserts the WRONG behaviour on purpose so it cannot be lost (H-085).
+    // Germanic compound-noun lines contain no function words at all, and mean
+    // word length cannot rescue them at line level — English lines reach 11.3
+    // there ("Additional: Conversational Portuguese"), so the classes do not
+    // separate on 3-5 words. Closing this needs the language-ID library.
+    const document = withInsert('Kenntnisse: Lagerverwaltung, Bedarfsplanung');
+    expect(findNonEnglishSegments(document).hasNonEnglishSegment).toBe(false);
+    expect(detectLanguageHeuristic(document).isEnglish).toBe(true);
   });
 });

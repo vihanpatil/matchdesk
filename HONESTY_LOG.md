@@ -3073,3 +3073,79 @@ still caught in PDF and DOCX.
 `languageDetection.ts` sits outside Stryker's `packages/core` scope and
 therefore carries **no mutation number at all**, the same gap H-057 records for
 `scripts/lib`.
+
+### H-086 · ADR-030 falsely refused Indian-English CVs — the target user's primary case
+
+**I shipped a regression against the people this tool is actually for, and the
+user caught it, not me.**
+
+ADR-030's compounding signal fires on "morphology English does not have".
+Long transliterated Indian proper nouns are exactly that shape. Measured on
+five synthetic Indian-English CVs immediately after the user raised it:
+
+```
+vtu_headers      "Visvesvaraya Technological University"    9.43  nearest=sv  REFUSED
+uni_lines_only   Indian university education section        9.54  nearest=it  REFUSED
+                                                    2 of 5 falsely refused
+```
+
+For comparison, the threshold was 9.4 and the Swedish header block it exists to
+catch is 10.45. **Indian-English education text sits between English and
+Swedish on this axis**, with 0.9 separating it from the thing being detected.
+
+**This is H-022's shape for the third time in this project.** H-022 was "every
+test used American degree forms". H-079 was "the prose heuristic was calibrated
+on English and Romance prose". This is "neither English corpus contained a
+single Indian CV" — and the recruiter this tool is built for works with Indian
+clients, so it is a primary case, not an edge.
+
+**The fix is semantic, not a threshold nudge.** A segment carrying two or more
+English institution words (`university`, `institute`, `technology`, `bachelor`,
+…) is English prose with long proper nouns in it. The German, Dutch and Swedish
+blocks this signal exists to catch contain **none** of them — they use
+`Universitaet`, `Hogeschool`, `Handelshoegskolan` — so the exemption does not
+weaken it. Measured: **0/18 English, 0/5 Indian, DE/NL/SV all still caught.**
+
+Raising the threshold to 10.0 was also measured clean and was **rejected**: it
+leaves only 0.45 above the Swedish block, and a threshold nudge does not
+express why Indian university names are not foreign morphology.
+
+**Indian CVs are now a permanent third English corpus** in the eval file, with
+a test asserting the mechanism rather than the outcome — otherwise someone
+could delete the exemption, watch these CVs pass for an unrelated reason, and
+reintroduce this later.
+
+**Residual, stated:** an Indian institution name in a window with no English
+institution word would still fire. Indian university names almost always carry
+"University", "Institute" or "College", but this rests on five synthetic CVs,
+not a corpus.
+
+### H-087 · Romance sub-floor inserts closed; Germanic ones are not
+
+The user approved the free half of the sub-floor fix. Measured before building:
+requiring **two distinct** non-English function words in a line gives **0 false
+positives across 70 lines of all 18 English CVs**; one hit gives 1.
+
+Result, adversarial round 3:
+
+```
+FR one line (35 letters)    refused      (was SCORED)
+FR two lines (69)           refused      (was SCORED)
+ES one line (32)            refused      (was SCORED)
+ES three lines (145)        refused
+DE one compound line (39)   SCORED  <-- still open
+DE two compound lines (72)  SCORED  <-- still open
+NL two compound lines (74)  SCORED  <-- still open
+```
+
+**Germanic compound lines carry no function words at all** — measured, zero
+hits on German, Dutch and Swedish header lines. And mean word length cannot
+rescue them at line level: English lines reach **11.3** there
+("Additional: Conversational Portuguese"), against a German degree line at
+10.2, so the classes do not separate on 3-5 words. Measured 3/70 English false
+positives if attempted, which is ~17% of documents — the cost H-080 already
+ruled out.
+
+**So H-041 stays wrong-score**, now with a precisely bounded residual: a
+Germanic-language insert shorter than ~100 letters. That is what the
+language-ID library is for.

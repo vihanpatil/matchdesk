@@ -240,7 +240,7 @@
       "id": "H-041",
       "severity": "wrong-score",
       "status": "open",
-      "note": "STILL WRONG-SCORE, residual narrowed again (ADR-030). Letter-based window floor + confidence margin + compounding-morphology signal replaced the English/Romance-biased prose gate: 0 false refusals across BOTH English corpora (18 CVs), 13/13 non-English refused, every held-out English CV now judged, DE/NL/SV/FR bilingual headers caught, FR/ES bilingual prose caught in PDF and DOCX. RESIDUAL (H-085): a foreign insert BELOW the ~100-letter window floor is never isolated - the window grows past it and dilutes. Material: a one-line foreign degree is ~70 letters. Closing it needs per-segment identification on ~5-8 word fragments, which character statistics cannot do - H-041's own original statement, now correctly scoped."
+      "note": "STILL WRONG-SCORE, residual now precisely bounded (ADR-030 + H-087). Romance sub-floor inserts CLOSED by a function-word signal (0 false positives in 70 English lines). RESIDUAL: a GERMANIC-language insert shorter than ~100 letters - compound lines carry no function words, and mean word length does not separate at line level (English reaches 11.3, a German degree line 10.2). Closing it needs the language-ID library the user approved."
     },
     {
       "id": "H-042",
@@ -494,6 +494,18 @@
       "severity": "process",
       "status": "closed",
       "note": "After ADR-030, a foreign insert below the ~100-letter window floor is still scored. Found by an adversarial round run specifically because H-078 records calling a narrowing a closure."
+    },
+    {
+      "id": "H-086",
+      "severity": "process",
+      "status": "closed",
+      "note": "ADR-030 falsely refused 2 of 5 Indian-English CVs - the target recruiter's primary case. Long transliterated proper nouns look like compound morphology (9.43 and 9.54 vs a 9.4 threshold). H-022's shape a third time: neither English corpus contained an Indian CV. Fixed with an English-institution-word exemption; Indian CVs added as a permanent third corpus."
+    },
+    {
+      "id": "H-087",
+      "severity": "process",
+      "status": "closed",
+      "note": "Romance sub-floor inserts closed by a two-distinct-function-word line signal (0 false positives in 70 English lines). Germanic sub-floor inserts remain open - compound lines have no function words and mean word length does not separate at line level."
     }
   ]
 }
