@@ -52,24 +52,37 @@ live count; as of this commit:
   11.2% foreign content.
 - **H-002 — triaged out**, pinned by `scripts/core-determinism.test.mjs`.
 
-**THE REMAINING DEFECT, and it is a specific one (H-079).** The prose gate is
-**English/Romance-biased**. Romance header lines carry lowercase function words
-(`Gestion **des** entrepots`) and clear the gate; **German capitalises every
-noun**, so German header lines look like header soup and are skipped. A
-German-English bilingual header CV is **scored at every proportion tested, down
-to 3.8%**. Dutch and Scandinavian share German's compounding and are **not
-measured** — do not assume they are safe.
+**THE REMAINING DEFECT (H-085), after two rounds of narrowing.** ADR-030
+replaced the biased prose gate with three measured signals — a **letter-based**
+window floor (the old 15-WORD floor was biased against compounding languages,
+H-082), a **confidence margin** (H-084), and a **compounding-morphology**
+signal for German, where the classifier returns a _wrong_ verdict rather than a
+silent one (H-083). Result: 0 false refusals across **both** English corpora,
+13/13 non-English refused, every held-out English CV judged, DE/NL/SV/FR
+bilingual headers caught, FR/ES prose caught in PDF and DOCX.
 
-**The obvious fix is ruled out, with numbers (H-080).** Refusing when
-`judgedSegmentCount === 0` closes the German case completely, but costs **3 of
-18** English CVs and refuses `headers_plus_tech_only`, **which the eval file
-requires to pass**. That is a standing requirement, not a cost to trade.
+**What is still broken:** a foreign insert **below the ~100-letter window
+floor** is never isolated — the window grows past it into English and dilutes.
 
-**So the next move is a better discriminator**, not a refusal rule: something
-that separates language-NEUTRAL tokens (proper nouns, acronyms, technology
-names) from language-BEARING ones, without assuming lowercase means prose.
-Measure any candidate against both the ten held-out and eight in-corpus English
-CVs — H-080 exists because I quoted a cost from the held-out set alone.
+```
+ES three lines (145 foreign letters)   refused
+DE two compound lines (72 letters)     SCORED
+FR one line (35 letters)               SCORED
+```
+
+Material, not cosmetic: a one-line foreign degree is ~70 letters, and a degree
+is what flipped eligibility in the original reproduction.
+
+**This is H-041's own first sentence, correctly scoped at last:** closing it
+needs per-segment identification on ~5-8 word fragments, which
+character-statistics cannot do. That is a **different method**, not a tuning
+change — and it is the only thing left between here and E5.
+
+**Before choosing one, decide whether it is worth it.** The alternative is the
+product decision that keeps being deferred: refuse documents whose language
+cannot be verified. That was ruled out at the whole-document level (H-080, it
+violates a standing eval requirement), but it has never been evaluated for the
+much narrower case that remains.
 
 **The code: choose and measure the remedy.** Deliberately left open (user's
 call — "classify now, choose the fix next"). For H-041 the three candidates,
