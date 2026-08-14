@@ -52,37 +52,40 @@ live count; as of this commit:
   11.2% foreign content.
 - **H-002 — triaged out**, pinned by `scripts/core-determinism.test.mjs`.
 
-**THE REMAINING DEFECT (H-085), after two rounds of narrowing.** ADR-030
-replaced the biased prose gate with three measured signals — a **letter-based**
-window floor (the old 15-WORD floor was biased against compounding languages,
-H-082), a **confidence margin** (H-084), and a **compounding-morphology**
-signal for German, where the classifier returns a _wrong_ verdict rather than a
-silent one (H-083). Result: 0 false refusals across **both** English corpora,
-13/13 non-English refused, every held-out English CV judged, DE/NL/SV/FR
-bilingual headers caught, FR/ES prose caught in PDF and DOCX.
+**THE REMAINING DEFECT, now precisely bounded: a GERMANIC-language insert
+shorter than ~100 letters.** Everything else in this class is closed.
 
-**What is still broken:** a foreign insert **below the ~100-letter window
-floor** is never isolated — the window grows past it into English and dilutes.
+| case                                    | status                         |
+| --------------------------------------- | ------------------------------ |
+| Foreign block ≥ ~100 letters (any lang) | caught (ADR-030)               |
+| Romance insert below the floor          | caught (H-087, function words) |
+| **Germanic insert below the floor**     | **SCORED — open**              |
 
-```
-ES three lines (145 foreign letters)   refused
-DE two compound lines (72 letters)     SCORED
-FR one line (35 letters)               SCORED
-```
+**Why it cannot be closed with another heuristic.** Germanic compound lines
+carry **no function words at all** (measured: zero hits on DE/NL/SV header
+lines), and mean word length does not separate at line level — English lines
+reach **11.3** ("Additional: Conversational Portuguese") against a German
+degree line at **10.2**. Attempting it costs 3/70 English lines ≈ 17% of
+documents, the cost H-080 already ruled out.
 
-Material, not cosmetic: a one-line foreign degree is ~70 letters, and a degree
-is what flipped eligibility in the original reproduction.
+**NEXT: adopt a real language-ID library (user-approved).** This is the
+"different method" H-041 named at the very start — a trained model works on
+short fragments where character statistics cannot. It requires:
 
-**This is H-041's own first sentence, correctly scoped at last:** closing it
-needs per-segment identification on ~5-8 word fragments, which
-character-statistics cannot do. That is a **different method**, not a tuning
-change — and it is the only thing left between here and E5.
+1. Candidate survey (`franc`, CLD3/wasm, `tinyld`) with **actual LICENSE files
+   read**, per ADR-016 — "probably MIT" is not evidence.
+2. A new-dependency ADR in the shape of ADR-026, including supply-chain cost.
+3. Measurement against **all three** English corpora (18 English + 5 Indian)
+   and all 13 non-English **before** it replaces anything.
 
-**Before choosing one, decide whether it is worth it.** The alternative is the
-product decision that keeps being deferred: refuse documents whose language
-cannot be verified. That was ruled out at the whole-document level (H-080, it
-violates a standing eval requirement), but it has never been evaluated for the
-much narrower case that remains.
+**DO NOT skip step 3.** Three separate defects in this class (H-022, H-079,
+H-086) were each a heuristic calibrated on a corpus that lacked the population
+it then failed on.
+
+**⚠ Indian-English CVs are a PRIMARY case, not an edge (H-086).** The recruiter
+this is built for works with Indian clients. ADR-030 falsely refused 2 of 5 on
+its first run. Any change to language detection must be measured against
+`INDIAN_ENGLISH_CVS` in the eval file.
 
 **The code: choose and measure the remedy.** Deliberately left open (user's
 call — "classify now, choose the fix next"). For H-041 the three candidates,
