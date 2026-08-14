@@ -16,7 +16,7 @@ pnpm verify    # ~1 min, must exit 0
 ```
 
 **Gate at time of writing:** E1 not met (checklist), E2 not met (derived from
-E5), **E5 NOT MET — TWO blockers** (`H-041`, `H-089`).
+E5), **E5 NOT MET — THREE blockers** (`H-041`, `H-089`, `H-095`).
 
 **E3 and E4 are `??` — do not carry forward the previous brief's "E3 MET, E4
 MET (80.96%)".** Both are settled by running a command, and neither has been
@@ -119,42 +119,73 @@ production dependency that does not fix the defect.
 
 ## 3. The work
 
-### Task E — H-089: an ambiguous date silently deletes a role ⟶ blocks E5
+### Task E — numeric dates: H-089 and H-095 ⟶ both block E5
 
-**This is new, and it means closing H-041 alone will no longer reach E5 MET.**
-If you only read one thing here, read this: the previous plan assumed one
-blocker. There are two.
+**Closing H-041 alone no longer reaches E5 MET.** The plan two sessions ago
+assumed one blocker; there are three, and the count went up twice because
+someone measured rather than reasoned.
 
-`DD/MM/YYYY` is standard in India. Measured:
+**Both were verified by an independent ADR-015 verifier who was not told the
+lead's view. The verdict matched; the lead's DESCRIPTION was wrong on four
+counts (H-094). Read H-094 before touching this — the corrections change the
+remedy, not just the wording.**
 
-| input                         | before           | after B.4         |
-| ----------------------------- | ---------------- | ----------------- |
-| `13/04/2019 - 15/08/2022`     | **`[]` dropped** | 3.3 years         |
-| `13-04-2019 - 15-08-2022`     | **`[]` dropped** | 3.3 years         |
-| `04/13/2019 - Present`        | **`[]` dropped** | correct           |
-| **`03/04/2019 - 05/08/2022`** | **`[]` dropped** | **STILL DROPPED** |
+What actually happens today, measured and reproduced twice:
 
-B.4 fixed only the unambiguous case, using the one fact true in every locale: a
-number in 13-31 cannot be a month. When **both** numbers are 1-12 the format is
-genuinely ambiguous; the pattern is built so it _structurally cannot_ match
-that shape, so it falls through unchanged.
+| input                     | result                   | recruiter-visible evidence      |
+| ------------------------- | ------------------------ | ------------------------------- |
+| `13/04/2019 - 15/08/2022` | 3.3 y ✓                  | `13/04/2019 - 15/08/2022` ✓     |
+| `03/04/2019 - 05/08/2022` | **role DELETED**         | —                               |
+| `13/04/2013 - 05/08/2022` | **role DELETED**         | — (END governs, not both sides) |
+| `03/04/2019 - Present`    | 5.2 y — **silent DD/MM** | `04/2019 - Present` (truncated) |
+| `04/03/2013 - Present`    | 11.3 y — **reads MARCH** | `03/2013 - Present` (truncated) |
+| `03-04-2013 - Present`    | 11.4 y — **OVER-counts** | `2013 - Present` (truncated)    |
 
-The consequence: a two-sided ambiguous range **drops the entire role**, and the
-recruiter is told a smaller total tenure with `warnings: []`.
+- **H-089** — silent deletion / under-count. **336/784** day-pairs, not the
+  144/784 a "both numbers 1-12" reading implies.
+- **H-095** — silent over-count. Dash and dot separators miss the slash-only
+  `\d{1,2}\/\d{4}` alternative and fall to bare `\d{4}`, defaulting to January.
+
+Traced end-to-end: the same candidate goes **10.7 y / 100 / ELIGIBLE** →
+**1.4 y / 55 / INELIGIBLE**, `warnings: []`, `reservations: []`, **match row
+persisted**. `warnings` is structurally unreachable — it is an ingestion-only
+concept and **no attribute extractor emits one at all.**
 
 **Pass criteria**
 
-- `03/04/2019 - 05/08/2022` no longer silently deletes the role.
-- **Do not resolve it by guessing a locale.** DD/MM is right for the target
-  recruiter's Indian clients and wrong for US CVs, and the tool cannot tell
-  which it is holding. H-040's remedy shape is the precedent: surface the
-  disagreement (a blocking `Reservation`), never resolve it silently in
-  arithmetic.
-- Flip the `DOCUMENTED GAP` test at the end of `experience.test.ts`.
+- Neither a deleted role nor an inflated one is reported as a confident number.
+- **Do not resolve it by guessing a locale**, and note the engine currently
+  guesses **by accident** — that is the bug, not the baseline.
+- **H-040's `Reservation` remedy is already built and fires — but it is blind
+  here by construction.** `discardedTenureClaim` needs an explicit claim to
+  disagree with; H-089 never extracts a first number, so there is nothing to
+  compare. **A different trigger is needed:** a
+  `\d{1,2}[/.-]\d{1,2}[/.-]\d{4}` token that no range consumed is exactly the
+  "unaccounted-for evidence" ADR-029 Decision 1 describes. That trigger does
+  not exist today.
+- Flip the four `DOCUMENTED GAP` tests at the end of `experience.test.ts`.
 
-**Note the severity is the lead's alone so far.** ADR-027's precedent says a
-gate call needs the independent verifier. **Route H-089 to #5 before treating
-its classification as settled.**
+### Task F — the relation that cannot fire ⟶ blocks E2
+
+**No metamorphic relation can generate a numeric date at all.** `renderRange`
+emits only `MONTHS[...] YYYY`, and R13/R20 are `toBeLessThanOrEqual` upper
+bounds — **so no relation in the suite can catch an undercount.**
+
+This is ADR-027 Decision 3's condemned pattern verbatim, and the same shape as
+H-070/R-L1: a relation that names its defect axis and then does not generate
+it is not a pin. **H-089 stays an E2 blocker even after its wrong-score status
+resolves.**
+
+The missing relation is the obvious one: **the tenure a CV yields must not
+depend on the notation used to write the same dates.**
+
+### Task G — E3 has no fixture for this class
+
+**Every one of the 13 numeric dates in `INDIAN_CV_CORPUS` has day ≥ 13.** The
+exclusion is disclosed in `definitions.mjs`, not hidden — but the corpus built
+to prove Indian date handling systematically excludes the notation that breaks
+it. **H-022's shape a fifth time**, and it means E3's "a fixture per known
+defect class" does not hold for this class.
 
 ### Task A — execute ADR-031. Decision taken; this is now mechanical.
 
@@ -263,7 +294,13 @@ session.**
    a percentage alone; re-run, never copy forward.
 4. **A narrowing reported as a closure** — H-078, H-085.
 5. **Abstention read as refusal** — ADR-027. Classify by what the _system_ does.
-6. **A number measured at the wrong granularity** — **new, H-091.** The survey
+6. **Agreement on a label mistaken for agreement on the facts** — **new,
+   H-094.** The verifier confirmed the lead's `wrong-score` verdict on H-089
+   and falsified the lead's description of it on four counts, including a code
+   comment that asserted the exact opposite of what the code did. **Have the
+   verifier check the measurement, not just the classification** — a matching
+   verdict is the least informative part of the report.
+7. **A number measured at the wrong granularity** — **new, H-091.** The survey
    reported `eld` would falsely refuse 9/23 English CVs. All nine were
    proper-noun-only lines, and the production system never judges a bare line.
    The figure was arithmetically correct and described an architecture nobody
