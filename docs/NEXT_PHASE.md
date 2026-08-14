@@ -31,7 +31,9 @@ scan is clean and on file. Do not push without asking.
 
 ## 1. The one thing to understand before doing anything
 
-**A decision is waiting for the user. Do not start Task A until it is taken.**
+**The decision has been TAKEN by the user and is recorded in ADR-031. Do not
+re-litigate it.** Option 1 below: adopt `eld` at window granularity, and close
+H-041 as a segmentation change or not at all. What remains is execution.
 
 The last session ran the language-ID library work the previous brief specified.
 It measured 64 configurations and reached a clean, negative result:
@@ -51,9 +53,9 @@ the granularity that catches the class, it refuses two real English CVs
 window** under `lineWindows`' forward-growth rule — so swapping the classifier
 was never going to fix it. Full measurement: **H-092**.
 
-### The three options, and the precedent that constrains them
+### The three options, and which one was chosen
 
-1. **Adopt `eld` at window granularity, accept H-041 stays open.**
+1. **✅ CHOSEN (ADR-031) — adopt `eld` at window granularity, accept H-041 stays open.**
    0/23 false refusals, 13/13 non-English refused, and it catches the H-079
    German header block in all 36 supplementary combinations **with no
    exemption**. This lets you **delete** the entire Cavnar & Trenkle apparatus
@@ -62,19 +64,16 @@ was never going to fix it. Full measurement: **H-092**.
    profiler's blind spots — at zero measured regression. **This is the only
    option that gets off the heuristic treadmill**, which is what Task A existed
    to do. Payload ~0.90 MB raw / ~0.26 MB gzip (`extrasmall` tier).
-2. **Also add a line-granularity pass — closes H-041, costs 2/23 English CVs.**
-   Gate-relevant: a wrong-score blocks E5, a false-refusal does not
-   (`docs/findings.json` header). So this would flip E5 by **trading a blocking
-   defect for a non-blocking one.** ⚠ **The user rejected exactly this trade at
-   3/18 ≈ 17% in H-080.** 2/23 ≈ 8.7% is cheaper but the same shape. **Do not
-   take this decision on the user's behalf.**
-3. **Reject `eld`, fix the geometry instead.** The defect is that a trailing
-   short line never forms a judgeable segment. That is a segmentation change,
-   not a classifier change, and nobody has costed it.
-
-**Ask the user. Do not threshold your way past this** — Task A's own
-non-negotiable rule says an unclosable class goes to the user, not into another
-threshold.
+2. **❌ REJECTED — also add a line-granularity pass.** It closes H-041 and would
+   flip E5, because a wrong-score blocks and a false-refusal does not
+   (`docs/findings.json` header) — i.e. it buys the gate by **trading a blocking
+   defect for a non-blocking one**, at 2/23 ≈ 8.7% of real English CVs. **The
+   user rejected this same trade at 3/18 ≈ 17% in H-080 and, asked again with
+   the cheaper number, rejected it again.** Do not revive it as a threshold.
+3. **Deferred — fix the geometry.** The real defect is that a trailing short
+   line never forms a judgeable segment. That is a segmentation change, not a
+   classifier change, and nobody has costed it. **This is now the only sanctioned
+   route to closing H-041.**
 
 ---
 
@@ -157,7 +156,36 @@ recruiter is told a smaller total tenure with `warnings: []`.
 gate call needs the independent verifier. **Route H-089 to #5 before treating
 its classification as settled.**
 
-### Task A — blocked on the §1 decision. Do not start it cold.
+### Task A — execute ADR-031. Decision taken; this is now mechanical.
+
+Owner: **#3, language-detection engineer**, `apps/server/src/ingestion/`.
+
+1. `pnpm add eld@2.1.0` (exact, production dependency — **not** dev-only) and
+   run `pnpm license:audit`. **Its output is the evidence for ADR-031's
+   prediction** — ADR-031 says so explicitly (H-025's shape). Paste it.
+2. Swap `eld` in behind `findNonEnglishSegments` at **window granularity**,
+   `extrasmall` tier. `MixedLanguageResult` is the contract — keep it, so
+   `extractText` and the pipeline are untouched.
+3. **Delete what it replaces**, per ADR-031: the whole Cavnar & Trenkle
+   apparatus (`LANGUAGE_TRAINING_TEXT`, `LANGUAGE_PROFILES`, `buildProfile`,
+   `rankedProfile`, `outOfPlaceDistance`, `ngramCounts`, `ngramsOfWord`,
+   `detectLanguageHeuristic`), plus `MAX_ENGLISH_MEAN_WORD_LENGTH`,
+   `ENGLISH_INSTITUTION_WORDS`/`isEnglishInstitutionText` and
+   `MIN_FOREIGN_MARGIN`. **Do not leave two mechanisms.**
+4. **Do NOT delete** `NON_ENGLISH_FUNCTION_WORDS`/`MIN_FUNCTION_WORD_HITS` —
+   measured as a net regression, not a subsumption.
+5. Re-measure against all four corpora. Bar: **0/23 English false refusals,
+   13/13 non-English refused**, `headers_plus_tech_only` passes, both Indian
+   cases pass. H-092's numbers were measured outside the repo — **re-measure
+   in place; do not carry them forward** (trap 3).
+6. The Germanic `DOCUMENTED GAP` test at `languageDetection.eval.test.ts:591`
+   **stays asserting the gap.** H-041 is not closed by this work, and a test
+   flipped out of optimism is trap 4.
+
+**One live blind spot this surfaced, not fixed by ADR-031:**
+`license-audit.mjs` passes a package whose declared SPDX is fine but which
+**ships no LICENSE file at all** — that is how `emscripten-wasm-loader` would
+have entered the tree. Worth its own finding and a negative-control test.
 
 ### Task B — landed. Residual: the four disciplines left out of `FIELD_VOCAB` on purpose.
 

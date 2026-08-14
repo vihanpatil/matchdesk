@@ -1473,3 +1473,138 @@ stays blocked.
 - **Mutation score is unaffected**: `languageDetection.ts` is in `apps/server`,
   outside Stryker's `packages/core` scope — so it carries no mutation number at
   all, which is its own gap (same shape as `scripts/lib`, H-057).
+
+---
+
+## ADR-031 — `eld` replaces the hand-built language classifier, and does not close H-041
+
+**Date:** 2026-08-14 · **Status:** Accepted · **Supersedes the classifier half
+of ADR-030**
+
+The user approved adopting a real language-ID library to close H-041's
+Germanic sub-floor residual. **It does not close it, and this ADR adopts the
+library anyway — for a different and better-evidenced reason.**
+
+### What was measured
+
+64 configurations: 4 granularities × 2 input conditionings × 4 ngram tiers ×
+`reliable` on/off, against `ENGLISH_CVS` (8), `HELD_OUT_ENGLISH_CVS` (10),
+`INDIAN_ENGLISH_CVS` (5), all 13 non-English CVs, and 13 Germanic sub-floor
+lines. Corpora were programmatically diffed against the eval file — 0 key
+mismatches, 0 text diffs — rather than hand-copied. Full data in
+`docs/research/langid-phase1-2026-08-14/` (H-092).
+
+| granularity            | Germanic caught | English CVs falsely refused | non-English refused |
+| ---------------------- | --------------- | --------------------------- | ------------------- |
+| `windows100` (current) | 0-1/13          | **0/23**                    | 13/13               |
+| `linePairs`            | 0-1/13          | 0-1/23                      | 13/13               |
+| `lines` + `reliable`   | **13/13**       | **2/23**                    | 13/13               |
+
+**No configuration satisfies both axes.** The two are not independently
+tunable: at the granularity that costs nothing the library is blind to the
+sub-floor class, and at the granularity that catches it, it refuses two real
+English CVs (`chef_terse`, `driver_very_terse`).
+
+**H-041 is a segmentation problem, not a classifier problem.** A trailing
+sub-floor line never forms a window under `lineWindows`' forward-growth rule,
+and pairing it with its one English neighbour dilutes it identically.
+Reproducing that with a trained model instead of the hand-built profiler is
+what settles it: **swapping the classifier was never going to fix it.** That
+correction is the most valuable output of this work, and it invalidates the
+plan the previous phase brief was built on.
+
+### Decision
+
+Adopt **`eld@2.1.0`**, pinned exact, as a **production dependency**, at
+**window granularity** behind the existing `findNonEnglishSegments` seam, using
+the **`extrasmall`** ngram tier.
+
+**Deleted, not layered over** (ADR-023's "replace, don't stack"):
+
+- the entire Cavnar & Trenkle apparatus — `LANGUAGE_TRAINING_TEXT`,
+  `LANGUAGE_PROFILES`, `buildProfile`, `rankedProfile`, `outOfPlaceDistance`,
+  `ngramCounts`, `ngramsOfWord`, `detectLanguageHeuristic`;
+- `MAX_ENGLISH_MEAN_WORD_LENGTH` (ADR-030);
+- `ENGLISH_INSTITUTION_WORDS` / `isEnglishInstitutionText` (H-086);
+- `MIN_FOREIGN_MARGIN`.
+
+**Those three thresholds exist only to patch the profiler's blind spots.** The
+profiler mis-scores the H-079 German header block as English (`dEn 69621` vs
+`dOther 70385`); it is caught today by mean-word-length, which then had to be
+exempted for Indian institution names after it falsely refused 2/5 Indian CVs.
+`eld` catches that case in all 36 supplementary combinations **with no
+exemption**, so the patches have nothing left to patch. Net heuristic count
+goes **down**, which is what Task A actually existed to do.
+
+**Explicitly NOT deleted:** `NON_ENGLISH_FUNCTION_WORDS` /
+`MIN_FUNCTION_WORD_HITS` (the H-087 Romance sub-floor pass). Replacing it with
+an `eld` line pass would cost 2/23 English CVs it currently costs 0/23. That is
+a net regression, not a subsumption.
+
+**Rejected: the line-granularity pass that would have closed H-041.** It flips
+E5 by trading a blocking wrong-score for a non-blocking false-refusal, at
+2/23 ≈ 8.7%. **The user rejected this same trade at 3/18 ≈ 17% in H-080** and,
+asked again with the cheaper number, rejected it again. H-041 will be closed as
+a segmentation change or not at all.
+
+### License evaluation (ADR-016 standard)
+
+LICENSE files opened and read 2026-08-14, in an isolated install outside the
+repo. Declared metadata was not treated as evidence.
+
+| Package     | Declared     | LICENSE file says                                                           |
+| ----------- | ------------ | --------------------------------------------------------------------------- |
+| `eld@2.1.0` | `Apache-2.0` | `node_modules/eld/LICENSE` — genuine Apache License 2.0, full standard text |
+
+**Zero transitive dependencies** — `package.json` carries no `dependencies`
+key, and `npm ls --all` on an isolated install resolves to exactly one package.
+Apache-2.0 is already on `PRODUCTION_ALLOWED`. **No `METADATA_WAIVERS` entry is
+required.**
+
+**`franc` rejected on measurement, not licence** — 10/13, because it is itself
+a trigram classifier, the same method as the code it would have replaced
+(H-091). It also ships no LICENSE file in its tarball.
+
+**`cld3-asm` rejected on licence evidence the audit script cannot see.**
+`emscripten-wasm-loader@3.0.3` ships **no LICENSE file in the npm package and
+has none in its GitHub repository**; its MIT declaration is unverified
+metadata, and `license-audit.mjs` would pass it silently because the script has
+no mechanism to notice an absent LICENSE file. It also pins `nanoid@2.1.11`
+(2020), carrying high-severity `GHSA-2v37-7h3g-55p8`. **That blind spot in our
+own audit script is a finding in its own right and is not fixed by this ADR.**
+
+**`tinyld@1.3.4`** is clean (MIT, zero deps) and is the credible runner-up at
+33/96, ~3.7× worse than `eld` on the false-refusal axis.
+
+### Constraint compliance, verified rather than assumed
+
+- **C4 determinism** — zero real `Math.*` calls in `languageDetector.js`; the
+  grep hits were `/**` comment asterisks. Only IEEE-754 `+ - * /`, correctly
+  rounded on every conforming platform. This is H-002's own reasoning.
+- **C2 offline** — no network and no `fs`. The single dynamic `import()` in the
+  default entry resolves a local ngram file; the `static.*` entries avoid even
+  that.
+- **C5** — a language identifier is not generative, and it sits in ingestion,
+  outside the scoring path.
+
+### This ADR is a decision, not evidence (H-025)
+
+The claim that `pnpm license:audit` passes is a **prediction** until it has run
+with `eld` installed. That run belongs to the commit that installs it, and its
+output is the evidence.
+
+### Costs, accepted
+
+- **A production dependency that ships to the recruiter**, where previously
+  this file had none. Zero transitive packages is the mitigation, not an
+  absence of cost.
+- **~0.90 MB raw / ~0.26 MB gzip** of ngram data at the `extrasmall` tier.
+  Approximate: measured on installed source, not a shipped bundle.
+- **H-041 remains open and E5 remains NOT MET.** This ADR buys simplification,
+  not the gate. Anyone reading it as "the language work is done" has misread it.
+- **A trained model is opaque in a way the hand-built profiler was not.** When
+  it misclassifies, there is no threshold to inspect. Accepted because the
+  profiler's transparency was not buying correctness — it needed three
+  hand-tuned patches and still mis-scored the H-079 case.
+- **`eld` is a single-maintainer package.** Pinned exact, and a new version
+  must be re-measured against all four corpora before it is taken.
