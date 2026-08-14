@@ -16,7 +16,13 @@ pnpm verify    # ~1 min, must exit 0
 ```
 
 **Gate at time of writing:** E1 not met (checklist), E2 not met (derived from
-E5), E3 **MET**, E4 **MET** (80.96%), **E5 NOT MET — TWO blockers.**
+E5), **E5 NOT MET — TWO blockers** (`H-041`, `H-089`).
+
+**E3 and E4 are `??` — do not carry forward the previous brief's "E3 MET, E4
+MET (80.96%)".** Both are settled by running a command, and neither has been
+re-run since `education.ts` and `experience.ts` changed. `pnpm test` settles
+E3; `pnpm mutate` (~14.5 min) settles E4. Quoting the old figures here would be
+trap 3, and this line replaced a draft of this brief that did exactly that.
 
 **41 commits are unpushed and the user has HELD the push.** An ADR-014 content
 scan is clean and on file. Do not push without asking.
