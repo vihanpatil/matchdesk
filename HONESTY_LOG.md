@@ -2953,3 +2953,123 @@ because each was a real defect in the change rather than a style nit:
 4. Inserting the helper left `scoreCandidate`'s doc comment orphaned above
    `reservationsFor`, so the documentation described the wrong function.
    Nothing would have failed; it would simply have been wrong.
+
+## 2026-08-14 — The discriminator, and the bug underneath the bug
+
+### H-082 · The word-count floor was biased against compounding languages
+
+Asked to build a language-neutral vs language-bearing discriminator, I measured
+seven candidates first. **Every one of them — including "no gate at all" —
+failed to catch German, Dutch and Swedish header blocks.** A gate cannot be the
+problem if removing the gate entirely does not fix it.
+
+The German block was absent from the margin distribution I printed, which was
+the tell: it produced no window at all. Cause:
+
+```
+block        words  letters  letters/word
+EN header       18      122       6.8
+FR header       19      124       6.5
+DE header       10      120      12.0
+NL header       11      121      11.0
+SV header       11      115      10.5
+```
+
+**All five carry the same amount of text. Only the compounding languages fail a
+WORD count.** German, Dutch and Swedish pack ~1.7x more letters per word, so a
+15-word floor silently demands ~1.7x more text from them and they were never
+judged.
+
+**The prose gate H-079 blamed was a symptom. The floor's UNIT was the defect** —
+and it had been there since ADR-022, unexamined, because every document used to
+calibrate it was English or Romance.
+
+Windows are now sized in letters. That alone fixed Dutch and Swedish.
+
+### H-083 · For German the classifier is wrong, not just silent
+
+Sizing in letters made the German block judgeable and it still was not caught.
+Measured directly:
+
+```
+DE header block   isEnglish=true   dEn=69621   dOther=70385   nearest=it
+```
+
+**It is classified ENGLISH, with ITALIAN as the nearest other language.** The
+reference profiles are built from ~150 words of prose; a compound-noun list has
+no function words and no inflectional glue, so it is out-of-domain for every
+profile. This is the limitation the module's own header comment already states
+for technology lists — it applies to compound-noun header lines too, and nobody
+had connected the two.
+
+**A gate decides whether to judge. It cannot repair a wrong verdict.** So the
+remedy is a second, orthogonal signal — mean word length — that detects
+morphology English does not have without asking what language it is.
+
+Measured separation: worst English window **8.36**, Swedish **10.45**, Dutch
+**11.00**, German **12.00**. 9.4 is mid-gap. **This is the narrowest threshold
+in the module and it rests on 18 English CVs**; an English CV built from
+unusually long compounds could exceed it and be falsely refused. Stated rather
+than smoothed over.
+
+### H-084 · The margin threshold H-041 rejected works at segment level
+
+H-041 measured relative margin for WHOLE DOCUMENTS and found the classes did
+not separate — a legitimate English CV's margin was four times narrower than
+the code-switched document it needed to reject. I re-measured it for
+**segments**, because it is a different question: not "English CV vs
+code-switched document" but "is this segment's foreign verdict meaningful".
+
+```
+worst English window (headers_plus_tech_only)   +0.0180
+Dutch header block                              +0.0399
+French prose block                              +0.0968
+French header block                             +0.1413
+```
+
+**At segment level the classes do separate**, and 0.03 sits mid-gap. This
+replaces the capitalisation heuristic with something language-symmetric: it
+asks how confident the verdict is, never what the text looks like.
+
+Recorded because the temptation was to treat H-041's finding as settled for all
+scopes. It was measured for one scope and stated for that scope; re-measuring
+the other scope was cheap and productive.
+
+### H-085 · The residual after all of it — H-041 still open
+
+Second adversarial round against the new detector:
+
+```
+ES three lines (145 foreign letters)   refused
+DE two compound lines (72 letters)     SCORED  <-- wrong-score path
+FR one line (35 letters)               SCORED  <-- wrong-score path
+```
+
+**A foreign insert below the letter floor is never isolated** — the window
+grows past it into surrounding English and dilutes. This is material, not
+cosmetic: "Licenciatura en Ciencias de la Computacion, Universidad de
+Salamanca" is ~70 letters and carries a degree, which is exactly the attribute
+that flipped eligibility in the original H-041 reproduction.
+
+**This is H-041's own original sentence, now correctly scoped:** closing it
+needs per-segment identification that works on ~5-8 word fragments, which
+character-statistics cannot do. Everything above ~100 letters is now handled.
+Below it, nothing has changed.
+
+**H-041 stays wrong-score and E5 stays blocked.** I ran the adversarial round
+specifically because H-078 records me calling a narrowing a closure one session
+earlier; without it this would have been reported as fixed.
+
+### Session record
+
+**Landed:** ADR-030 — letter floor, confidence margin, compounding signal;
+neutral-token stripping; the biased prose gate deleted. **0 false refusals
+across BOTH English corpora** (18 CVs — the eval now checks both, because H-080
+exists from checking only one), 13/13 non-English refused, every held-out
+English CV judged, DE/NL/SV/FR bilingual headers caught, FR/ES bilingual prose
+still caught in PDF and DOCX.
+
+`pnpm verify` exit 0, **833 tests**. Mutation unaffected —
+`languageDetection.ts` sits outside Stryker's `packages/core` scope and
+therefore carries **no mutation number at all**, the same gap H-057 records for
+`scripts/lib`.

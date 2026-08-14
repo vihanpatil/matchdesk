@@ -406,36 +406,70 @@ describe('mixed-language veto — held-out validation of the 15-word floor (ADR-
     );
   });
 
-  it('BLIND SPOT NARROWED 4 -> 1, and the remaining one is stated, not hidden', () => {
-    // WAS: four of the ten — chef_terse, electrician_terse, logistics_headers,
-    // driver_very_terse — had no judgeable segment, asserted as a known limit
-    // (H-041). **The old expectation encoded a defect, not a boundary.**
-    // Abstaining meant those documents were SCORED unchecked, so a bilingual
-    // CV in any of those shapes got a wrong number (H-069, ADR-027).
+  it('BLIND SPOT CLOSED: every held-out CV now has judgeable evidence', () => {
+    // Progression, each step forced by a failing assertion rather than noticed:
+    //   4 of 10 silent  (the original H-041 blind spot)
+    //   1 of 10 silent  (ADR-029's prose-gated line window)
+    //   0 of 10 silent  (ADR-030's letter floor — `logistics_headers` closed)
     //
-    // The line window (ADR-029) gives three of the four judgeable evidence.
-    // `logistics_headers` is pure header soup — a name, an email and
-    // comma-separated proper nouns, with no prose line anywhere — so every
-    // window falls below the prose gate and is skipped rather than
-    // coin-flipped.
-    //
-    // **This is NOT the blind spot closed.** A CV of that exact shape, written
-    // bilingually, is still scored. The residual is one in ten instead of four
-    // in ten, and closing it needs a product decision (refuse documents whose
-    // language could not be verified at all), not a detector change.
+    // The last step came from finding the ROOT cause: the 15-WORD floor is
+    // biased against compounding languages, which pack ~1.7x more letters per
+    // word, so they never reached it. Sizing the window in letters asks for
+    // the same amount of TEXT regardless of how a language packages it.
     const silent = Object.entries(HELD_OUT_ENGLISH_CVS)
       .filter(([, cv]) => findNonEnglishSegments(cv).judgedSegmentCount === 0)
       .map(([label]) => label);
-    expect(silent).toEqual(['logistics_headers']);
+    expect(silent).toEqual([]);
   });
 
-  it('and closing it costs ZERO false refusals on the held-out corpus', () => {
+  it('a GERMAN header block inside an English header CV is caught (H-079)', () => {
+    // The defect ADR-029 left open. German capitalises every noun, so German
+    // header lines defeated the lowercase prose gate; and worse, the n-gram
+    // profiles CLASSIFY such a block as English (dEn 69621 vs dOther 70385,
+    // nearest = Italian) because a compound-noun list is out-of-domain for
+    // profiles built from prose. No gate can fix a wrong verdict, so this is
+    // caught by mean word length instead — morphology English does not have.
+    const english = [
+      'Skills: Warehouse Management, SAP, Forecasting, Route Planning, Inventory Control',
+      'Systems: Oracle WMS, Manhattan Associates, Excel, Power BI, Tableau',
+      'Certifications: Forklift, IOSH Managing Safely, First Aid, HACCP Level 3',
+      'Sectors: Retail Distribution, Cold Chain, Third Party Logistics, E-commerce',
+    ];
+    const german = [
+      'Kenntnisse: Lagerverwaltung, Bedarfsplanung, Tourenplanung, Bestandskontrolle',
+      'Ausbildung: Diplom Logistikmanagement, Universitaet Koeln',
+    ];
+
+    // Swept across English mass, so this cannot pass merely because the
+    // whole-document classifier happened to flip at one proportion.
+    for (const repeats of [1, 4, 12]) {
+      const lines = ['Anneliese Vogt', 'Contact: a.v@example.com'];
+      for (let i = 0; i < repeats; i++) lines.push(...english);
+      lines.push(...german);
+      const document = lines.join('\n');
+
+      // No blank lines: this is the PDF shape (H-062/H-065).
+      expect(
+        findNonEnglishSegments(document).hasNonEnglishSegment,
+        `German block missed at ${String(repeats)} English blocks`,
+      ).toBe(true);
+      // And the whole-document classifier does NOT catch it, so the veto is
+      // doing the work rather than riding on a dilution effect.
+      expect(detectLanguageHeuristic(document).isEnglish).toBe(true);
+    }
+  });
+
+  it('and closing it costs ZERO false refusals across BOTH English corpora', () => {
     // The number that decided the design. Blank-line-delimited runs were the
     // cheaper implementation but failed on the PDF path; the line window works
     // on PDF and cost one false refusal until the prose gate was added.
     // This is that gate's regression test — if it ever fires, the gate moved
     // or the corpus grew a shape it does not handle.
-    const falselyRefused = Object.entries(HELD_OUT_ENGLISH_CVS)
+    // Checked against BOTH corpora on purpose. H-080 exists because a cost was
+    // quoted from the held-out set alone, missing that the rule under
+    // consideration would have refused `headers_plus_tech_only` — which this
+    // eval file REQUIRES to pass.
+    const falselyRefused = Object.entries({ ...ENGLISH_CVS, ...HELD_OUT_ENGLISH_CVS })
       .filter(([, cv]) => findNonEnglishSegments(cv).hasNonEnglishSegment)
       .map(([label]) => label);
     expect(falselyRefused).toEqual([]);

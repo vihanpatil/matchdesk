@@ -336,43 +336,120 @@ const SENTENCE_BOUNDARY = /\n+|(?<=[.!?])\s+/;
  */
 
 /**
- * A window is only judged if it reads as PROSE.
+ * LANGUAGE-NEUTRAL vs LANGUAGE-BEARING (ADR-030, replaces the prose gate).
  *
- * Without this the line window costs one false refusal in ten held-out English
- * CVs — `logistics_headers`, whose opening window is a name, an email address
- * and comma-separated proper nouns ("Warehouse Management, SAP, Forecasting,
- * Route Planning"), which the n-gram profile reads as French. That is exactly
- * the coin-flip case {@link MIN_WORDS_FOR_SEGMENT_JUDGEMENT} already warns
- * about, and H-041's own calibration rejected a setting that cost 1 in 10.
+ * The first attempt at this gated windows on "share of plain lowercase tokens",
+ * on the theory that prose is lowercase and header soup is Title Case. **That
+ * was English/Romance-biased and German defeated it (H-079):** German
+ * capitalises every noun, so a German header line looked like soup, was
+ * skipped, and a German-English bilingual header CV was scored.
  *
- * Prose in ANY language is mostly plain lowercase words; header and label soup
- * is Title Case, acronyms and punctuation. Measured separation:
+ * Measuring the replacement found the real root cause, which was not the gate
+ * at all. **The 15-WORD floor is itself biased against compounding
+ * languages:**
  *
- *     header soup (the false refusal)   0.00
- *     English prose                     0.81
- *     French prose                      0.90
+ *     block                words  letters  letters/word
+ *     EN header               18      122       6.8
+ *     FR header               19      124       6.5
+ *     DE header               10      120      12.0
+ *     NL header               11      121      11.0
+ *     SV header               11      115      10.5
  *
- * Every threshold in [0.30, 0.70] gives 0 false refusals, keeps all four
- * held-out non-English CVs refused, and catches the bilingual defect at every
- * proportion tested. **Unlike the word floor, whose viable window was a narrow
- * 12-18, these two classes separate with a large gap**, so 0.5 is mid-gap
- * rather than tuned to an edge.
- *
- * Known limit, not measured away: a CV written in heavy Title Case prose
- * ("Managed Warehouse Operations And Route Planning") scores lower on this
- * ratio and could fall below the gate, in which case the window is skipped and
- * this check is silent for that window — the conservative direction.
+ * All five carry the same amount of text. Only the compounding ones fail a
+ * word count, so they were never judged — the gate was a symptom.
  */
-const MIN_PROSE_RATIO = 0.5;
-const MAX_LINES_PER_WINDOW = 12;
-const EMAIL_OR_URL = /\S+@\S+|https?:\/\/\S+/g;
-const LOWERCASE_WORD = /^[a-zà-ÿ'’-]+[.,;:!?]?$/;
 
-/** Share of tokens that are plain lowercase words, ignoring emails and URLs. */
-function proseRatio(text: string): number {
-  const tokens = text.replace(EMAIL_OR_URL, ' ').split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) return 0;
-  return tokens.filter((t) => LOWERCASE_WORD.test(t)).length / tokens.length;
+/**
+ * Window size is measured in LETTERS, not words, so the floor asks for the same
+ * amount of text regardless of how a language packages it. 100 letters is the
+ * English equivalent of the old 15-word floor (15 x 6.7 measured), chosen so
+ * this does not silently loosen the calibrated behaviour for English. 85 also
+ * measured clean.
+ */
+const MIN_LETTERS_FOR_WINDOW = 100;
+const MAX_LINES_PER_WINDOW = 12;
+
+/**
+ * A foreign verdict on a judged segment is only acted on when the foreign
+ * profile beats English by this relative margin. A coin-flip verdict on
+ * language-neutral text has a tiny margin by construction; real foreign
+ * morphology has a large one. Measured over every window of all 18 English CVs
+ * and the foreign blocks:
+ *
+ *     English soup, worst (headers_plus_tech_only)   +0.0180
+ *     Dutch header block                            +0.0399
+ *     French prose block                            +0.0968
+ *     French header block                            +0.1413
+ *
+ * 0.03 is mid-gap between the worst English window and the weakest genuine
+ * foreign one. **This is language-symmetric** — it asks how confident the
+ * verdict is, never what the text looks like, which is the property the
+ * lowercase heuristic lacked.
+ *
+ * H-041 rejected a margin threshold for WHOLE DOCUMENTS, where the classes
+ * genuinely did not separate. This is a different question — not "English CV vs
+ * code-switched document" but "is this segment's foreign verdict meaningful" —
+ * and it was re-measured rather than assumed to fail.
+ */
+const MIN_FOREIGN_MARGIN = 0.03;
+
+/**
+ * Mean letters per word above which text carries morphology English does not
+ * have. This is the signal that catches German, where the n-gram profiles
+ * themselves fail: a German compound-noun list is out-of-domain for every
+ * reference profile (they are built from prose), and it classifies as ENGLISH
+ * with Italian as the nearest other — measured `dEn` 69621 vs `dOther` 70385.
+ * **No amount of gating fixes a wrong verdict**, so a second, orthogonal
+ * signal is needed.
+ *
+ *     worst English window (headers_plus_tech_only)   8.36
+ *     Swedish header block                           10.45
+ *     Dutch header block                             11.00
+ *     German header block                            12.00
+ *
+ * 9.4 is mid-gap. **This is the narrowest margin in this module** — 8.36 to
+ * 10.45 — and it is stated rather than smoothed over: an English CV built from
+ * unusually long compounds ("Telecommunications Infrastructure Modernisation
+ * Programme") could exceed it and be falsely refused. Only 18 English CVs back
+ * this number.
+ *
+ * It deliberately does NOT try to identify which language; ADR-006 only needs
+ * English-vs-not.
+ */
+const MAX_ENGLISH_MEAN_WORD_LENGTH = 9.4;
+
+const EMAIL_OR_URL = /\S+@\S+|https?:\/\/\S+/g;
+const ACRONYM = /^[A-Z][A-Z/&.-]{1,}$/;
+
+/**
+ * Removes tokens that carry no language signal — emails, URLs, anything
+ * containing a digit, and ALL-CAPS acronyms.
+ *
+ * Deliberately does NOT remove "anything capitalised": that was the bias in the
+ * previous gate. A capitalised word may be a proper noun or may be an ordinary
+ * German noun, and this function cannot tell the difference, so it does not
+ * try.
+ */
+function stripNeutralTokens(text: string): string {
+  return text
+    .replace(EMAIL_OR_URL, ' ')
+    .split(/\s+/)
+    .filter((t) => t !== '')
+    .filter((t) => !/\d/.test(t))
+    .filter((t) => !ACRONYM.test(t))
+    .join(' ');
+}
+
+/** Letters only, so punctuation and spacing cannot inflate a window's size. */
+function letterCount(text: string): number {
+  return (text.match(/\p{L}/gu) ?? []).length;
+}
+
+/** Mean letters per word; 0 when there are no words. */
+function meanWordLength(text: string): number {
+  const words = wordsOf(text);
+  if (words.length === 0) return 0;
+  return letterCount(text) / words.length;
 }
 
 export interface NonEnglishSegment {
@@ -400,6 +477,9 @@ interface TextSegment {
   readonly text: string;
   readonly start: number;
   readonly end: number;
+  /** true when this segment already cleared a size floor of its own, so the
+   *  word-based floor must not re-reject it (ADR-030). */
+  readonly floorCleared?: boolean;
 }
 
 /** Splits on one boundary while keeping offsets into the original text valid.
@@ -441,9 +521,11 @@ function linesWithOffsets(text: string): TextSegment[] {
 /**
  * Windows over consecutive lines, each grown until it clears the word floor.
  *
- * Only prose-looking windows are emitted — see {@link MIN_PROSE_RATIO} for the
- * measured reason. Emitting the window here rather than gating it later keeps
- * `findNonEnglishSegments` a single uniform loop.
+ * Sized in LETTERS (see {@link MIN_LETTERS_FOR_WINDOW}) so the floor asks for
+ * the same amount of text from a compounding language as from English. Windows
+ * carry `floorCleared` so the word-based floor in
+ * {@link findNonEnglishSegments} does not re-reject them — applying both would
+ * reinstate exactly the bias this replaced (H-079).
  */
 function lineWindows(text: string): TextSegment[] {
   const lines = linesWithOffsets(text);
@@ -456,16 +538,11 @@ function lineWindows(text: string): TextSegment[] {
       if (first === undefined || last === undefined) break;
 
       const slice = text.slice(first.start, last.end);
-      // `wordsOf` is the detector's own tokenizer, reused deliberately: a
-      // second word count here could drift from the one the floor is
-      // calibrated against.
-      if (wordsOf(slice).length < MIN_WORDS_FOR_SEGMENT_JUDGEMENT) continue;
+      if (letterCount(stripNeutralTokens(slice)) < MIN_LETTERS_FOR_WINDOW) continue;
 
-      // Cleared the floor: this is the window for `i`. Judge it only if it
-      // reads as prose, then stop growing — a longer window would dilute.
-      if (proseRatio(slice) >= MIN_PROSE_RATIO) {
-        found.push({ text: slice, start: first.start, end: last.end });
-      }
+      // Cleared the floor: this is the window for `i`. Stop growing — a longer
+      // window would dilute whatever makes this one distinctive.
+      found.push({ text: slice, start: first.start, end: last.end, floorCleared: true });
       break;
     }
   }
@@ -529,16 +606,39 @@ export function findNonEnglishSegments(text: string): MixedLanguageResult {
   let judgedSegmentCount = 0;
 
   for (const segment of segmentsOf(text)) {
-    const verdict = detectLanguageHeuristic(segment.text);
+    // Judge the language-BEARING part. Emails, URLs, numbers and acronyms are
+    // the same strings in every language and only add noise to a profile
+    // comparison (ADR-030).
+    const bearing = stripNeutralTokens(segment.text);
+    const verdict = detectLanguageHeuristic(bearing);
 
     // `isEnglish === null` means the segment was below the detector's own
-    // floor; the separate, higher segment floor keeps short technology lines
-    // out of the vote entirely.
+    // floor. `floorCleared` segments already passed a letter-based floor, so
+    // re-applying the word floor to them would reinstate the bias against
+    // compounding languages that H-079 recorded.
     if (verdict.isEnglish === null) continue;
-    if (verdict.wordCount < MIN_WORDS_FOR_SEGMENT_JUDGEMENT) continue;
+    if (segment.floorCleared !== true && verdict.wordCount < MIN_WORDS_FOR_SEGMENT_JUDGEMENT)
+      continue;
 
     judgedSegmentCount++;
-    if (verdict.isEnglish) continue;
+
+    // Signal 1 — morphology English does not have. This catches German, where
+    // the n-gram profiles themselves return the WRONG verdict because a
+    // compound-noun list is out-of-domain for profiles built from prose.
+    const compounding = meanWordLength(bearing) >= MAX_ENGLISH_MEAN_WORD_LENGTH;
+
+    // Signal 2 — a foreign verdict, but only when it is confident. An
+    // unconfident foreign verdict on language-neutral text is a coin flip.
+    const margin =
+      verdict.distanceToEnglish !== null &&
+      verdict.distanceToNearestOther !== null &&
+      verdict.distanceToEnglish > 0
+        ? (verdict.distanceToEnglish - verdict.distanceToNearestOther) / verdict.distanceToEnglish
+        : 0;
+    // `isEnglish` is narrowed to boolean here — the null case already continued.
+    const confidentlyForeign = !verdict.isEnglish && margin >= MIN_FOREIGN_MARGIN;
+
+    if (!compounding && !confidentlyForeign) continue;
 
     nonEnglishSegments.push({
       text: segment.text,

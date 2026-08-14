@@ -240,7 +240,7 @@
       "id": "H-041",
       "severity": "wrong-score",
       "status": "open",
-      "note": "NARROWED but still WRONG-SCORE (ADR-029). The prose-gated line window took held-out CVs with no judgeable segment from 4/10 to 1/10 at zero false refusals, and the bilingual defect is now caught in PDF and DOCX down to 11.2% foreign content. RESIDUAL: a pure-header CV (no prose line anywhere, e.g. logistics_headers) is still unjudged and therefore still scored if bilingual. Closing it needs the refuse-vs-caveat product decision, not a detector change. RESIDUAL MEASURED (H-079): the prose gate is English/Romance-biased. German capitalises every noun, so German header lines are skipped as soup and a German-English bilingual header CV is SCORED at every proportion tested down to 3.8%. Refusing on judgedSegmentCount===0 closes it but costs 3/18 English CVs and refuses headers_plus_tech_only, which the eval REQUIRES to pass (H-080)."
+      "note": "STILL WRONG-SCORE, residual narrowed again (ADR-030). Letter-based window floor + confidence margin + compounding-morphology signal replaced the English/Romance-biased prose gate: 0 false refusals across BOTH English corpora (18 CVs), 13/13 non-English refused, every held-out English CV now judged, DE/NL/SV/FR bilingual headers caught, FR/ES bilingual prose caught in PDF and DOCX. RESIDUAL (H-085): a foreign insert BELOW the ~100-letter window floor is never isolated - the window grows past it and dilutes. Material: a one-line foreign degree is ~70 letters. Closing it needs per-segment identification on ~5-8 word fragments, which character statistics cannot do - H-041's own original statement, now correctly scoped."
     },
     {
       "id": "H-042",
@@ -470,6 +470,30 @@
       "severity": "process",
       "status": "closed",
       "note": "The H-040 remedy, and four defects lint/types caught in my own change."
+    },
+    {
+      "id": "H-082",
+      "severity": "process",
+      "status": "closed",
+      "note": "The 15-WORD segment floor was biased against compounding languages (DE/NL/SV pack ~1.7x more letters per word), so they were never judged. The prose gate blamed in H-079 was a symptom; the floor's UNIT was the defect."
+    },
+    {
+      "id": "H-083",
+      "severity": "process",
+      "status": "closed",
+      "note": "For German compound-noun blocks the n-gram classifier returns the WRONG verdict (English, nearest=Italian), not merely a silent one. Profiles are built from prose and a compound list is out-of-domain. A gate cannot repair a wrong verdict."
+    },
+    {
+      "id": "H-084",
+      "severity": "process",
+      "status": "closed",
+      "note": "The relative-margin threshold H-041 rejected for whole documents DOES separate at segment level (worst English +0.0180 vs weakest genuine foreign +0.0399). Re-measuring a finding in a different scope was cheap and productive."
+    },
+    {
+      "id": "H-085",
+      "severity": "process",
+      "status": "closed",
+      "note": "After ADR-030, a foreign insert below the ~100-letter window floor is still scored. Found by an adversarial round run specifically because H-078 records calling a narrowing a closure."
     }
   ]
 }

@@ -1376,3 +1376,100 @@ make. Recorded here rather than resolved.
   corpus, but it is more work than the previous two-granularity split.
 - **`logistics_headers` remains unjudged**, and with it the residual
   wrong-score path above.
+
+---
+
+## ADR-030 — Language-neutral vs language-bearing: three signals, and the floor's unit was the bug
+
+**Date:** 2026-08-14 · **Status:** Accepted ·
+**Supersedes:** ADR-029 Decision 2's prose gate
+
+ADR-029 gated windows on "share of plain lowercase tokens". H-079 measured that
+as **English/Romance-biased**: German capitalises every noun, so German header
+lines read as label soup, were skipped, and a German-English bilingual header CV
+was scored.
+
+**Building the replacement found a deeper cause than the gate.**
+
+### Finding 1 — the 15-WORD floor is biased against compounding languages
+
+| block     | words | letters | letters/word |
+| --------- | ----- | ------- | ------------ |
+| EN header | 18    | 122     | 6.8          |
+| FR header | 19    | 124     | 6.5          |
+| DE header | 10    | 120     | **12.0**     |
+| NL header | 11    | 121     | **11.0**     |
+| SV header | 11    | 115     | **10.5**     |
+
+All five carry the same amount of text. Only the compounding languages fail a
+**word** count. **The gate was a symptom; the floor's unit was the defect.**
+Windows are now sized in **letters** (100 ≈ the old 15 English words at the
+measured 6.7 letters/word).
+
+### Finding 2 — for German, the classifier itself is wrong, so no gate can help
+
+A German compound-noun list is out-of-domain for reference profiles built from
+prose. Measured on the German header block:
+
+```
+isEnglish=true   dEn=69621   dOther=70385   nearest=it
+```
+
+It is classified **English**, with **Italian** as the nearest other. Judging it
+more eagerly produces a confident wrong answer, so a second, orthogonal signal
+is required.
+
+### Decision — three signals, each measured, replacing one biased heuristic
+
+1. **Letter floor** (`MIN_LETTERS_FOR_WINDOW = 100`) — language-fair sizing.
+2. **Confidence margin** (`MIN_FOREIGN_MARGIN = 0.03`) — act on a foreign
+   verdict only when the foreign profile wins clearly. Measured: worst English
+   window `+0.0180`, Dutch header `+0.0399`, French prose `+0.0968`, French
+   header `+0.1413`. 0.03 is mid-gap. **Language-symmetric** — it asks how
+   confident the verdict is, never what the text looks like.
+3. **Compounding morphology** (`MAX_ENGLISH_MEAN_WORD_LENGTH = 9.4`) — catches
+   German where the profiles fail. Measured: worst English window **8.36**,
+   Swedish **10.45**, Dutch **11.00**, German **12.00**.
+
+Neutral tokens (emails, URLs, digit-bearing tokens, ALL-CAPS acronyms) are
+stripped before judging. **Capitalisation is deliberately NOT used** — that was
+the bias.
+
+**Measured result across the full grid** (floor 85/100 × margin 0.02/0.05 ×
+compound 9.0/9.4/10.0): **0 false refusals over all 18 English CVs**, 13/13
+non-English refused, FR/ES bilingual prose caught, and **DE/NL/SV/FR bilingual
+headers caught**. Every held-out English CV now has judgeable evidence —
+`logistics_headers` went from 0 judged segments to 4.
+
+### H-041 is NOT closed, and the remaining gap is exactly what H-041 first said
+
+A second adversarial round found the residual:
+
+```
+ES three lines (145 foreign letters)   refused
+DE two compound lines (72 letters)     SCORED
+FR one line (35 letters)               SCORED
+```
+
+**A foreign insert below the letter floor is never isolated** — the window
+grows past it into English text and dilutes. This is material: a single line
+like "Licenciatura en Ciencias de la Computacion, Universidad de Salamanca" is
+~70 letters and carries a degree.
+
+**This is the original H-041 statement, now correctly scoped:** closing it
+needs per-segment identification that works on ~5-8 word fragments, which
+character-statistics cannot do. Everything _above_ that threshold is now
+handled; below it, nothing has changed. H-041 stays **wrong-score** and E5
+stays blocked.
+
+### Costs, accepted
+
+- **9.4 is the narrowest threshold in this module** — 8.36 to 10.45, backed by
+  18 English CVs. An English CV of unusually long compounds
+  ("Telecommunications Infrastructure Modernisation Programme") could exceed it
+  and be falsely refused. Stated, not smoothed over.
+- **Three thresholds instead of one.** More surface to drift. Each is asserted
+  in the eval file against both English corpora rather than described.
+- **Mutation score is unaffected**: `languageDetection.ts` is in `apps/server`,
+  outside Stryker's `packages/core` scope — so it carries no mutation number at
+  all, which is its own gap (same shape as `scripts/lib`, H-057).
