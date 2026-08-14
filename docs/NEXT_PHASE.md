@@ -24,7 +24,7 @@ re-run since `education.ts` and `experience.ts` changed. `pnpm test` settles
 E3; `pnpm mutate` (~14.5 min) settles E4. Quoting the old figures here would be
 trap 3, and this line replaced a draft of this brief that did exactly that.
 
-**41 commits are unpushed and the user has HELD the push.** An ADR-014 content
+**44 commits are unpushed and the user has HELD the push.** An ADR-014 content
 scan is clean and on file. Do not push without asking.
 
 ---
@@ -79,9 +79,10 @@ was never going to fix it. Full measurement: **H-092**.
 
 ## 2. What the last session actually did
 
-Nothing is committed to `apps/server/`. **`eld` is NOT installed** and **no ADR
-was written** — deliberately, because approving a shipped dependency on an
-unmeasured premise is the project's most-repeated failure one level up.
+Nothing is committed to `apps/server/`. **`eld` is NOT installed** — ADR-031
+records the decision to adopt it, but the install and the swap are Task A and
+have not been done. ADR-031 says explicitly that its licence-audit claim is a
+**prediction** until `pnpm license:audit` runs with `eld` present (H-025).
 
 **Task B (extraction i18n) — LANDED.**
 
@@ -96,18 +97,25 @@ unmeasured premise is the project's most-repeated failure one level up.
   had only ever been measured by hand.
 - 701 passed / 2 expected-fail, verified by the lead, not taken on report.
 
-**Task A (language ID) — measured, not integrated.** Survey + 64-config sweep.
-Research preserved in `docs/research/langid-survey-2026-08-14/` and
-`docs/research/langid-phase1-2026-08-14/` (the scratchpad is ephemeral). The
-draft ADR is `ADR-031-DRAFT.md` in the first of those — **a draft, not a
-decision.**
+**Task A (language ID) — measured and decided, not integrated.** Survey +
+64-config sweep, then ADR-031. Research preserved in
+`docs/research/langid-survey-2026-08-14/` and
+`docs/research/langid-phase1-2026-08-14/`, because the scratchpad it was
+produced in is ephemeral.
 
-**Two new defects found, both logged and registered:**
+**Task C (adversarial verification) — run for H-089 only**, not the full
+`ATTACK_CHECKLIST`. Row **A5 (section segmentation, PDF path) has still never
+been run.**
 
-- **H-089 — new E5 blocker.** An ambiguous numeric date range silently deletes
-  a whole role. See §3.
-- **H-090 — closed same session.** The B.4 fix landed with no test that failed
-  without it.
+**Findings registered this session:**
+
+- **H-089, H-095 — new E5 blockers.** Numeric dates. See Task E.
+- **H-090 — closed.** The B.4 fix landed with no test that failed without it.
+- **H-091, H-092 — open.** The language-ID measurement.
+- **H-093, H-096 — closed.** Manifest and floor housekeeping, including a floor
+  the lead set by arithmetic instead of measurement.
+- **H-094 — closed.** The verifier agreed with the lead's verdict and
+  falsified the lead's description of it. See trap 6.
 
 **Falsified along the way (H-091):** the previous brief named `franc` first and
 argued "a trained model works where character statistics cannot". `franc`
