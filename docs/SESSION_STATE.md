@@ -12,6 +12,10 @@ branch-coverage figure, and H-074 before quoting a coverage total.
 
 **Current work: remediating H-040 + H-041 — one remedy, both defects.**
 
+**➡ NEXT PHASE BRIEF: `docs/NEXT_PHASE.md`** — tasks, deliverables, pass
+criteria and the tiger-team decomposition for the next session. Read
+SESSION_STATE for state, NEXT_PHASE for what to do.
+
 **START HERE — run `pnpm gate` FIRST. It prints the gate; do not read one.**
 
 **The gate is now computed, not argued (ADR-028, H-075).** Three of the five
