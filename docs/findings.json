@@ -517,7 +517,7 @@
       "id": "H-089",
       "severity": "wrong-score",
       "status": "open",
-      "note": "An ambiguous numeric date range (both leading numbers 1-12, e.g. 03/04/2019) silently DELETES an entire role: two-sided ranges yield [] and the recruiter is told a smaller total tenure with warnings: []. Pre-existing, found while measuring Indian date formats (Task B.4). H-040's shape exactly; H-040's remedy shape (surface the disagreement as a Reservation) has NOT been built. B.4 fixed only the unambiguous case (one number in 13-31). NEEDS ADR-015 VERIFIER CONFIRMATION - classified by the lead alone, which ADR-027's precedent says is not sufficient for a gate call."
+      "note": "An ambiguous numeric date range silently deletes a role and reports a smaller total tenure with warnings: []. CONFIRMED wrong-score by an independent ADR-015 verifier who was not told the lead's view. The verifier CORRECTED the lead's description on three counts (H-094): (1) the open-ended case does NOT abstain - it matches a SUBSTRING and silently commits to DD/MM, truncating the evidence span; (2) the END date governs, not 'both sides ambiguous', so the population is 336/784 day-pairs not 144/784; (3) H-040's Reservation remedy IS built but is blind here by construction - discardedTenureClaim needs an explicit claim to disagree with, and H-089 never extracts a first number. Traced end-to-end: 10.7y/100/ELIGIBLE becomes 1.4y/55/INELIGIBLE, match row persisted, warnings structurally unreachable. ALSO an E2 blocker: no metamorphic relation can generate a numeric date at all."
     },
     {
       "id": "H-090",
@@ -542,6 +542,24 @@
       "severity": "process",
       "status": "closed",
       "note": "Test manifest regenerated (913 identities) and minTests raised 844 -> 913 after the H-088 documented-gap test was deliberately flipped by Task B.1. Reason recorded as the integrity check demands. Notable: this check and pnpm typecheck each caught something a subagent's own scoped green run did not."
+    },
+    {
+      "id": "H-094",
+      "severity": "process",
+      "status": "closed",
+      "note": "The ADR-015 verifier agreed with the lead's wrong-score verdict on H-089 and falsified the lead's DESCRIPTION on four counts. Agreement on the label concealed disagreement on the facts. Most serious: the code docstring claimed the ambiguous case was 'deliberately left unresolved rather than silently guessing a locale', which is false - measured and reproduced independently by the lead. Docstring and the DOCUMENTED GAP test corrected in the same commit."
+    },
+    {
+      "id": "H-095",
+      "severity": "wrong-score",
+      "status": "open",
+      "note": "Dash and dot date separators silently INFLATE tenure. The \\d{1,2}/\\d{4} alternative is slash-only, so 03-04-2013 and 03.04.2013 fall to bare \\d{4} and default to January: 11.4y reported against a truth of 11.2, evidence truncated to '2013 - Present'. 192/784 two-sided dash pairs and 12/28 '- Present' dash cases are wrong. Opposite direction from H-089 - a candidate can be credited with tenure they do not have. Split out of H-089 on the verifier's recommendation. Pinned by a DOCUMENTED GAP test."
+    },
+    {
+      "id": "H-096",
+      "severity": "process",
+      "status": "closed",
+      "note": "Manifest shrink 916 -> 915 was a deliberate rename (one DOCUMENTED GAP test replaced by three that pin actual behaviour, H-094), requiring --allow-shrink because the tool cannot distinguish a rename from a deletion. Separately: the lead set minTests to 917 by arithmetic rather than measurement; the real count is 915 and the tool refused the guess. Trap 3 committed by the lead in the same session they removed a stale E4 figure from the handoff for the same reason."
     }
   ]
 }

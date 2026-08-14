@@ -3422,3 +3422,150 @@ see it. It is the second gate this session to catch something a subagent's own
 green run did not — `pnpm typecheck` was the first, failing on
 `fixtures/corpus/text-tier.test.mjs` implicit-`any` errors that
 `pnpm typecheck:tests` does not cover.
+
+---
+
+### H-094 · The independent verifier agreed with my verdict and falsified my description
+
+H-089 was routed to an ADR-015 verifier who had not authored the code and was
+not told what I had concluded. **The verdict matched — `wrong-score`, high
+confidence — and three parts of my description of the defect were wrong.**
+Agreement on the label concealed disagreement on the facts, which is exactly
+why the label is not the useful part of a verification.
+
+**Correction 1 — the biggest. `03/04/2019 - Present` does NOT abstain.**
+I wrote, and the code comment claimed, that the ambiguous case was
+"deliberately left unresolved rather than silently guessing a locale."
+**Measured and reproduced by me independently:**
+
+```
+"03/04/2019 - Present"  -> 5.2 y   evidence "04/2019 - Present"
+"04/03/2013 - Present"  -> 11.3 y  evidence "03/2013 - Present"   (reads MARCH)
+```
+
+The 3-part token fails, and then `\d{1,2}\/\d{4}` matches a **substring**,
+discarding the leading component. **The engine does commit to a locale** —
+accidentally, through a fallback — and truncates the evidence span the
+recruiter is shown. A US author writing `04/03/2013` for 4 March gets March by
+coincidence; an Indian author writing the same characters for 3 April gets the
+wrong month. The docstring asserting safety was the most dangerous artefact in
+the change, because it would have stopped the next engineer looking.
+
+**Correction 2 — the END date governs, not "both sides ambiguous".**
+`13/04/2013 - 05/08/2022` has an unambiguous start and is still deleted.
+Verifier's sweep over day-pairs 1-28: **336/784 silently deleted**, against the
+**144/784** my "both leading numbers 1-12" framing implied. **2.3× the
+population I reported.**
+
+**Correction 3 — a second, opposite failure mode nobody registered.** Dash and
+dot separators miss the slash-only alternative and fall to bare `\d{4}`,
+defaulting to January: `03-04-2013 - Present` → **11.4 y** against a truth of
+11.2, evidence truncated to `2013 - Present`. A silent **over**-count.
+Registered separately as **H-095**.
+
+**Correction 4 — my claim that H-040's remedy "has NOT been built" was wrong.**
+It is built and it fires: with an explicit claim present, a blocking
+`unverified_tenure_claim` reservation is raised and `scoreStoredPair` refuses
+to persist. **The real gap is narrower and sharper than I stated:**
+`discardedTenureClaim` detects unread roles only via an explicit-claim proxy,
+and a CV that merely lists roles offers nothing to disagree with. H-040's
+mechanism is **blind by construction** here — in H-040 the engine extracted the
+evidence and then discarded it, so two numbers existed to compare; in H-089 it
+never extracted it, so there is no second number. Saying "same shape exactly"
+obscured the one structural difference that decides the remedy.
+
+**Traced end-to-end by the verifier**, same candidate, only the earlier role's
+notation changed:
+
+```
+Apr 2013 - Aug 2022        10.7 y · score 100 · ELIGIBLE
+03/04/2013 - 05/08/2022     1.4 y · score  55 · INELIGIBLE
+  "Requires at least 9 years of experience; found 1.4."
+  warnings: []   reservations: []   match row PERSISTED
+```
+
+**`warnings` cannot ever fire here, structurally:** it is an ingestion-only
+concept and **no attribute extractor emits one at all.** There is no code path
+by which an unreadable date reaches it.
+
+**The verifier's falsification round is worth recording** because it is the
+strongest argument against its own verdict: _"nobody can read `03/04/2019`;
+failing to read an unreadable input is a coverage-gap, not a wrong score."_
+It does not survive, and the measurement is why. The two locale readings of
+`03/04/2019 - 05/08/2022` differ by **0.1 years**; swept over all 20736
+ambiguous combinations the maximum disagreement is **1.8 years**. The engine
+reports **0** and deletes a 9.3-year role. **Abstaining is strictly worse than
+either guess for any role longer than 1.8 years** — and it does not abstain
+visibly, it asserts a confident false number and stores it.
+
+**Two further gaps the verifier found that nobody had registered:**
+
+- **No metamorphic relation can generate a numeric date at all.** `renderRange`
+  emits only `MONTHS[...] YYYY`, and R13/R20 are `toBeLessThanOrEqual` upper
+  bounds, so **no relation can catch an undercount.** This is ADR-027
+  Decision 3's condemned pattern verbatim — a relation that names its defect
+  axis and does not generate it is not a pin. **The missing relation is
+  obvious: tenure must not depend on the notation used to write the same
+  dates.** H-089 therefore stays an **E2** blocker even after its wrong-score
+  status is resolved.
+- **E3 has no fixture for this defect class.** All 13 numeric dates in
+  `INDIAN_CV_CORPUS` have day ≥ 13. The exclusion is disclosed in
+  `definitions.mjs`, not hidden — but the corpus built to prove Indian date
+  handling systematically excludes the notation that breaks it. **H-022's shape
+  a fifth time.**
+
+**Fixed in this commit:** the false docstring, and the `DOCUMENTED GAP` test
+split into four that pin what actually happens rather than what I thought did.
+
+---
+
+### H-095 · Dash and dot date separators silently inflate tenure
+
+Split out of H-089 on the verifier's recommendation because it is a distinct
+mechanism in the opposite direction.
+
+`\d{1,2}\/\d{4}` is **slash-only**, so `03-04-2013` and `03.04.2013` miss it
+and fall through to bare `\d{4}`, which defaults to January. Measured:
+
+```
+"03-04-2013 - Present"  -> 11.4 y  evidence "2013 - Present"   (truth 11.2)
+"03.04.2013 - Present"  -> 11.4 y  evidence "2013 - Present"   (truth 11.2)
+```
+
+Verifier's sweep: **192/784** two-sided dash pairs report 9.6 against a truth
+of 9.3, and **12/28** `- Present` dash cases are wrong. The dot form is
+H-040's original `03.2006` gap, still open in this path.
+
+**Classified wrong-score.** The magnitude is small — a fraction of a year — but
+the number is asserted confidently, the evidence span is truncated to just the
+year, and it crosses eligibility thresholds like any other number. The
+direction matters: a candidate can be credited with tenure they do not have.
+
+**Pinned** by `DOCUMENTED GAP (H-095)` in `experience.test.ts`, asserting the
+wrong behaviour on purpose.
+
+---
+
+### H-096 · Manifest shrink was deliberate; the floor I set was a guess
+
+Two things, both small, both worth the record.
+
+**The shrink is intentional.** `DOCUMENTED GAP: a fully ambiguous numeric range
+is still silently dropped` was removed and replaced by three tests that pin
+what the code actually does (H-094). One identity out, three in. The identity
+gate is not weakened by the swap — it is strengthened — but `--allow-shrink`
+was required because the tool cannot tell a rename from a deletion, which is
+the correct default.
+
+**The floor I typed was not measured.** I set `minTests` to **917** by
+arithmetic on what I expected the delta to be. The real count is **915**. The
+tool refused it and printed the true number.
+
+That is **trap 3 — "a figure carried across a change" — committed by me, in
+the same session in which I removed a stale `E4 MET (80.96%)` from the handoff
+for exactly the same reason.** The floor is now 915, from the tool's own
+output rather than from my arithmetic.
+
+**Third gate this session to catch something a green run did not**, after
+`pnpm typecheck` (implicit-`any` in the fixture tier) and the manifest
+integrity check (the renamed gap test).

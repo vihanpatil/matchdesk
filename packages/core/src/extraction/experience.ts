@@ -52,15 +52,32 @@ const MONTH_PATTERN =
  * unambiguously 13 April also (MM/DD/YYYY, the US convention) — both read
  * to month 4.
  *
- * When BOTH leading numbers are 1-12 (`03/04/2019`), the format is
- * genuinely ambiguous between DD/MM/YYYY and MM/DD/YYYY and nothing here
- * resolves it — measured, not assumed, and deliberately left unresolved
- * rather than silently guessing a locale (see the B.4 write-up). This
- * pattern is therefore built to structurally match ONLY the unambiguous
- * shape; the ambiguous shape never reaches `parseDateToken` as a 3-part
- * token at all; it falls through to the existing `\d{1,2}\/\d{4}` and
- * `\d{4}` alternatives exactly as before this change, so the ambiguous case
- * is provably unchanged by this fix.
+ * When BOTH leading numbers are 1-12 (`03/04/2019`), the format is genuinely
+ * ambiguous between DD/MM/YYYY and MM/DD/YYYY, and this pattern is built to
+ * match ONLY the unambiguous shape, so the ambiguous shape never reaches
+ * `parseDateToken` as a 3-part token.
+ *
+ * ⚠ **DO NOT read that as "the ambiguous case is left unresolved".** An
+ * earlier version of this comment claimed exactly that, and an independent
+ * verifier falsified it (H-094). What actually happens is worse, because the
+ * ambiguous token falls through to the alternatives BELOW, which match a
+ * SUBSTRING of it:
+ *
+ *   `03/04/2019 - Present`  -> `04/2019 - Present`  (leading `03/` discarded)
+ *   `04/03/2013 - Present`  -> `03/2013 - Present`  (reads MARCH — a US-form
+ *                                                    date silently read DD/MM)
+ *   `03-04-2013 - Present`  -> `2013 - Present`     (dash misses the
+ *                                                    slash-only alternative
+ *                                                    and defaults to January)
+ *
+ * So the engine DOES commit to a locale — accidentally, via a fallback,
+ * rather than deliberately — and it truncates the recruiter-visible evidence
+ * span while doing so. Two-sided ranges are governed by the END date and are
+ * dropped entirely, deleting the role.
+ *
+ * These are tracked as H-089 (silent deletion / under-count) and H-095
+ * (silent over-count). **Both are open wrong-score findings. Do not "tidy"
+ * this comment back into a claim of safety.**
  */
 const UNAMBIGUOUS_DAY_NUMBER = '(?:1[3-9]|2[0-9]|3[01])';
 const THREE_PART_UNAMBIGUOUS_DATE = `(?:${UNAMBIGUOUS_DAY_NUMBER}[\\/\\-]\\d{1,2}|\\d{1,2}[\\/\\-]${UNAMBIGUOUS_DAY_NUMBER})[\\/\\-]\\d{4}`;
