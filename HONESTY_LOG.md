@@ -3149,3 +3149,54 @@ ruled out.
 **So H-041 stays wrong-score**, now with a precisely bounded residual: a
 Germanic-language insert shorter than ~100 letters. That is what the
 language-ID library is for.
+
+### H-088 · Indian degrees were silently rejecting real candidates
+
+**The user asked whether an English CV from an Indian candidate works. It
+mostly did, and in four common cases it did not — measured, not assumed.**
+
+Language detection, skills, employers and tenure all extract correctly from an
+Indian-English CV: `Infosys`, `Tata Consultancy Services`, `Bengaluru`, `Jul
+2021 - Present` all parse, and an Indian CV and its US-localised twin scored
+**100 and eligible, identically**.
+
+**Education did not.** Measured across 17 qualification forms, six extracted
+nothing, and four of those flip an eligibility gate:
+
+```
+B.E.  Anna University   edu=0  SCORE=50  INELIGIBLE  "Requires at least a bachelor degree."
+MCA   Pune University   edu=0  SCORE=50  INELIGIBLE
+BCA   Bangalore         edu=0  SCORE=50  INELIGIBLE
+PGDM  XLRI              edu=0  SCORE=50  INELIGIBLE
+B.Tech IIT              edu=1  SCORE=100 eligible
+```
+
+**The tool told the recruiter that a candidate holding a bachelor's degree has
+no bachelor's degree.** Same shape as H-040 and H-041: same person, different
+presentation, different outcome — this time decided by which country awarded
+the degree.
+
+**Fixed:** `B.E.`, `M.E.`, `MCA`, `BCA` and `PGDM` added to `DEGREE_PATTERNS`.
+`be` and `me` went into `AMBIGUOUS_BARE_FORMS` — they are **more** dangerous
+than the US bare forms already guarded there, because they are ordinary English
+words appearing constantly in CV prose. Verified they do not leak: "asked to
+**be** the lead engineer" and "asked **me** to run the migration" both produce
+nothing.
+
+**PGDM → `master` is a judgement, not a fact.** It is a postgraduate _diploma_
+by name, treated as MBA-equivalent by Indian employers. Recorded here because
+the name does not obviously imply the level.
+
+**Residual, bounded and localised (asserted as a documented gap):** a bare
+`BE`/`M.E.` whose field is not in `FIELD_VOCAB` is still missed, because the
+ambiguity guard needs corroboration and the only corroboration available is a
+recognised field or the literal word "degree". `FIELD_VOCAB` is 14 US-skewed
+entries, so **"Electronics and Communication" and "Structural Engineering" — two
+of the commonest Indian engineering disciplines — do not qualify.** The same
+degrees parse correctly the moment the field is recognised, which localises the
+defect to the **vocabulary**, not the patterns.
+
+**Why this was not found earlier:** every education test used American forms.
+That is H-022's sentence verbatim, and H-022 was about this exact file.
+**Fourth instance this session** of a component calibrated on a corpus lacking
+the population it then failed on (H-022, H-079, H-086, H-088).

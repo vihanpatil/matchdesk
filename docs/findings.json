@@ -506,6 +506,12 @@
       "severity": "process",
       "status": "closed",
       "note": "Romance sub-floor inserts closed by a two-distinct-function-word line signal (0 false positives in 70 English lines). Germanic sub-floor inserts remain open - compound lines have no function words and mean word length does not separate at line level."
+    },
+    {
+      "id": "H-088",
+      "severity": "coverage-gap",
+      "status": "open",
+      "note": "Indian degrees B.E./M.E./MCA/BCA/PGDM extracted NOTHING, scoring real candidates 50 and INELIGIBLE with 'Requires at least a bachelor degree'. Patterns added and false-positive guards verified for the ordinary words 'be'/'me'. RESIDUAL: a bare BE/M.E. with a field outside FIELD_VOCAB's 14 US-skewed entries is still missed - 'Electronics and Communication', 'Structural Engineering'. Fix is the vocabulary, not the patterns. Classified coverage-gap per ADR-023's own example (degree-vocabulary gaps), but it FLIPS ELIGIBILITY, so re-triage if that example is ever revisited."
     }
   ]
 }

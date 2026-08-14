@@ -29,12 +29,12 @@ const DEGREE_PATTERNS: readonly { readonly level: DegreeLevel; readonly pattern:
   {
     level: 'master',
     pattern:
-      /\b(?:master'?s?(?:\s+degree)?|m\.?sc\.?|m\.?eng\.?|m\.?b\.?a\.?|m\.?phil\.?|l\.?l\.?m\.?|m\.?tech\.?|m\.?s\.?|m\.?a\.?)\b/gi,
+      /\b(?:master'?s?(?:\s+degree)?|m\.?sc\.?|m\.?eng\.?|m\.?b\.?a\.?|m\.?phil\.?|l\.?l\.?m\.?|m\.?tech\.?|m\.?c\.?a\.?|p\.?g\.?d\.?m\.?|m\.?s\.?|m\.?a\.?|m\.?e\.?)\b/gi,
   },
   {
     level: 'bachelor',
     pattern:
-      /\b(?:bachelor'?s?(?:\s+degree)?|b\.?sc\.?|b\.?eng\.?|b\.?b\.?a\.?|b\.?com\.?|l\.?l\.?b\.?|b\.?tech\.?|b\.?s\.?|b\.?a\.?)\b/gi,
+      /\b(?:bachelor'?s?(?:\s+degree)?|b\.?sc\.?|b\.?eng\.?|b\.?b\.?a\.?|b\.?com\.?|l\.?l\.?b\.?|b\.?tech\.?|b\.?c\.?a\.?|b\.?s\.?|b\.?a\.?|b\.?e\.?)\b/gi,
   },
   { level: 'associate', pattern: /\b(?:associate'?s?(?:\s+degree)?|a\.?a\.?|a\.?s\.?)\b/gi },
   { level: 'high_school', pattern: /\bhigh school(?:\s+diploma)?\b/gi },
@@ -60,6 +60,13 @@ const AMBIGUOUS_BARE_FORMS: ReadonlySet<string> = new Set([
   'jd',
   'aa',
   'as',
+  // Indian/Commonwealth engineering degrees (H-088). `be` and `me` are
+  // ordinary English words — "be", "me" — and are far MORE dangerous than the
+  // US forms above, so they are guarded the same way: a match is trusted only
+  // with corroborating degree context nearby. `bca`, `mca` and `pgdm` are
+  // distinctive enough to stand alone and are deliberately NOT listed here.
+  'be',
+  'me',
 ]);
 
 /**

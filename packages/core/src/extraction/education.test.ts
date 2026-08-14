@@ -401,3 +401,60 @@ describe('degree ladder is reachable at every level (H-057)', () => {
     ]);
   });
 });
+
+describe('Indian and Commonwealth qualifications (H-088)', () => {
+  const degrees = (text: string) =>
+    extractEducation(text).map((a) => `${a.degreeLevel}/${a.field ?? '?'}`);
+
+  // Measured before the fix: B.E., M.E., MCA, BCA and PGDM extracted NOTHING,
+  // and a candidate holding one was scored 50 and marked INELIGIBLE with
+  // "Requires at least a bachelor degree" — a false statement about someone who
+  // holds a bachelor's degree. This recruiter works with Indian clients, so
+  // these are a primary case.
+  it('extracts B.E. as a bachelor degree', () => {
+    expect(degrees('Education\nB.E. in Computer Science, Anna University, 2016')).toEqual([
+      'bachelor/computer-science',
+    ]);
+  });
+
+  it('extracts MCA and BCA', () => {
+    expect(degrees('Education\nMCA, Savitribai Phule Pune University, 2019')).toEqual(['master/?']);
+    expect(degrees('Education\nBCA, Bangalore University, 2016')).toEqual(['bachelor/?']);
+  });
+
+  it('extracts PGDM as a postgraduate qualification', () => {
+    // PGDM is India's postgraduate diploma in management, treated as
+    // MBA-equivalent by employers. Mapped to `master` on that basis; it is a
+    // diploma by name, so this is a judgement recorded rather than obvious.
+    expect(degrees('Education\nPGDM in Marketing, XLRI Jamshedpur, 2020')).toEqual([
+      'master/marketing',
+    ]);
+  });
+
+  it('does NOT invent a degree from the ordinary words "be" and "me"', () => {
+    // These are far more dangerous than the US bare forms already guarded:
+    // "be" and "me" appear in ordinary CV prose constantly. They are in
+    // AMBIGUOUS_BARE_FORMS and require corroborating degree context.
+    expect(degrees('I was asked to be the lead engineer on the project')).toEqual([]);
+    expect(degrees('The team lead asked me to run the migration effort')).toEqual([]);
+    expect(degrees('BE')).toEqual([]);
+  });
+
+  it('DOCUMENTED GAP: a bare B.E./M.E. with an unrecognised field is still missed', () => {
+    // Asserts the WRONG behaviour on purpose. The pattern matches, but "be"/"me"
+    // need corroborating context, and the only corroboration available is a
+    // FIELD_VOCAB hit or the literal word "degree". FIELD_VOCAB is 14 US-skewed
+    // entries, so "Electronics and Communication" and "Structural Engineering"
+    // — two of the commonest Indian engineering disciplines — do not qualify.
+    //
+    // The fix is expanding FIELD_VOCAB, not touching DEGREE_PATTERNS.
+    expect(degrees('Education\nBE in Electronics and Communication, Anna University')).toEqual([]);
+    expect(degrees('Education\nM.E. in Structural Engineering, IIT Madras, 2019')).toEqual([]);
+
+    // ...and both are found the moment the field IS recognised, which is what
+    // localises the defect to the vocabulary rather than the pattern.
+    expect(degrees('Education\nBE in Computer Science, Anna University, 2016')).toEqual([
+      'bachelor/computer-science',
+    ]);
+  });
+});
