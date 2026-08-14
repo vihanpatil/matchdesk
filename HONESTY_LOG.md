@@ -2079,3 +2079,161 @@ vertical-gap heuristic. Section detection reads structure, so a fixture cannot
 assume one expected text across both formats. Whether the PDF extractor
 _should_ infer a break from a vertical gap is a real question about
 `pdfExtractor.ts` and is **not** being answered here.
+
+---
+
+## 2026-08-13 — Phase 3: the fixture corpus, text tier
+
+### H-062 · The PDF line model rests entirely on one pdfjs flag, and that is unmeasured
+
+`pdfExtractor.ts` reconstructs lines in two lines of code:
+
+```js
+pageText += item.str;
+pageText += item.hasEOL ? '\n' : ' ';
+```
+
+A PDF has no concept of a line — only glyph runs at coordinates — so line
+structure is inference, and **the whole inference is delegated to pdfjs's
+`hasEOL`.** There is no vertical-gap fallback.
+
+**Named failure mode, so it is falsifiable rather than a vague worry.** If
+`hasEOL` is ever wrong on a real document, two logical lines join with a space.
+A joined section header — `"Skills TypeScript, Python"` — no longer matches
+`detectSections`, which requires a header to be the WHOLE trimmed line. The
+section disappears and everything under it is absorbed by the previous one.
+**That is H-028 D1 exactly**, the defect that cost a candidate 53 points.
+
+**Status: unmeasured hypothesis, not a finding.** On generated fixtures pdfjs
+flags every line correctly, verified. Real CVs come from Word, LaTeX and
+InDesign and their behaviour here is simply unknown to us — and ADR-014 forbids
+committing a real CV to find out. Under ADR-023 an unmeasured worry is not a
+wrong-score defect, so **this does not block**.
+
+**Decision (user, 2026-08-13): record, do not act.** Rejected for now: adding a
+vertical-gap heuristic. It would change the exact string every evidence span is
+computed against, in response to a risk nobody has demonstrated — and
+`pdfExtractor.ts` carries an explicit comment that nothing may normalise its
+output for that reason. The Phase 5 adversarial verifier is the right party to
+attack this, because it did not write the extractor.
+
+**Two adjacent things WERE measured, and both came out clean:**
+
+- Same-line runs split mid-word — routine in real PDFs when a font changes —
+  do **not** gain a space. `"Java"` + `"Script"` drawn adjacently came back as
+  one item, `"JavaScript"`. pdfjs merges visually contiguous runs itself, so
+  the feared `java` fabrication does not arise by this route.
+- PDF text always ends with a trailing separator, because the join appends one
+  after every item including the last. Left as is, deliberately: trimming would
+  shift offsets for a cosmetic gain. Fixtures expect it.
+
+### H-063 · E5 rests on a classification that was never performed
+
+**This one is gate-relevant and I want it stated plainly.**
+
+H-055 records: _"E5 is now unblocked. H-052 was the only open wrong-score
+entry."_ That sentence is only true if none of H-028's still-open D8 sub-items
+is wrong-score. **Those items were never classified under ADR-023's three-way
+split** — they were filed under the heading _"D8 — Lower severity, still real"_,
+and that wording predates ADR-023, which is the ADR that created the split.
+"Lower severity" was a judgement made against a scheme that did not yet exist.
+
+Reproduced while writing the `d4b` fixture:
+
+```
+"AWS Certified Solutions Architect - Associate"    -> aws-saa
+"AWS Certified Solutions Architect - Professional" -> aws-saa
+```
+
+Two distinct credentials collapse to one id, silently, and the recruiter is
+shown the base name for both.
+
+**My assessment, with the reasoning exposed so it can be attacked:** this is
+**coverage-gap**, not wrong-score, on one specific and checkable argument — the
+gazetteer contains no Professional id, so a job cannot express "Professional
+required" either, and therefore no score can currently differ because of the
+collapse. **That argument is load-bearing and fragile.** Add one level-bearing
+certification id and the same behaviour becomes wrong-score, because a
+candidate holding the Associate would then satisfy a must-have meaning
+Professional.
+
+**What is NOT resolved:** the other D8 sub-items — `confidence` computed and
+never read, evidence spans being order-dependent, an empty-requirement job
+marking everyone eligible, `migrate.ts` `localeCompare` — have still not been
+triaged under the split. **Until they are, E5's "zero open wrong-score entries"
+is an assumption, not a measurement.** I am not silently downgrading E5; I am
+recording that its basis was never established. Triaging them is the honest
+prerequisite to claiming E5, and it belongs to whoever next asserts the gate.
+
+Pinned meanwhile by `gap-certification-level-variants-collapse`, which asserts
+the WRONG behaviour on purpose so it cannot be lost.
+
+### H-064 · A snapshot that claimed to include spans, and did not
+
+The corpus snapshot serialiser carried a comment stating that evidence spans
+were included, because they are the mechanism behind the product's central
+promise. It serialised only the span's **text**.
+
+Two attributes at different offsets with identical surface text — and the
+baseline fixture has exactly that, `TypeScript` appearing in both the
+experience prose and the skills list — produced identical snapshot entries. **A
+span that slid from one occurrence to the other would have changed nothing in
+the snapshot.** That is the H-028 D4 shape, an in-bounds span pointing at the
+wrong place, and the guard written specifically to catch it could not have.
+
+Found by reading the generated snapshot instead of accepting it. Now records
+`start..end` alongside the quoted evidence: the text keeps it reviewable, the
+offsets make it sound.
+
+**The general rule:** a snapshot nobody reads is not an endorsed answer, it is
+a record of current behaviour with a reassuring name.
+
+### H-065 · Correction to H-059's blank-line note
+
+The Phase 2 entry stated that because the PDF and DOCX text differ over blank
+lines, and "section detection reads structure", fixtures could not assume one
+expected text across formats. **The conclusion is right and the reason given
+was wrong.**
+
+`sections.ts` line 90 is `if (trimmed.length === 0) continue;` — blank lines are
+explicitly skipped. No extractor uses them: `bullets.ts` splits into non-empty
+lines and nothing anywhere keys on `\n\n`. Measured end to end, the same CV in
+both formats produced **identical sections and identical attributes**.
+
+So the difference is real in the text and inert in the engine. It constrains
+only raw-text snapshots and span offsets, which are per-document anyway. The
+overstatement is corrected here rather than edited out of H-059, since both
+logs are append-only.
+
+### Phase 3 record
+
+**13 fixtures, 26 tests, `pnpm verify` exit 0, 772 tests, floor 746 → 772.**
+Eleven pin a known wrong-score defect class, one pins a documented gap, one is
+the clean baseline whose job is to fail when a fix for an edge case breaks the
+ordinary case.
+
+Each fixture carries both targeted claims — **written from what is correct, not
+from what the engine printed** — and a full snapshot including spans.
+
+**The corpus failed on its first run.** `d3` asserted that a CV naming no
+technology yields no skill; the engine returned `stakeholder-management`. The
+engine was right and the fixture was wrong — the document says "stakeholder
+management" in plain words and it is a real taxonomy entry. **Corrected to the
+exact expected set rather than loosened**, which is strictly stronger than the
+original: any fabricated skill now fails, including one nobody thought to name.
+The three assertions that mattered — no `r`, no `go`, no `c` — passed, so D3
+is confirmed fixed rather than merely believed fixed.
+
+**Infrastructure changes this required**, both stated because they widen what
+the gates cover: `fixtures/**/*.test.mjs` added to the vitest include, and
+`fixtures/**/*.mjs` added to `tsconfig.scripts.json` — the latter for H-059's
+reason, that `checkJs` is what catches a silently-ignored option, and a fixture
+which quietly tests nothing looks exactly like one that passes.
+`@matchdesk/core` is now a root devDependency so `fixtures/` can resolve it;
+it is a workspace link, so no new third-party code enters the tree.
+
+**Deferred to Phase 4, recorded so neither is lost:** the PDF-versus-DOCX
+format-parity metamorphic relation (approved by the user this session — it
+needs binaries, so it belongs with the binary tier), and
+`scripts/build-fixtures.mjs`, the CLI that writes fixtures to disk for a human
+to open, for the same reason.

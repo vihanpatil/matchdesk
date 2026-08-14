@@ -1,0 +1,365 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`corpus · text tier · full snapshots > baseline-clean-cv · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "Jan 2020 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "6.6",
+    "span": "75..93",
+    "years": 6.6,
+  },
+  {
+    "canonicalId": "typescript",
+    "evidence": "TypeScript",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "typescript",
+    "span": "137..147",
+  },
+  {
+    "canonicalId": "python",
+    "evidence": "Python",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "python",
+    "span": "152..158",
+  },
+  {
+    "evidence": "Jun 2017 - Dec 2019",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "2.5",
+    "span": "188..207",
+    "years": 2.5,
+  },
+  {
+    "canonicalId": "postgresql",
+    "evidence": "PostgreSQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "postgresql",
+    "span": "219..229",
+  },
+  {
+    "canonicalId": "docker",
+    "evidence": "Docker",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "docker",
+    "span": "244..250",
+  },
+  {
+    "degreeLevel": "bachelor",
+    "evidence": "BSc",
+    "field": null,
+    "kind": "education",
+    "normalized": "bachelor",
+    "span": "276..279",
+  },
+  {
+    "canonicalId": "typescript",
+    "evidence": "TypeScript",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "typescript",
+    "span": "306..316",
+  },
+  {
+    "canonicalId": "python",
+    "evidence": "Python",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "python",
+    "span": "318..324",
+  },
+  {
+    "canonicalId": "postgresql",
+    "evidence": "PostgreSQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "postgresql",
+    "span": "326..336",
+  },
+  {
+    "canonicalId": "docker",
+    "evidence": "Docker",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "docker",
+    "span": "338..344",
+  },
+  {
+    "canonicalId": "aws",
+    "evidence": "AWS",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "aws",
+    "span": "346..349",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > d1-unrecognised-section-header · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "Jan 2020 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "6.6",
+    "span": "71..89",
+    "years": 6.6,
+  },
+  {
+    "canonicalId": "python",
+    "evidence": "Python",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "python",
+    "span": "136..142",
+  },
+  {
+    "evidence": "Mar 2016 - Dec 2019",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "3.8",
+    "span": "187..206",
+    "years": 3.8,
+  },
+  {
+    "canonicalId": "postgresql",
+    "evidence": "PostgreSQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "postgresql",
+    "span": "218..228",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > d2-longest-match-does-not-swallow · extraction is unchanged 1`] = `
+[
+  {
+    "canonicalId": "rails",
+    "evidence": "Ruby on Rails",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "rails",
+    "span": "21..34",
+  },
+  {
+    "canonicalId": "ruby",
+    "evidence": "Ruby on Rails",
+    "kind": "skill",
+    "matchType": "alias",
+    "normalized": "ruby",
+    "span": "21..34",
+  },
+  {
+    "canonicalId": "postgresql",
+    "evidence": "PostgreSQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "postgresql",
+    "span": "36..46",
+  },
+  {
+    "canonicalId": "docker",
+    "evidence": "Docker",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "docker",
+    "span": "48..54",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > d3-name-never-manufactures-a-skill · extraction is unchanged 1`] = `
+[
+  {
+    "canonicalId": "stakeholder-management",
+    "evidence": "stakeholder management",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "stakeholder-management",
+    "span": "94..116",
+  },
+  {
+    "evidence": "Jan 2021 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "5.6",
+    "span": "167..185",
+    "years": 5.6,
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > d4a-job-title-is-not-a-degree · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "Feb 2022 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "4.5",
+    "span": "74..92",
+    "years": 4.5,
+  },
+  {
+    "canonicalId": "java",
+    "evidence": "Java",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "java",
+    "span": "111..115",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > d4b-certification-level-is-not-a-degree · extraction is unchanged 1`] = `
+[
+  {
+    "canonicalId": "aws",
+    "evidence": "AWS",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "aws",
+    "span": "34..37",
+  },
+  {
+    "canonicalId": "aws-saa",
+    "evidence": "AWS Certified Solutions Architect",
+    "kind": "certification",
+    "normalized": "aws-saa",
+    "span": "34..67",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > d4c-prose-is-not-a-degree · extraction is unchanged 1`] = `[]`;
+
+exports[`corpus · text tier · full snapshots > d5-education-dates-are-not-employment · extraction is unchanged 1`] = `
+[
+  {
+    "degreeLevel": "bachelor",
+    "evidence": "BSc",
+    "field": null,
+    "kind": "education",
+    "normalized": "bachelor",
+    "span": "27..30",
+  },
+  {
+    "degreeLevel": "master",
+    "evidence": "MSc",
+    "field": null,
+    "kind": "education",
+    "normalized": "master",
+    "span": "61..64",
+  },
+  {
+    "evidence": "Jan 2024 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "2.6",
+    "span": "149..167",
+    "years": 2.6,
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > d5b-explicit-claim-not-summed-with-ranges · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "10 years of experience",
+    "isExplicitStatement": true,
+    "kind": "years_experience",
+    "normalized": "10",
+    "span": "23..45",
+    "years": 10,
+  },
+  {
+    "evidence": "Jan 2016 - Jan 2026",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "10",
+    "span": "114..133",
+    "years": 10,
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > d5c-quantity-is-not-a-date-range · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "Jan 2023 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "3.6",
+    "span": "62..80",
+    "years": 3.6,
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > gap-certification-level-variants-collapse · extraction is unchanged 1`] = `
+[
+  {
+    "canonicalId": "aws",
+    "evidence": "AWS",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "aws",
+    "span": "34..37",
+  },
+  {
+    "canonicalId": "aws-saa",
+    "evidence": "AWS Certified Solutions Architect",
+    "kind": "certification",
+    "normalized": "aws-saa",
+    "span": "34..67",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > h034-invisible-characters-fabricate-nothing · extraction is unchanged 1`] = `
+[
+  {
+    "canonicalId": "javascript",
+    "evidence": "Java​Script",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "javascript",
+    "span": "21..32",
+  },
+  {
+    "canonicalId": "postgresql",
+    "evidence": "Postgre­SQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "postgresql",
+    "span": "34..45",
+  },
+  {
+    "canonicalId": "docker",
+    "evidence": "Doc﻿ker",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "docker",
+    "span": "47..54",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > h040-overlapping-roles-not-double-counted · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "Jan 2020 - Jan 2026",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "6",
+    "span": "66..85",
+    "years": 6,
+  },
+]
+`;

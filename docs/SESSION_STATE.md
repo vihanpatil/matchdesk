@@ -8,7 +8,7 @@ code is right and this file is a bug** — fix it.
 recording this file follows it). Working tree clean, `pnpm verify` exit 0,
 re-run twice on this date — see H-058 before quoting any branch-coverage figure.
 
-**Current work: the E3 fixture corpus, Phases 1-2 of 6 complete.** The phase plan
+**Current work: the E3 fixture corpus, Phases 1-3 of 6 complete.** The phase plan
 lives outside this repo in the user's private notes; the phases are
 (1) ADR-025 + ADR-026, (2) fixture generator, (3) ~12 text fixtures,
 (4) ~5 binary + refusal fixtures → **E3 MET**, (5) adversarial round 1,
@@ -76,9 +76,9 @@ work until it is done** (ADR-018).
 | `pnpm lint`          | pass                                                       |
 | `pnpm format:check`  | pass                                                       |
 | `pnpm license:audit` | pass (1 waiver: `duck@0.1.12`, ADR-016)                    |
-| `pnpm test:cov`      | **746 passed / 43 files**, none skipped, manifest complete |
+| `pnpm test:cov`      | **772 passed / 44 files**, none skipped, manifest complete |
 
-Coverage after Phase 2: **98.90% statements, ~93.1-93.4% branches, 100%
+Coverage after Phase 3: **98.90% statements, ~93.1-93.4% branches, 100%
 functions** repo-wide. **The branch figure is a range on purpose (H-058):** no
 `fast-check` seed is pinned, so property tests reach a slightly different branch
 set each run — 638/684 and 639/684 were both observed on 2026-08-13 from an
@@ -189,28 +189,31 @@ accident:
 
 ## 5. Open items — nothing here is signed off
 
-| ID    | Item                                          | Why it matters                                                           |
-| ----- | --------------------------------------------- | ------------------------------------------------------------------------ |
-| H-002 | Cross-machine determinism not guaranteed      | Limits C4; mitigated by 6dp quantization, not solved                     |
-| H-007 | Section 7 LLM validator can't do what's asked | Catches fabricated entities, not fabricated relations                    |
-| H-008 | OCR budget unmeasured (matrix half CLOSED)    | Matrix first fill measured at 0.34 s (H-046). OCR + embeddings untouched |
-| H-015 | `--no-verify` bypasses hooks                  | Unfixable client-side; CI is the backstop                                |
-| H-020 | ~~Stale `dist/` survives a failing compile~~  | **CLOSED** — went live on the first import, mitigated + verified (H-047) |
-| H-033 | ~~Degree guard context-window dependent~~     | **CLOSED** — lower-case "as" rejected; pinned by R10 (H-042)             |
-| H-034 | ~~Invisible characters~~                      | **CLOSED** — they FABRICATED skills, not just broke extraction (H-042)   |
-| H-036 | 378 mutation survivors (was 607)              | `explain.ts` 28.93% → 73.68%; 55 survivors left, still the largest block |
-| H-040 | Tenure understated when ranges don't parse    | A 3-year parsed role beats a 20-year claim. Needs an `explain.ts` caveat |
-| H-041 | Mixed-language veto abstains on terse CVs     | A terse BILINGUAL CV is still scored. 4 of 10 held-out CVs are silent    |
-| H-051 | ~~E2 FAILS — 9 of 12 defects unpinned~~       | **CLOSED** — R10/R17-R20, R-L1-R-L3 and 9 new properties (H-055)         |
-| H-052 | ~~Stored evidence drifts from the score~~     | **CLOSED** — attributes never persisted; scores reproducible (ADR-024)   |
-| H-053 | `<degree> of <field>` is ambiguous            | "Associate of Engineering" has the same shape as a real degree           |
-| H-056 | `roundHalfUp` bound breaks above ~1e9         | Outside the scoring domain; do NOT reuse this function elsewhere         |
-| H-058 | Branch coverage not reproducible run to run   | No `fast-check` seed pinned. Every recorded figure is ±1 branch minimum  |
-| H-059 | Fixture determinism needed 3 fixes, not 1     | `docx` SILENTLY IGNORES `created`/`modified`; only `checkJs` caught it   |
-| H-060 | A negative test that could not fire           | 21-byte buffer never entered the scan it tested. H-052's shape again     |
-| H-061 | `PDFDocument.load` restamps dates on read     | Defaults `updateMetadata: true`. Assert with it OFF, never on raw bytes  |
-| D7    | audit_log `INSERT OR REPLACE` bypass          | Integrity defect, not wrong-score — E2 does not apply. Still open        |
-| H-044 | Manifest completeness is unverifiable         | Floor guard blocks the accident; a hand-edited manifest still passes     |
+| ID    | Item                                          | Why it matters                                                               |
+| ----- | --------------------------------------------- | ---------------------------------------------------------------------------- |
+| H-002 | Cross-machine determinism not guaranteed      | Limits C4; mitigated by 6dp quantization, not solved                         |
+| H-007 | Section 7 LLM validator can't do what's asked | Catches fabricated entities, not fabricated relations                        |
+| H-008 | OCR budget unmeasured (matrix half CLOSED)    | Matrix first fill measured at 0.34 s (H-046). OCR + embeddings untouched     |
+| H-015 | `--no-verify` bypasses hooks                  | Unfixable client-side; CI is the backstop                                    |
+| H-020 | ~~Stale `dist/` survives a failing compile~~  | **CLOSED** — went live on the first import, mitigated + verified (H-047)     |
+| H-033 | ~~Degree guard context-window dependent~~     | **CLOSED** — lower-case "as" rejected; pinned by R10 (H-042)                 |
+| H-034 | ~~Invisible characters~~                      | **CLOSED** — they FABRICATED skills, not just broke extraction (H-042)       |
+| H-036 | 378 mutation survivors (was 607)              | `explain.ts` 28.93% → 73.68%; 55 survivors left, still the largest block     |
+| H-040 | Tenure understated when ranges don't parse    | A 3-year parsed role beats a 20-year claim. Needs an `explain.ts` caveat     |
+| H-041 | Mixed-language veto abstains on terse CVs     | A terse BILINGUAL CV is still scored. 4 of 10 held-out CVs are silent        |
+| H-051 | ~~E2 FAILS — 9 of 12 defects unpinned~~       | **CLOSED** — R10/R17-R20, R-L1-R-L3 and 9 new properties (H-055)             |
+| H-052 | ~~Stored evidence drifts from the score~~     | **CLOSED** — attributes never persisted; scores reproducible (ADR-024)       |
+| H-053 | `<degree> of <field>` is ambiguous            | "Associate of Engineering" has the same shape as a real degree               |
+| H-056 | `roundHalfUp` bound breaks above ~1e9         | Outside the scoring domain; do NOT reuse this function elsewhere             |
+| H-058 | Branch coverage not reproducible run to run   | No `fast-check` seed pinned. Every recorded figure is ±1 branch minimum      |
+| H-059 | Fixture determinism needed 3 fixes, not 1     | `docx` SILENTLY IGNORES `created`/`modified`; only `checkJs` caught it       |
+| H-060 | A negative test that could not fire           | 21-byte buffer never entered the scan it tested. H-052's shape again         |
+| H-061 | `PDFDocument.load` restamps dates on read     | Defaults `updateMetadata: true`. Assert with it OFF, never on raw bytes      |
+| H-062 | PDF line model rests entirely on `hasEOL`     | No vertical-gap fallback. A merged header deletes a section = D1. Unmeasured |
+| H-063 | **E5's basis was never established**          | D8 sub-items never triaged under ADR-023's split. E5 is an assumption        |
+| H-064 | Snapshot claimed to include spans, did not    | Only the span TEXT. A span sliding between identical words was invisible     |
+| D7    | audit_log `INSERT OR REPLACE` bypass          | Integrity defect, not wrong-score — E2 does not apply. Still open            |
+| H-044 | Manifest completeness is unverifiable         | Floor guard blocks the accident; a hand-edited manifest still passes         |
 
 **From H-028, still open:** D7 audit-log `REPLACE` bypass; D8 (negative weights
 unvalidated, `confidence` computed but never read, evidence spans
@@ -331,21 +334,30 @@ wrong numbers invites trust the tool has not earned.
    Phase 3 — with no definitions it would be dead code.
    **Phase 3 must design around this:** the same definition does NOT yield the
    same text in both formats. Blank lines survive in DOCX and vanish in PDF.
-10. **Section 9.2 fixture corpus (E3)** — Phases 3-4. Generator
-    (`scripts/build-fixtures.mjs`, deterministic, byte-identical on
-    regeneration, timestamps suppressed) → ~12 text fixtures, one per known
-    wrong-score defect class plus a clean baseline → ~5 real PDF/DOCX fixtures
-    plus documented-refusal fixtures for known coverage gaps. Every fixture gets
-    **both** targeted per-defect assertions and a committed full snapshot.
-    **E3 is MET at the end of Phase 4.**
-11. **Adversarial rounds (E1)** — Phases 5-6. An independent Opus verifier that
+10. ~~Text tier of the corpus.~~ **Done — Phase 3.** `fixtures/corpus/`, 13
+    fixtures, 26 tests: 11 wrong-score defect classes, 1 documented gap, 1 clean
+    baseline. Each carries targeted claims written from what is CORRECT plus a
+    full snapshot with spans. **It failed on its first run** — `d3` expected no
+    skills, the engine returned `stakeholder-management`, and the ENGINE was
+    right; corrected to an exact expected set, which is stronger than the
+    original. Also **H-062** (the PDF line model rests entirely on pdfjs
+    `hasEOL`; recorded, deliberately not acted on), **H-063** (**E5's basis was
+    never established** — read it before asserting the gate), **H-064** (the
+    snapshot claimed to include spans and did not), **H-065** (corrects H-059's
+    blank-line reasoning: blank lines are inert, sections skip them).
+11. **Binary tier + E3** — Phase 4. `scripts/build-fixtures.mjs` (the CLI, still
+    unwritten), ~5 real PDF/DOCX fixtures through the FULL pipeline, plus
+    documented-refusal fixtures. **Also owed here: the PDF-vs-DOCX format-parity
+    metamorphic relation** — measured to hold on 2026-08-13, agreed with the
+    user, not yet written. **E3 is MET at the end of Phase 4.**
+12. **Adversarial rounds (E1)** — Phases 5-6. An independent Opus verifier that
     did not author the corpus, attacking the engine plus the corpus, triaged by
     ADR-023's three-way severity split. Two consecutive clean rounds meet E1;
     any wrong-score finding resets the counter to zero. If both find defects,
     **ADR-025 fires.**
-12. **Then** `apps/web`: Jobs, Candidates, Shortlist. React 19 + Vite +
+13. **Then** `apps/web`: Jobs, Candidates, Shortlist. React 19 + Vite +
     Tailwind 4 + Radix, TanStack Query/Table.
-13. Fastify API over the pipeline; launcher script (ADR-013); then the
+14. Fastify API over the pipeline; launcher script (ADR-013); then the
     remaining directive phases (matrix, PDF report, LLM narrative, hardening).
 
 ---

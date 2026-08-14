@@ -14,5 +14,10 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext"
   },
-  "include": ["scripts/**/*.mjs", "scripts/**/*.js"]
+  /* `fixtures/` is included for the same reason `scripts/` is: H-059 was a
+     silently-ignored constructor option that ONLY `checkJs` caught. Fixture
+     definitions are the last place an undetected typo should be able to hide,
+     since a fixture that quietly tests nothing looks exactly like one that
+     passes. */
+  "include": ["scripts/**/*.mjs", "scripts/**/*.js", "fixtures/**/*.mjs"]
 }

@@ -11,6 +11,9 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.8.1(supports-color@7.2.0))
+      '@matchdesk/core':
+        specifier: workspace:*
+        version: link:packages/core
       '@stryker-mutator/core':
         specifier: 9.6.1
         version: 9.6.1(@types/node@26.2.0)(supports-color@7.2.0)

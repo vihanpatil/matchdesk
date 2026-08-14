@@ -16,7 +16,14 @@ export default defineConfig({
   },
   test: {
     globals: false,
-    include: ['{apps,packages}/*/src/**/*.test.{ts,mts,cts}', 'scripts/**/*.test.mjs'],
+    /* `fixtures/` is the Section 9.2 corpus (ADR-023 E3). It lives outside
+       apps/ and packages/ on purpose: it is test data, not product code, and
+       must never be reachable from anything that ships. */
+    include: [
+      '{apps,packages}/*/src/**/*.test.{ts,mts,cts}',
+      'scripts/**/*.test.mjs',
+      'fixtures/**/*.test.mjs',
+    ],
 
     /* Section 0.2.2, first line of defence: a `.only` anywhere fails the run
        outright rather than quietly narrowing it. Enforced by the runner, so
