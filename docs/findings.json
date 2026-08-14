@@ -240,7 +240,7 @@
       "id": "H-041",
       "severity": "wrong-score",
       "status": "open",
-      "note": "NARROWED but still WRONG-SCORE (ADR-029). The prose-gated line window took held-out CVs with no judgeable segment from 4/10 to 1/10 at zero false refusals, and the bilingual defect is now caught in PDF and DOCX down to 11.2% foreign content. RESIDUAL: a pure-header CV (no prose line anywhere, e.g. logistics_headers) is still unjudged and therefore still scored if bilingual. Closing it needs the refuse-vs-caveat product decision, not a detector change."
+      "note": "NARROWED but still WRONG-SCORE (ADR-029). The prose-gated line window took held-out CVs with no judgeable segment from 4/10 to 1/10 at zero false refusals, and the bilingual defect is now caught in PDF and DOCX down to 11.2% foreign content. RESIDUAL: a pure-header CV (no prose line anywhere, e.g. logistics_headers) is still unjudged and therefore still scored if bilingual. Closing it needs the refuse-vs-caveat product decision, not a detector change. RESIDUAL MEASURED (H-079): the prose gate is English/Romance-biased. German capitalises every noun, so German header lines are skipped as soup and a German-English bilingual header CV is SCORED at every proportion tested down to 3.8%. Refusing on judgedSegmentCount===0 closes it but costs 3/18 English CVs and refuses headers_plus_tech_only, which the eval REQUIRES to pass (H-080)."
     },
     {
       "id": "H-042",
@@ -452,6 +452,18 @@
       "severity": "process",
       "status": "closed",
       "note": "The H-041 fix is a narrowing (4/10 -> 1/10 unjudged), not a closure. I measured it before the prose gate landed and briefly recorded it as fixing all four; a test I had just written caught the overstatement."
+    },
+    {
+      "id": "H-079",
+      "severity": "process",
+      "status": "closed",
+      "note": "The prose gate added in ADR-029 is English/Romance-biased; German noun capitalisation defeats it and a German-English bilingual header CV is scored. H-022's shape."
+    },
+    {
+      "id": "H-080",
+      "severity": "process",
+      "status": "closed",
+      "note": "Refusing on zero language evidence closes the German residual but costs 3/18 English CVs and violates the eval's standing requirement that headers_plus_tech_only passes. I quoted 10% to the user from the held-out set alone before checking the in-corpus set."
     }
   ]
 }

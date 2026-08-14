@@ -2837,3 +2837,76 @@ meant the document was scored unchecked.
 **NOT landed:** H-040 is untouched, and H-041's residual is open. Both wait on
 one product question — refuse, or score with a caveat — which has measured
 costs on both sides and is not the lead's call.
+
+### H-079 · The prose gate is English/Romance-biased, and German defeats it
+
+Asked to shrink H-041's residual before paying for a refusal, I tried to
+construct the failure rather than argue it was absent. **The first three
+attempts could not produce a scored bilingual header CV**, and I nearly
+recorded the residual as unreachable:
+
+```
+English header CV (baseline)       wholeDoc=true   judged=0  => scored (correct, it IS English)
+Half-French header CV              wholeDoc=false  judged=1  => REFUSED
+Mostly-French header CV            wholeDoc=false  judged=2  => REFUSED
+Header CV + one French prose line  wholeDoc=true   judged=2  => REFUSED
+```
+
+Even the adversarial shape — a long English header CV massed to dominate the
+whole-document classifier, plus a small French header block — was refused down
+to **3.2%** foreign content.
+
+**The reason is structural, and it is exactly why the gate is biased.** Romance
+languages put lowercase function words inside noun phrases (`Gestion **des**
+entrepots`, `Diplome **en** gestion **de la** chaine`), so French header lines
+clear a gate built to skip English header soup, which is Title Case compounds.
+
+**German capitalises every noun.** So German header lines look like header soup
+to my gate and are skipped:
+
+```
+  EN reps  foreign%   wholeDoc  judged  veto   outcome
+     1     29.7%      true         0    false  SCORED  <-- wrong-score path
+     4     10.4%      true         0    false  SCORED
+    12      3.8%      true         0    false  SCORED
+```
+
+**A German-English bilingual header CV is scored at every proportion tested.**
+The residual is real and reachable.
+
+**This is H-022's shape.** H-022 was "every test used American degree forms".
+This is "the prose heuristic was calibrated on English and Romance prose", and
+it took an adversarial construction in a language I had not tried to expose it.
+Dutch and the Scandinavian languages share German's compounding and are likely
+affected; **not measured, and I am not claiming they are safe.**
+
+### H-080 · Closing the residual costs more than I quoted, and breaks a standing requirement
+
+The obvious close is to refuse when `judgedSegmentCount === 0` — no language
+evidence at all, so no English claim can be made. **It works**: every German
+case above becomes REFUSED.
+
+**The cost is higher than the 10% I put in front of the user:**
+
+```
+held-out ENGLISH CVs newly refused:  1/10  [logistics_headers]
+in-corpus ENGLISH CVs newly refused: 2/8   [skills_list_2, headers_plus_tech_only]
+                                     ----
+                                     3/18  = 17%
+```
+
+**And `headers_plus_tech_only` is a document the eval file requires to pass.**
+H-041 already recorded it as "real English CV, eval requires it to pass" when
+it rejected margin thresholds for the same reason. So this is not a cost to
+weigh — it is a standing requirement the rule would violate.
+
+**I quoted 10% from the held-out set alone and did not check the in-corpus set
+before asking.** The number reached the user one question too early. Corrected
+here rather than quietly in the next message.
+
+**Where that leaves H-041:** narrowed from 4/10 to 1/10 unjudged, the bilingual
+prose defect closed in FR and ES across PDF and DOCX, and **a real remaining
+wrong-score path for German-style header CVs**. It stays wrong-score and E5
+stays blocked on it. The next move is a better discriminator for
+language-neutral versus language-bearing tokens, not a refusal rule — because
+the refusal rule contradicts an existing requirement.
