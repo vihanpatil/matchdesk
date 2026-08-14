@@ -37,24 +37,39 @@ when their earlier role and degree are written in Spanish and **100 and
 eligible** in English — and the recruiter is told "Requires at least 9 years of
 experience; found 4.8" about someone with 9.1 years. `warnings: []`.
 
-**Two findings block E5, both wrong-score, both the same shape.** The triage
-of 2026-08-13 is done and **zero findings are now unclassified**:
+**E5 has ONE blocker left: H-041's German residual.** Run `pnpm gate` for the
+live count; as of this commit:
 
-- **H-041** — mixed-language veto silent below 15-word lines (ADR-027).
-- **H-040** — **newly classified wrong-score.** Measured: the same person with
-  the same dates scores **19.6 years / 100 / eligible** when an old employer
-  wrote `Mar 2006 - Aug 2016`, and **2.9 years / 66 / INELIGIBLE** when they
-  wrote `03.2006 - 08.2016`. The engine extracts the explicit 20-year claim
-  and discards it, then reports "found 2.9". See H-040's entry.
-- **H-002 — triaged OUT.** Not wrong-score: the ORT mechanism it describes does
-  not exist in the engine, and that basis is now **pinned by
-  `scripts/core-determinism.test.mjs`**, which fails if a transcendental, an
-  exponentiation operator or an inference runtime enters core. **A failure
-  there means re-triage H-002, not relax the test.**
+- **H-040 — CLOSED (ADR-029, H-081).** When a discarded explicit tenure claim
+  would flip the eligibility verdict, `scoreCandidate` raises a blocking
+  `Reservation` and `scoreStoredPair` refuses to persist a match. Materiality
+  is computed by re-running the experience gate with the discarded claim.
+  **Residual, stated:** a non-blocking reservation can still move the score and
+  rank order silently.
+- **H-041 — NARROWED, still wrong-score.** The prose-gated line window took
+  held-out CVs with no judgeable segment from 4/10 to 1/10 at **zero** false
+  refusals, and catches bilingual prose in FR and ES, PDF and DOCX, down to
+  11.2% foreign content.
+- **H-002 — triaged out**, pinned by `scripts/core-determinism.test.mjs`.
 
-**H-040 and H-041 are one problem wearing two hats** — the engine emitting a
-confident number while silently discarding something it knows it could not
-account for. **Design one remedy for both**, and measure it before choosing.
+**THE REMAINING DEFECT, and it is a specific one (H-079).** The prose gate is
+**English/Romance-biased**. Romance header lines carry lowercase function words
+(`Gestion **des** entrepots`) and clear the gate; **German capitalises every
+noun**, so German header lines look like header soup and are skipped. A
+German-English bilingual header CV is **scored at every proportion tested, down
+to 3.8%**. Dutch and Scandinavian share German's compounding and are **not
+measured** — do not assume they are safe.
+
+**The obvious fix is ruled out, with numbers (H-080).** Refusing when
+`judgedSegmentCount === 0` closes the German case completely, but costs **3 of
+18** English CVs and refuses `headers_plus_tech_only`, **which the eval file
+requires to pass**. That is a standing requirement, not a cost to trade.
+
+**So the next move is a better discriminator**, not a refusal rule: something
+that separates language-NEUTRAL tokens (proper nouns, acronyms, technology
+names) from language-BEARING ones, without assuming lowercase means prose.
+Measure any candidate against both the ten held-out and eight in-corpus English
+CVs — H-080 exists because I quoted a cost from the held-out set alone.
 
 **The code: choose and measure the remedy.** Deliberately left open (user's
 call — "classify now, choose the fix next"). For H-041 the three candidates,
