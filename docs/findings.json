@@ -512,6 +512,30 @@
       "severity": "coverage-gap",
       "status": "open",
       "note": "Indian degrees B.E./M.E./MCA/BCA/PGDM extracted NOTHING, scoring real candidates 50 and INELIGIBLE with 'Requires at least a bachelor degree'. Patterns added and false-positive guards verified for the ordinary words 'be'/'me'. RESIDUAL: a bare BE/M.E. with a field outside FIELD_VOCAB's 14 US-skewed entries is still missed - 'Electronics and Communication', 'Structural Engineering'. Fix is the vocabulary, not the patterns. Classified coverage-gap per ADR-023's own example (degree-vocabulary gaps), but it FLIPS ELIGIBILITY, so re-triage if that example is ever revisited."
+    },
+    {
+      "id": "H-089",
+      "severity": "wrong-score",
+      "status": "open",
+      "note": "An ambiguous numeric date range (both leading numbers 1-12, e.g. 03/04/2019) silently DELETES an entire role: two-sided ranges yield [] and the recruiter is told a smaller total tenure with warnings: []. Pre-existing, found while measuring Indian date formats (Task B.4). H-040's shape exactly; H-040's remedy shape (surface the disagreement as a Reservation) has NOT been built. B.4 fixed only the unambiguous case (one number in 13-31). NEEDS ADR-015 VERIFIER CONFIRMATION - classified by the lead alone, which ADR-027's precedent says is not sufficient for a gate call."
+    },
+    {
+      "id": "H-090",
+      "severity": "process",
+      "status": "closed",
+      "note": "The B.4 date fix changed live behaviour with experience.test.ts untouched - no test failed without it, so by ADR-028 it was not closed. Caught by reading git status, not the report. Fixed in the same commit: 5 targeted tests, verified 3 fail on revert, 67/67 pass with the fix. Trap 2 from NEXT_PHASE section 5, one session after being written down."
+    },
+    {
+      "id": "H-091",
+      "severity": "process",
+      "status": "open",
+      "note": "Language-ID survey falsified the brief's premise: franc catches only 10/13 Germanic sub-floor lines, consistent with it being the same trigram method as the existing Cavnar & Trenkle code. eld@2.1.0 measured best (13/13, 9/96). Licence, C4 determinism (zero real Math.* calls) and C2 offline verified independently by the lead. cld3-asm rejected: emscripten-wasm-loader@3.0.3 has NO LICENSE file anywhere, which license-audit.mjs would have silently passed. NO ADR WRITTEN, eld NOT INSTALLED - open until the user decides."
+    },
+    {
+      "id": "H-092",
+      "severity": "process",
+      "status": "open",
+      "note": "eld Phase-1: 64 configurations swept, NO configuration meets the bar. Window granularity = 0/23 false refusals but 0-1/13 Germanic; line granularity + reliable = 13/13 Germanic but 2/23 false refusals. The gap is GEOMETRY, not library accuracy - a trailing sub-floor line never forms a window. Valuable side result: eld at window granularity subsumes the whole Cavnar & Trenkle apparatus plus MAX_ENGLISH_MEAN_WORD_LENGTH, ENGLISH_INSTITUTION_WORDS and MIN_FOREIGN_MARGIN at zero measured regression. Decision belongs to the user."
     }
   ]
 }

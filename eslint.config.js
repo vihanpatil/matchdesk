@@ -169,6 +169,12 @@ export default tseslint.config(
       // code nobody wrote. A gate must not be breakable by another gate.
       '**/.stryker-tmp/**',
       '**/reports/**',
+      // Preserved measurement evidence (H-091, H-092), kept verbatim because
+      // the scratchpad it was produced in is ephemeral. Linting it would
+      // reformat it, and reformatted evidence is no longer the artifact that
+      // produced the numbers in the log. Read-only by intent: never imported,
+      // never executed by any gate.
+      'docs/research/**',
     ],
   },
 

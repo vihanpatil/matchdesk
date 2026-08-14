@@ -91,9 +91,47 @@ const AMBIGUOUS_BARE_WORD_FORMS: ReadonlySet<string> = new Set([
   'associates',
 ]);
 
-/** Small controlled vocabulary of fields of study — deliberately never institutions. */
+/**
+ * Small controlled vocabulary of fields of study — deliberately never
+ * institutions.
+ *
+ * **International expansion (B.1, H-088's residual).** The original 14
+ * entries were exclusively US-skewed, so a bare `BE`/`M.E.` in one of the
+ * commonest Indian engineering disciplines had no way to corroborate itself
+ * and extracted nothing — see `AMBIGUOUS_BARE_FORMS` above. The additions
+ * below cover Indian engineering disciplines plus their short-form
+ * abbreviations, alongside realistic alias spellings (an ampersand as well
+ * as "and", with and without a trailing "Engineering").
+ *
+ * **Every short abbreviation added here was checked against ordinary CV
+ * prose before being kept** (see the adversarial cases in
+ * `education.test.ts`, "international field vocabulary"). `canonicalizeField`
+ * only matches when the ENTIRE captured phrase (after trimming to the
+ * nearest stop marker — comma, period, newline, " from "/" at "/" with "/
+ * " - ") equals an alias exactly, not a substring — that materially narrows
+ * the false-positive surface, but does not remove it: "in IT" or "in
+ * mechanical" alone, with nothing else before the next comma or period, is
+ * exactly the shape ordinary prose can produce. Two candidates were tried
+ * and REJECTED for that reason and are deliberately absent:
+ *
+ * - **`it`** — collides with "IT support", "IT department", "IT
+ *   procurement" and similar, which routinely appear as the last item in a
+ *   comma-separated list right after "in"/"of" (e.g. "other duties such as
+ *   IT, vendor management"). `information-technology` therefore keeps only
+ *   the full phrase "information technology".
+ * - **bare `mechanical` / `civil` / `structural` / `instrumentation`** —
+ *   each collides with ordinary engineering-CV prose in the same
+ *   comma-terminated shape ("...gained experience in instrumentation,
+ *   monitoring and alerting", "...focused on mechanical issues, then
+ *   moved to..."). Only the full "<discipline> Engineering" phrasing is
+ *   included for these four.
+ *
+ * `ece`, `eee` and `cse` were kept: none is an ordinary English word or a
+ * common non-degree abbreviation, so the collision risk that sank `it` does
+ * not apply to them — verified adversarially below.
+ */
 const FIELD_VOCAB: readonly { readonly id: string; readonly aliases: readonly string[] }[] = [
-  { id: 'computer-science', aliases: ['computer science', 'cs', 'computer engineering'] },
+  { id: 'computer-science', aliases: ['computer science', 'cs', 'computer engineering', 'cse'] },
   { id: 'business-administration', aliases: ['business administration', 'business'] },
   { id: 'data-science', aliases: ['data science'] },
   { id: 'electrical-engineering', aliases: ['electrical engineering'] },
@@ -107,6 +145,37 @@ const FIELD_VOCAB: readonly { readonly id: string; readonly aliases: readonly st
   { id: 'biology', aliases: ['biology'] },
   { id: 'chemistry', aliases: ['chemistry'] },
   { id: 'physics', aliases: ['physics'] },
+  {
+    id: 'electronics-communication',
+    aliases: [
+      'electronics and communication',
+      'electronics & communication',
+      'electronics and communication engineering',
+      'electronics & communication engineering',
+      'ece',
+    ],
+  },
+  {
+    id: 'electrical-electronics',
+    aliases: [
+      'electrical and electronics',
+      'electrical & electronics',
+      'electrical and electronics engineering',
+      'electrical & electronics engineering',
+      'eee',
+    ],
+  },
+  { id: 'structural-engineering', aliases: ['structural engineering'] },
+  { id: 'civil-engineering', aliases: ['civil engineering'] },
+  {
+    id: 'instrumentation-engineering',
+    aliases: ['instrumentation engineering', 'instrumentation and control engineering'],
+  },
+  {
+    id: 'information-science',
+    aliases: ['information science', 'information science and engineering'],
+  },
+  { id: 'biotechnology', aliases: ['biotechnology', 'biotech'] },
 ];
 
 const FIELD_CAPTURE = /\b(?:in|of)\s+([A-Za-z][A-Za-z&/\- ]{1,60})/i;

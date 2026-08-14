@@ -1,7 +1,7 @@
 import { detectSections, extractAttributes, totalYearsExperience } from '@matchdesk/core';
 import { describe, expect, it } from 'vitest';
 
-import { CORPUS, CORPUS_REFERENCE_DATE } from './definitions.mjs';
+import { CORPUS, CORPUS_REFERENCE_DATE, INDIAN_CV_CORPUS } from './definitions.mjs';
 
 /**
  * The Section 9.2 fixture corpus — TEXT TIER (ADR-023 E3).
@@ -32,7 +32,7 @@ import { CORPUS, CORPUS_REFERENCE_DATE } from './definitions.mjs';
 
 /** @param {string} id */
 function fixture(id) {
-  const found = CORPUS.find((f) => f.id === id);
+  const found = [...CORPUS, ...INDIAN_CV_CORPUS].find((f) => f.id === id);
   if (found === undefined) throw new Error(`no fixture "${id}" in the corpus`);
   return found;
 }
@@ -241,8 +241,135 @@ describe('corpus · text tier · targeted claims', () => {
   });
 });
 
+/**
+ * Task B.2/B.4 (docs/NEXT_PHASE.md) — the Indian CV corpus.
+ *
+ * Every qualification form named in H-088's table, each paired with an
+ * Indian employer/city and at least one Indian date format. See the corpus
+ * comment in `definitions.mjs` for the full rationale and the deliberate
+ * exclusion of the genuinely locale-ambiguous date shape.
+ */
+describe('corpus · text tier · Indian CV corpus (B.2/B.4)', () => {
+  it('indian-be-ece · B.E. in Electronics and Communication resolves to bachelor, and both Indian date formats parse the day unambiguously', () => {
+    const attrs = attributesOf('indian-be-ece-unambiguous-dates');
+    const education = educationOf(attrs);
+    expect(education).toHaveLength(1);
+    expect(education[0]?.degreeLevel).toBe('bachelor');
+    expect(education[0]?.field).toBe('electronics-communication');
+
+    // 13/06/2019 - Present is 7.2y; 15-07-2016 - 20-05-2019 is 2.8y. Both
+    // dates have an unambiguous day (13, 15, 20), so B.4's fix applies to
+    // both the slash and the dash form on the SAME document.
+    expect(totalYearsExperience(attrs)).toBe(10);
+  });
+
+  it('indian-me-structural · M.E. in Structural Engineering resolves to master, and a DD-MM-YYYY range no longer defaults to January', () => {
+    const attrs = attributesOf('indian-me-structural-dash-dates');
+    const education = educationOf(attrs);
+    expect(education).toHaveLength(1);
+    expect(education[0]?.degreeLevel).toBe('master');
+    expect(education[0]?.field).toBe('structural-engineering');
+
+    // 18-02-2014 - 25-11-2021 is 7.8y. Before B.4 this range's month was
+    // silently dropped and both dates defaulted to January, giving 7.9y
+    // instead — a small but silent and unwarned discrepancy.
+    expect(totalYearsExperience(attrs)).toBe(7.8);
+  });
+
+  it('indian-btech-eee · the EEE short form resolves a field, not merely a degree level', () => {
+    const attrs = attributesOf('indian-btech-eee-slash-dates');
+    const education = educationOf(attrs);
+    expect(education).toHaveLength(1);
+    expect(education[0]?.degreeLevel).toBe('bachelor');
+    expect(education[0]?.field).toBe('electrical-electronics');
+  });
+
+  it('indian-mtech-ece · M.Tech in Electronics and Communication Engineering resolves to master', () => {
+    const attrs = attributesOf('indian-mtech-ece-nit');
+    const education = educationOf(attrs);
+    expect(education).toHaveLength(1);
+    expect(education[0]?.degreeLevel).toBe('master');
+    expect(education[0]?.field).toBe('electronics-communication');
+  });
+
+  it('indian-mca · MCA (already recognised, H-088) resolves to master with no field', () => {
+    const education = educationOf(attributesOf('indian-mca-tcs'));
+    expect(education).toHaveLength(1);
+    expect(education[0]?.degreeLevel).toBe('master');
+    expect(education[0]?.field).toBeNull();
+  });
+
+  it('indian-bca · BCA (already recognised, H-088) resolves to bachelor, and a bare DD/MM/YYYY range parses correctly', () => {
+    const attrs = attributesOf('indian-bca-hcl');
+    const education = educationOf(attrs);
+    expect(education).toHaveLength(1);
+    expect(education[0]?.degreeLevel).toBe('bachelor');
+    // 28/04/2016 - Present, day 28 unambiguous: April 2016 to Aug 2026.
+    expect(totalYearsExperience(attrs)).toBe(10.3);
+  });
+
+  it('indian-pgdm · PGDM (already recognised, H-088) resolves to master with its field', () => {
+    const education = educationOf(attributesOf('indian-pgdm-marketing-xlri'));
+    expect(education).toHaveLength(1);
+    expect(education[0]?.degreeLevel).toBe('master');
+    expect(education[0]?.field).toBe('marketing');
+  });
+
+  it('indian-btech-then-mba · both degrees present, and two DD/MM/YYYY roles sum without overlap', () => {
+    const attrs = attributesOf('indian-btech-then-mba-gurugram');
+    const education = educationOf(attrs);
+    expect(education.map((e) => e.degreeLevel).toSorted()).toEqual(['bachelor', 'master']);
+    expect(education.some((e) => e.field === 'computer-science')).toBe(true);
+
+    // 21/06/2021 - Present (5.2y) + 14/07/2016 - 19/05/2019 (2.8y), two
+    // sequential non-overlapping roles: 8.0y.
+    expect(totalYearsExperience(attrs)).toBe(8);
+  });
+
+  it('indian-bsc · B.Sc (already worked before H-088) still resolves to bachelor', () => {
+    const education = educationOf(attributesOf('indian-bsc-zoho'));
+    expect(education).toHaveLength(1);
+    expect(education[0]?.degreeLevel).toBe('bachelor');
+  });
+
+  /**
+   * The H-088 claim itself, pinned as an automated assertion rather than a
+   * one-off manual measurement (docs/NEXT_PHASE.md Task B pass criteria:
+   * "An Indian CV and its US-localised twin score identically"). No such
+   * committed test existed anywhere in the repo before this — searched for
+   * "twin"/"identically"/"Infosys" across `apps/server` and `packages/core`
+   * and found only the manual measurement recorded in HONESTY_LOG H-088 and
+   * `docs/NEXT_PHASE.md` §1. This is that measurement, made durable.
+   */
+  it('an Indian CV and its US-localised twin extract IDENTICAL education, skills and tenure', () => {
+    const indian = attributesOf('indian-be-ece-unambiguous-dates');
+    const usTwin = attributesOf('us-localised-twin-of-indian-be-ece');
+
+    /** @param {readonly ExtractedAttribute[]} attrs */
+    const educationSummary = (attrs) =>
+      educationOf(attrs)
+        .map((e) => `${e.degreeLevel}/${e.field ?? '?'}`)
+        .toSorted();
+
+    expect(educationSummary(indian)).toEqual(educationSummary(usTwin));
+    expect(skillIds(indian)).toEqual(skillIds(usTwin));
+    expect(totalYearsExperience(indian)).toBe(totalYearsExperience(usTwin));
+
+    // Not merely the same TOTAL by coincidence — each individual role's
+    // computed years must match too, or a compensating pair of errors could
+    // hide behind an equal sum.
+    /** @param {readonly ExtractedAttribute[]} attrs */
+    const perRoleYears = (attrs) =>
+      attrs
+        .filter((a) => a.kind === 'years_experience')
+        .map((a) => a.years ?? 0)
+        .toSorted((a, b) => a - b);
+    expect(perRoleYears(indian)).toEqual(perRoleYears(usTwin));
+  });
+});
+
 describe('corpus · text tier · full snapshots', () => {
-  for (const entry of CORPUS) {
+  for (const entry of [...CORPUS, ...INDIAN_CV_CORPUS]) {
     it(`${entry.id} · extraction is unchanged`, () => {
       const text = entry.lines.join('\n');
       const attrs = extractAttributes(text, { referenceDate: CORPUS_REFERENCE_DATE });

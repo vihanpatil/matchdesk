@@ -296,3 +296,57 @@ describe('plausibility bounds (H-057)', () => {
     expect(attrs.length).toBeGreaterThan(0);
   });
 });
+
+describe('unambiguous numeric date formats (B.4)', () => {
+  // These pin the B.4 fix. Before it, `DATE_TOKEN` had no three-part numeric
+  // alternative, so `13/04/2019` matched only the trailing `04/2019` and
+  // `13-04-2019` matched only the trailing `2019` (defaulting to January).
+  // Verified to fail without the fix by reverting experience.ts and re-running.
+  //
+  // The rule is the one fact that holds in every locale: a number in 13-31
+  // cannot be a month, so the OTHER number must be. Nothing here guesses a
+  // locale — see the DOCUMENTED GAP below for what stays unresolved.
+
+  it('parses a full DD/MM/YYYY range on both sides', () => {
+    // Was `[]` — the whole role vanished and contributed zero years.
+    const attrs = extractYearsExperience('Engineer, Acme, 13/04/2019 - 15/08/2022', REF);
+    expect(attrs.length).toBeGreaterThan(0);
+    expect(attrs[0]?.years).toBe(3.3);
+  });
+
+  it('parses a full DD-MM-YYYY range on both sides', () => {
+    // Dash separator was strictly worse than slash: it fell all the way back
+    // to the bare `\d{4}` alternative.
+    const attrs = extractYearsExperience('Engineer, Acme, 13-04-2019 - 15-08-2022', REF);
+    expect(attrs.length).toBeGreaterThan(0);
+    expect(attrs[0]?.years).toBe(3.3);
+  });
+
+  it('reads the month from the non-day side regardless of which side it is on', () => {
+    // DD/MM (Indian/European) and MM/DD (US) must both resolve to April 2019.
+    const indian = extractYearsExperience('Engineer, Acme, 13/04/2019 - 13/04/2021', REF);
+    const us = extractYearsExperience('Engineer, Acme, 04/13/2019 - 04/13/2021', REF);
+    expect(indian[0]?.years).toBe(2);
+    expect(us[0]?.years).toBe(2);
+  });
+
+  it('does not match when neither leading number can be a day', () => {
+    // "13/25/2019" has no valid month on either side; it must not be trusted
+    // as a date. Pins the `month >= 1 && month <= 12` check in parseDateToken.
+    const attrs = extractYearsExperience('Engineer, Acme, 13/25/2019 - 13/25/2021', REF);
+    expect(attrs).toEqual([]);
+  });
+
+  it('DOCUMENTED GAP: a fully ambiguous numeric range is still silently dropped', () => {
+    // Asserts the WRONG behaviour on purpose so it cannot be lost (H-085's
+    // lesson). When BOTH leading numbers are 1-12, "03/04/2019" is genuinely
+    // ambiguous between DD/MM and MM/DD. The B.4 pattern deliberately cannot
+    // match it, so a two-sided ambiguous range falls through to no date at
+    // all: the role vanishes, contributes zero years, and `warnings` is empty.
+    //
+    // That is a candidate wrong-score defect in H-040's shape, tracked as
+    // H-089. It is NOT closed by B.4 and must not be resolved by guessing a
+    // locale — the remedy shape is H-040's: surface the disagreement.
+    expect(extractYearsExperience('Engineer, Acme, 03/04/2019 - 05/08/2022', REF)).toEqual([]);
+  });
+});

@@ -10,11 +10,44 @@ docs/SESSION_STATE.md`. A hardcoded hash here went stale twice; don't add one
 back. Working tree clean, `pnpm verify` exit 0 — see H-058 before quoting any
 branch-coverage figure, and H-074 before quoting a coverage total.
 
-**Current work: remediating H-040 + H-041 — one remedy, both defects.**
+**Current work: E5 has TWO blockers, and a decision is waiting for the user.**
 
 **➡ NEXT PHASE BRIEF: `docs/NEXT_PHASE.md`** — tasks, deliverables, pass
 criteria and the tiger-team decomposition for the next session. Read
 SESSION_STATE for state, NEXT_PHASE for what to do.
+
+---
+
+## ⚠ UPDATE 2026-08-14 (later session) — READ THIS BEFORE THE REST OF THIS FILE
+
+Everything below this block predates the language-ID measurement and the Indian
+date-format work. Where it disagrees with this block, **this block is right.**
+
+1. **E5 now has TWO blockers, not one.** `H-089` joined `H-041`: an ambiguous
+   numeric date range (`03/04/2019 - 05/08/2022`, both leading numbers 1-12)
+   **silently deletes an entire role** and reports a smaller total tenure with
+   `warnings: []`. H-040's shape exactly. **Closing H-041 alone will no longer
+   reach E5 MET** — the plan below assumes it will, and that assumption is now
+   wrong.
+2. **The language-ID library does NOT close H-041 for free.** 64 configurations
+   measured (H-092). At window granularity `eld` is blind to the sub-floor
+   class; at line granularity it catches 13/13 but falsely refuses 2/23 English
+   CVs. **The defect is segmentation geometry, not classifier accuracy** — a
+   trailing sub-floor line never forms a window, so swapping the classifier was
+   never going to fix it. `eld` is **not installed** and **no ADR is written**;
+   three options and the H-080 precedent are in `docs/NEXT_PHASE.md` §1, and
+   **the decision is the user's.**
+3. **`franc` was measured and rejected** — 10/13, because it is itself a
+   trigram classifier, the same method as the existing code (H-091). The
+   previous brief named it first on an argument that did not survive contact.
+4. **Task B landed** (uncommitted at time of writing → now committed):
+   `FIELD_VOCAB` 14 → 22, `INDIAN_CV_CORPUS`, a committed H-088 twin test, and
+   a bounded fix for unambiguous `DD/MM/YYYY` dates.
+5. **Housekeeping owed:** `pnpm test:manifest` not run (69 tests added,
+   `minTests` stale at 844), full `pnpm verify` not run end-to-end since Task B,
+   `pnpm mutate` not re-run since E4 was measured.
+
+**Do not read the gate from here either — run `pnpm gate`.**
 
 **START HERE — run `pnpm gate` FIRST. It prints the gate; do not read one.**
 

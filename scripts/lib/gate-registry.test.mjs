@@ -158,13 +158,19 @@ describe('the REAL registry, as shipped', () => {
     // deliberately, which is the point — the gate result cannot change
     // silently.
     //
-    // It has already earned that TWICE: it failed when H-002 was triaged out
-    // of the blocking set, and again when H-040 was closed by ADR-029 — each
-    // time forcing a deliberate edit rather than letting the gate quietly get
-    // easier. ['H-002','H-040','H-041'] -> ['H-040','H-041'] -> ['H-041'].
+    // It has now earned that THREE times: it failed when H-002 was triaged out
+    // of the blocking set, again when H-040 was closed by ADR-029, and again
+    // when H-089 was registered — each time forcing a deliberate edit rather
+    // than letting the gate change silently.
+    // ['H-002','H-040','H-041'] -> ['H-040','H-041'] -> ['H-041']
+    //   -> ['H-041','H-089'].
+    //
+    // The first two moves made the gate EASIER. This one makes it HARDER, and
+    // that direction matters more: the previous plan assumed H-041 was the
+    // last blocker, so closing it would flip E5. H-089 means it will not.
     const gate = computeGate(registry.findings);
     expect(gate.e5).toBe(false);
-    expect(gate.blockingE5.map((f) => f.id).sort()).toEqual(['H-041']);
+    expect(gate.blockingE5.map((f) => f.id).sort()).toEqual(['H-041', 'H-089']);
   });
 
   it('every remaining E5 blocker is a measured defect, not an untriaged one', () => {

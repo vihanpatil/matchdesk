@@ -395,3 +395,573 @@ exports[`corpus · text tier · full snapshots > h040-overlapping-roles-not-doub
   },
 ]
 `;
+
+exports[`corpus · text tier · full snapshots > indian-bca-hcl · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "28/04/2016 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "10.3",
+    "span": "80..100",
+    "years": 10.3,
+  },
+  {
+    "degreeLevel": "bachelor",
+    "evidence": "BCA",
+    "field": null,
+    "kind": "education",
+    "normalized": "bachelor",
+    "span": "187..190",
+  },
+  {
+    "canonicalId": "sql",
+    "evidence": "SQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "sql",
+    "span": "228..231",
+  },
+  {
+    "canonicalId": "python",
+    "evidence": "Python",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "python",
+    "span": "233..239",
+  },
+  {
+    "canonicalId": "linux",
+    "evidence": "Linux",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "linux",
+    "span": "241..246",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > indian-be-ece-unambiguous-dates · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "13/06/2019 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "7.2",
+    "span": "81..101",
+    "years": 7.2,
+  },
+  {
+    "canonicalId": "java",
+    "evidence": "Java",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "java",
+    "span": "145..149",
+  },
+  {
+    "canonicalId": "spring-boot",
+    "evidence": "Spring Boot",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "spring-boot",
+    "span": "154..165",
+  },
+  {
+    "canonicalId": "spring",
+    "evidence": "Spring Boot",
+    "kind": "skill",
+    "matchType": "alias",
+    "normalized": "spring",
+    "span": "154..165",
+  },
+  {
+    "evidence": "15-07-2016 - 20-05-2019",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "2.8",
+    "span": "223..246",
+    "years": 2.8,
+  },
+  {
+    "canonicalId": "postgresql",
+    "evidence": "PostgreSQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "postgresql",
+    "span": "258..268",
+  },
+  {
+    "canonicalId": "docker",
+    "evidence": "Docker",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "docker",
+    "span": "283..289",
+  },
+  {
+    "degreeLevel": "bachelor",
+    "evidence": "BE",
+    "field": "electronics-communication",
+    "kind": "education",
+    "normalized": "bachelor",
+    "span": "315..317",
+  },
+  {
+    "canonicalId": "communication",
+    "evidence": "Communication",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "communication",
+    "span": "337..350",
+  },
+  {
+    "canonicalId": "java",
+    "evidence": "Java",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "java",
+    "span": "383..387",
+  },
+  {
+    "canonicalId": "spring-boot",
+    "evidence": "Spring Boot",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "spring-boot",
+    "span": "389..400",
+  },
+  {
+    "canonicalId": "postgresql",
+    "evidence": "PostgreSQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "postgresql",
+    "span": "402..412",
+  },
+  {
+    "canonicalId": "docker",
+    "evidence": "Docker",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "docker",
+    "span": "414..420",
+  },
+  {
+    "canonicalId": "aws",
+    "evidence": "AWS",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "aws",
+    "span": "422..425",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > indian-bsc-zoho · extraction is unchanged 1`] = `
+[
+  {
+    "canonicalId": "qa",
+    "evidence": "QA",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "qa",
+    "span": "39..41",
+  },
+  {
+    "evidence": "Feb 2018 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "8.5",
+    "span": "79..97",
+    "years": 8.5,
+  },
+  {
+    "degreeLevel": "bachelor",
+    "evidence": "B.Sc",
+    "field": null,
+    "kind": "education",
+    "normalized": "bachelor",
+    "span": "186..190",
+  },
+  {
+    "canonicalId": "python",
+    "evidence": "Python",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "python",
+    "span": "239..245",
+  },
+  {
+    "canonicalId": "selenium",
+    "evidence": "Selenium",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "selenium",
+    "span": "247..255",
+  },
+  {
+    "canonicalId": "sql",
+    "evidence": "SQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "sql",
+    "span": "257..260",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > indian-btech-eee-slash-dates · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "17/01/2018 - 22/08/2022",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "4.6",
+    "span": "81..104",
+    "years": 4.6,
+  },
+  {
+    "degreeLevel": "bachelor",
+    "evidence": "B.Tech",
+    "field": "electrical-electronics",
+    "kind": "education",
+    "normalized": "bachelor",
+    "span": "186..192",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > indian-btech-then-mba-gurugram · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "21/06/2021 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "5.2",
+    "span": "81..101",
+    "years": 5.2,
+  },
+  {
+    "evidence": "14/07/2016 - 19/05/2019",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "2.8",
+    "span": "206..229",
+    "years": 2.8,
+  },
+  {
+    "degreeLevel": "master",
+    "evidence": "MBA",
+    "field": null,
+    "kind": "education",
+    "normalized": "master",
+    "span": "294..297",
+  },
+  {
+    "degreeLevel": "bachelor",
+    "evidence": "B.Tech",
+    "field": "computer-science",
+    "kind": "education",
+    "normalized": "bachelor",
+    "span": "346..352",
+  },
+  {
+    "canonicalId": "sql",
+    "evidence": "SQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "sql",
+    "span": "423..426",
+  },
+  {
+    "canonicalId": "java",
+    "evidence": "Java",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "java",
+    "span": "428..432",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > indian-mca-tcs · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "03/2017 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "9.4",
+    "span": "95..112",
+    "years": 9.4,
+  },
+  {
+    "degreeLevel": "master",
+    "evidence": "MCA",
+    "field": null,
+    "kind": "education",
+    "normalized": "master",
+    "span": "196..199",
+  },
+  {
+    "canonicalId": "java",
+    "evidence": "Java",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "java",
+    "span": "249..253",
+  },
+  {
+    "canonicalId": "sql",
+    "evidence": "SQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "sql",
+    "span": "255..258",
+  },
+  {
+    "canonicalId": "spring-boot",
+    "evidence": "Spring Boot",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "spring-boot",
+    "span": "260..271",
+  },
+  {
+    "canonicalId": "spring",
+    "evidence": "Spring Boot",
+    "kind": "skill",
+    "matchType": "alias",
+    "normalized": "spring",
+    "span": "260..271",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > indian-me-structural-dash-dates · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "18-02-2014 - 25-11-2021",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "7.8",
+    "span": "92..115",
+    "years": 7.8,
+  },
+  {
+    "degreeLevel": "master",
+    "evidence": "M.E",
+    "field": "structural-engineering",
+    "kind": "education",
+    "normalized": "master",
+    "span": "201..204",
+  },
+  {
+    "canonicalId": "project-management",
+    "evidence": "Project Management",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "project-management",
+    "span": "279..297",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > indian-mtech-ece-nit · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "Jun 2015 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "11.2",
+    "span": "86..104",
+    "years": 11.2,
+  },
+  {
+    "degreeLevel": "master",
+    "evidence": "M.Tech",
+    "field": "electronics-communication",
+    "kind": "education",
+    "normalized": "master",
+    "span": "171..177",
+  },
+  {
+    "canonicalId": "communication",
+    "evidence": "Communication",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "communication",
+    "span": "197..210",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > indian-pgdm-marketing-xlri · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "Jul 2019 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "7.1",
+    "span": "80..98",
+    "years": 7.1,
+  },
+  {
+    "canonicalId": "stakeholder-management",
+    "evidence": "stakeholder management",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "stakeholder-management",
+    "span": "129..151",
+  },
+  {
+    "degreeLevel": "master",
+    "evidence": "PGDM",
+    "field": "marketing",
+    "kind": "education",
+    "normalized": "master",
+    "span": "189..193",
+  },
+  {
+    "canonicalId": "marketing",
+    "evidence": "Marketing",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "marketing",
+    "span": "197..206",
+  },
+  {
+    "canonicalId": "marketing",
+    "evidence": "Marketing",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "marketing",
+    "span": "247..256",
+  },
+  {
+    "canonicalId": "stakeholder-management",
+    "evidence": "Stakeholder Management",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "stakeholder-management",
+    "span": "258..280",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > us-localised-twin-of-indian-be-ece · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "Jun 2019 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "7.2",
+    "span": "94..112",
+    "years": 7.2,
+  },
+  {
+    "canonicalId": "java",
+    "evidence": "Java",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "java",
+    "span": "156..160",
+  },
+  {
+    "canonicalId": "spring-boot",
+    "evidence": "Spring Boot",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "spring-boot",
+    "span": "165..176",
+  },
+  {
+    "canonicalId": "spring",
+    "evidence": "Spring Boot",
+    "kind": "skill",
+    "matchType": "alias",
+    "normalized": "spring",
+    "span": "165..176",
+  },
+  {
+    "evidence": "Jul 2016 - May 2019",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "2.8",
+    "span": "233..252",
+    "years": 2.8,
+  },
+  {
+    "canonicalId": "postgresql",
+    "evidence": "PostgreSQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "postgresql",
+    "span": "264..274",
+  },
+  {
+    "canonicalId": "docker",
+    "evidence": "Docker",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "docker",
+    "span": "289..295",
+  },
+  {
+    "degreeLevel": "bachelor",
+    "evidence": "B.S",
+    "field": "electronics-communication",
+    "kind": "education",
+    "normalized": "bachelor",
+    "span": "321..324",
+  },
+  {
+    "canonicalId": "communication",
+    "evidence": "Communication",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "communication",
+    "span": "345..358",
+  },
+  {
+    "canonicalId": "java",
+    "evidence": "Java",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "java",
+    "span": "392..396",
+  },
+  {
+    "canonicalId": "spring-boot",
+    "evidence": "Spring Boot",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "spring-boot",
+    "span": "398..409",
+  },
+  {
+    "canonicalId": "postgresql",
+    "evidence": "PostgreSQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "postgresql",
+    "span": "411..421",
+  },
+  {
+    "canonicalId": "docker",
+    "evidence": "Docker",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "docker",
+    "span": "423..429",
+  },
+  {
+    "canonicalId": "aws",
+    "evidence": "AWS",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "aws",
+    "span": "431..434",
+  },
+]
+`;

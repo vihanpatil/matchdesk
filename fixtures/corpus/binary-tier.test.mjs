@@ -10,7 +10,7 @@ import {
 } from '../../apps/server/src/ingestion/languageDetection.js';
 
 import { buildFixtureDocx, buildFixturePdf } from '../../scripts/lib/fixture-docs.mjs';
-import { CORPUS, CORPUS_REFERENCE_DATE, REFUSAL_CORPUS } from './definitions.mjs';
+import { CORPUS, CORPUS_REFERENCE_DATE, INDIAN_CV_CORPUS, REFUSAL_CORPUS } from './definitions.mjs';
 
 /**
  * The Section 9.2 fixture corpus — BINARY TIER (ADR-023 E3).
@@ -29,7 +29,7 @@ import { CORPUS, CORPUS_REFERENCE_DATE, REFUSAL_CORPUS } from './definitions.mjs
 
 /** @param {string} id */
 function fixture(id) {
-  const found = CORPUS.find((f) => f.id === id);
+  const found = [...CORPUS, ...INDIAN_CV_CORPUS].find((f) => f.id === id);
   if (found === undefined) throw new Error(`no fixture "${id}" in the corpus`);
   return found;
 }
@@ -82,6 +82,41 @@ describe('corpus · binary tier · a document becomes a score', () => {
     expect(skills).not.toContain('java');
     expect(skills).toContain('javascript');
   });
+
+  /**
+   * Task B.2/B.4 (docs/NEXT_PHASE.md), end to end. The text tier already
+   * pins that `experience.ts` parses `13/06/2019` and `15-07-2016` and that
+   * `education.ts` resolves "Electronics and Communication" — this confirms
+   * neither a real PDF's text layout nor a real DOCX's paragraph structure
+   * disturbs either fix before it reaches `packages/core`.
+   */
+  it('an Indian B.E. and Indian date formats survive a real PDF container', async () => {
+    const entry = fixture('indian-be-ece-unambiguous-dates');
+    const result = await extractText(await buildFixturePdf(entry), 'indian-be-ece.pdf');
+    expect(result.parseStatus).toBe('ok');
+    expect(result.language).toBe('en');
+
+    const attrs = extractAttributes(result.text, { referenceDate: CORPUS_REFERENCE_DATE });
+    const education = attrs.flatMap((a) => (a.kind === 'education' ? [a] : []));
+    expect(education).toHaveLength(1);
+    expect(education[0]?.degreeLevel).toBe('bachelor');
+    expect(education[0]?.field).toBe('electronics-communication');
+    expect(totalYearsExperience(attrs)).toBe(10);
+  });
+
+  it('an Indian B.E. and Indian date formats survive a real DOCX container', async () => {
+    const entry = fixture('indian-be-ece-unambiguous-dates');
+    const result = await extractText(await buildFixtureDocx(entry), 'indian-be-ece.docx');
+    expect(result.parseStatus).toBe('ok');
+    expect(result.language).toBe('en');
+
+    const attrs = extractAttributes(result.text, { referenceDate: CORPUS_REFERENCE_DATE });
+    const education = attrs.flatMap((a) => (a.kind === 'education' ? [a] : []));
+    expect(education).toHaveLength(1);
+    expect(education[0]?.degreeLevel).toBe('bachelor');
+    expect(education[0]?.field).toBe('electronics-communication');
+    expect(totalYearsExperience(attrs)).toBe(10);
+  });
 });
 
 describe('corpus · binary tier · C7 refusals', () => {
@@ -119,7 +154,8 @@ describe('corpus · binary tier · C7 refusals', () => {
  * text differs, and a relation over them would break for no defect.
  */
 describe('corpus · binary tier · format parity (metamorphic)', () => {
-  const comparable = CORPUS.filter((entry) => entry.pdfUnrenderable === undefined);
+  const ALL_FIXTURES = [...CORPUS, ...INDIAN_CV_CORPUS];
+  const comparable = ALL_FIXTURES.filter((entry) => entry.pdfUnrenderable === undefined);
 
   /**
    * Not a silent skip. Every excluded fixture is named, with its reason, so
@@ -127,7 +163,7 @@ describe('corpus · binary tier · format parity (metamorphic)', () => {
    * counting. A corpus that quietly covers less than it appears to is the
    * H-004 shape.
    */
-  for (const entry of CORPUS.filter((e) => e.pdfUnrenderable !== undefined)) {
+  for (const entry of ALL_FIXTURES.filter((e) => e.pdfUnrenderable !== undefined)) {
     it.fails(`${entry.id} · CANNOT be rendered as PDF — DOCX-only coverage (H-067)`, async () => {
       await buildFixturePdf(entry);
     });

@@ -3200,3 +3200,193 @@ defect to the **vocabulary**, not the patterns.
 That is H-022's sentence verbatim, and H-022 was about this exact file.
 **Fourth instance this session** of a component calibrated on a corpus lacking
 the population it then failed on (H-022, H-079, H-086, H-088).
+
+---
+
+### H-089 · An ambiguous numeric date range silently deletes an entire role
+
+**Found while measuring Indian date formats (Task B.4). Not introduced by this
+session's change — it was already there, and nothing had ever looked.**
+
+`DD/MM/YYYY` is standard in India and `experience.ts` was written against US
+conventions. Measured, not assumed:
+
+| input                         | before B.4                             | after B.4         |
+| ----------------------------- | -------------------------------------- | ----------------- |
+| `13/04/2019 - 15/08/2022`     | **`[]` — whole role dropped, 0 years** | 3.3 years         |
+| `13-04-2019 - 15-08-2022`     | **`[]` — whole role dropped, 0 years** | 3.3 years         |
+| `13-04-2019 - Present`        | year only, month defaulted to January  | correct           |
+| `04/13/2019 - Present`        | **`[]` — dropped** (parsed month 13)   | correct           |
+| **`03/04/2019 - 05/08/2022`** | **`[]` — dropped**                     | **STILL DROPPED** |
+
+**What is fixed.** A number in 13-31 cannot be a month in any locale, so
+whichever of the two leading numbers falls in that range is the day and the
+other is the month. That resolves `13/04` and `04/13` identically to April
+without guessing a locale.
+
+**What is NOT fixed, and why it is logged as its own defect.** When _both_
+leading numbers are 1-12, `03/04/2019` is genuinely ambiguous. The B.4 pattern
+is built so it _structurally cannot match_ that shape — provable from the
+regex, not merely tested — so it falls through unchanged. The consequence:
+
+- a one-sided range (`03/04/2019 - Present`) yields a plausible-looking number
+  that silently assumes DD/MM;
+- **a two-sided range (`03/04/2019 - 05/08/2022`) drops the entire role.** The
+  recruiter is told a smaller total tenure, with `warnings: []`.
+
+**This is H-040's shape exactly**: a discarded fact, resolved silently in
+arithmetic, reported as fact. H-040 was classified wrong-score and closed by
+raising a blocking `Reservation` rather than asserting a contradicted number.
+The same remedy shape applies here and has not been built.
+
+**Classified wrong-score, open.** It does not change the gate — E5 is already
+NOT MET on H-041 — but it means **closing H-041 alone will not reach E5 MET.**
+That correction matters more than the finding: the next session would otherwise
+integrate a language-ID library, watch H-041 close, and expect the gate to
+flip. It will not.
+
+**Deliberately not resolved by picking a locale.** Choosing DD/MM would be
+right for the target recruiter's Indian clients and wrong for US CVs, and the
+tool cannot tell which it is holding. That is a decision for the user, not a
+threshold.
+
+---
+
+### H-090 · A real fix landed with no test that fails without it
+
+The B.4 date fix changed live behaviour — two inputs went from "role silently
+deleted" to a correct tenure — and `experience.test.ts` was **not touched**.
+Every test passed before and after, so nothing pinned the change.
+
+ADR-028 defines a finding as closed only when a test fails without the fix.
+By that definition B.4 was not closed; it was merely present, and one careless
+refactor would have reverted it invisibly.
+
+**Caught by reading `git status`, not by reading the report.** The engineer's
+own summary said "all 62 `experience.test.ts` tests pass unchanged" — accurate,
+and the giveaway. A behaviour change that leaves the test count unchanged has
+not been pinned.
+
+**Fixed in this commit:** five targeted tests. Verified by reverting
+`experience.ts` and re-running: **3 fail without the fix, 67/67 pass with it.**
+The remaining two pin behaviour that did not change — the invalid-month guard,
+and the ambiguous-range gap asserted as wrong-on-purpose so H-089 cannot be
+lost.
+
+**Trap 2 from `docs/NEXT_PHASE.md` §5** — "a guard that cannot fire. Write the
+test that fails first." It fired again, one session after being written down.
+
+---
+
+### H-091 · The language-ID survey falsified the premise the brief was built on
+
+`docs/NEXT_PHASE.md` Task A argued that "a trained model works on short
+fragments where character statistics cannot", and named `franc` first.
+
+**Measured, per line, across all 23 English CVs and 13 Germanic sub-floor
+lines:**
+
+| candidate       | false refusals / 96 EN lines | Germanic caught / 13 |
+| --------------- | ---------------------------- | -------------------- |
+| `franc`         | 47/96                        | **10/13**            |
+| `franc-min`     | 40/96                        | **10/13**            |
+| `franc-all`     | 52/96                        | **11/13**            |
+| `tinyld/heavy`  | 33/96                        | 13/13                |
+| `cld3-asm`      | 36/96                        | 13/13                |
+| **`eld@2.1.0`** | **9/96**                     | **13/13**            |
+
+**`franc` does not close the class.** That is consistent with the mechanism:
+the existing detector is already a Cavnar & Trenkle character-n-gram
+classifier, and `franc` is also a trigram classifier. Had the brief's named
+first candidate been adopted on the strength of the argument, it would have
+shipped a production dependency that does not fix the defect.
+
+**`eld` verified independently** rather than accepted: LICENSE read (genuine
+Apache-2.0, zero transitive dependencies, no waiver needed); **zero real
+`Math.*` calls** in `languageDetector.js` — the grep hits were `/**` comment
+asterisks — so only IEEE-754 `+ - * /`, satisfying C4 by H-002's own reasoning;
+no network and no `fs`, satisfying C2.
+
+**`cld3-asm` rejected on evidence the audit script would have missed.** Its
+tree contains `emscripten-wasm-loader@3.0.3` with **no LICENSE file in the npm
+package or the GitHub repo** — an unverified MIT claim `license-audit.mjs`
+would have silently passed — plus a 2020 `nanoid` carrying GHSA-2v37-7h3g-55p8.
+
+**The spike measured the wrong granularity, and the headline number is
+therefore not the cost it appears to be.** It reported that `eld` would falsely
+refuse 9/23 English CVs — worse than the 17% H-080 already rejected. All nine
+were inspected individually: **every one is a proper-noun-only line**, eight of
+them a CV's name header (`Priya Chandrasekaran`, `Jamie Okonkwo`, …) and one an
+Indian university name (`Amrita Vishwa Vidyapeetham Coimbatore`). Not one is
+English prose. `findNonEnglishSegments` never judges a bare line — it
+aggregates into ≥100-letter windows first — so that figure describes an
+architecture nobody proposed.
+
+**The question that decides Task A is therefore still unmeasured:** H-041's
+residual is by definition a sub-100-letter insert that no window can isolate,
+so the real experiment is whether `eld` can judge _below the window floor_ at
+zero false refusals. **No ADR has been written and `eld` is not installed.**
+Approving a shipped dependency on an unmeasured premise is trap 1 one level up.
+
+---
+
+### H-092 · `eld` does not close H-041 for free — the gap is granularity, not accuracy
+
+Phase-1 measurement, read-only, no dependency installed. 64 configurations
+swept: 4 granularities × 2 conditionings × 4 ngram tiers × `reliable` on/off.
+Corpora were programmatically diffed against the real eval file — **0 key
+mismatches, 0 text diffs** across all 23 English CVs — rather than hand-copied.
+
+**No configuration meets the bar.** Stated plainly rather than thresholded past.
+
+| granularity            | germanic  | EN false refusals | non-EN refused |
+| ---------------------- | --------- | ----------------- | -------------- |
+| `windows100` (current) | 0-1/13    | **0/23**          | 13/13          |
+| `linePairs`            | 0-1/13    | 0-1/23            | 13/13          |
+| `lines` + `reliable`   | **13/13** | **2/23**          | 13/13          |
+
+**The two axes cannot be satisfied at once.** At the granularity that costs
+nothing, `eld` is blind to the sub-floor class; at the granularity that catches
+it, it refuses two real English CVs.
+
+**This is a geometry result, not a library result.** A trailing single-line
+insert with nothing after it never forms a window under `lineWindows`' forward
+growth rule, and pairing it with one English neighbour dilutes it identically.
+Reproduced with a real trained model instead of the hand-built profiler, this
+is the same geometry ADR-027/H-085 already documented. **Swapping the
+classifier was never going to fix a segmentation problem.**
+
+**`reliable` is not a separator.** It cuts false refusals hard (7-9/23 → 1-4/23)
+but does not zero them: all three residual false refusals carry
+`reliable=true`, exactly like the true catches. `"Dmitri Karalis - Head Chef"`
+→ Tagalog at 0.64 vs English 0.37 — not close. `"- Trained six commis chefs to
+chef de partie level"` → French at 0.7405 vs English 0.7393, where the French
+loanword tips a near coin-flip.
+
+**The genuinely valuable finding is the one nobody asked for.** At the existing
+window granularity `eld` scores **0/23 false refusals, 13/13 non-English
+refused**, and catches the H-079 German header block in **all 36** supplementary
+combinations. Production catches that case only via
+`MAX_ENGLISH_MEAN_WORD_LENGTH` plus the `ENGLISH_INSTITUTION_WORDS` exemption,
+because the n-gram profiler mis-scores it English (`dEn 69621` vs
+`dOther 70385`). `eld` has no such blind spot and needs no exemption to avoid
+mis-firing on Indian institution names.
+
+So `eld` at window granularity can **delete** the entire Cavnar & Trenkle
+apparatus _and_ three heuristics layered on to patch it —
+`MAX_ENGLISH_MEAN_WORD_LENGTH`, `ENGLISH_INSTITUTION_WORDS`,
+`MIN_FOREIGN_MARGIN` — at zero measured regression. **That is getting off the
+heuristic treadmill, which is what Task A actually existed to do.** It just
+does not close H-041.
+
+**Explicitly NOT subsumed:** `NON_ENGLISH_FUNCTION_WORDS` (the H-087 Romance
+sub-floor pass). Replacing it with an `eld` line pass would cost 2/23 English
+CVs that it currently costs 0/23. That is a net regression, not a subsumption.
+
+**Payload:** `extrasmall` suffices for the window-granularity swap — 0.90 MB
+raw, ~0.26 MB gzip. Approximate: measured on installed source, not a shipped
+bundle.
+
+**The decision now belongs to the user, per Task A's own rule.** See
+`docs/NEXT_PHASE.md` for the three options and the precedent that constrains
+them.

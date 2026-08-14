@@ -1,0 +1,517 @@
+================================================================================
+English-corpus lines: 96 (must classify EN; failure = false refusal)
+================================================================================
+
+[franc] 49/96 correctly EN  (47 false refusals, 0 threw)
+  FALSE REFUSAL  skills_list_1#0  verdict=other  raw=jav  text="Priya Chandrasekaran"
+  FALSE REFUSAL  skills_list_1#1  verdict=other  raw=fra  text="Skills: Python, Docker, Kubernetes, AWS, React, Node.js, PostgreSQL, G"
+  FALSE REFUSAL  skills_list_2#1  verdict=other  raw=nno  text="Skills: Java, Spring, Hibernate, MySQL, Kafka, Jenkins, Terraform, Lin"
+  FALSE REFUSAL  skills_list_2#2  verdict=other  raw=cat  text="Tools: IntelliJ, Postman, Grafana, Prometheus"
+  FALSE REFUSAL  skills_list_2#3  verdict=other  raw=cat  text="Experience: Backend Engineer, Vantage Retail, 2018-present"
+  FALSE REFUSAL  terse_bullets_1#0  verdict=other  raw=bug  text="Casey Nakamura - Site Reliability Engineer"
+  FALSE REFUSAL  terse_bullets_1#2  verdict=other  raw=nob  text="- Automated deployment pipeline, cutting release time by 60 percent"
+  FALSE REFUSAL  terse_bullets_1#6  verdict=other  raw=sco  text="- Mentored three new hires during their first six months"
+  FALSE REFUSAL  terse_bullets_2#1  verdict=other  raw=sco  text="- Launched three features that increased signups by 18 percent"
+  FALSE REFUSAL  terse_bullets_2#2  verdict=other  raw=sco  text="- Ran weekly experiments across the onboarding funnel"
+  FALSE REFUSAL  terse_bullets_2#4  verdict=other  raw=glg  text="- Presented quarterly results to senior leadership"
+  FALSE REFUSAL  code_heavy#0  verdict=other  raw=fra  text="Sam Iverson - Software Engineer"
+  FALSE REFUSAL  code_heavy#1  verdict=other  raw=ron  text="function calculateTotal(items) { return items.reduce((sum, item) => su"
+  FALSE REFUSAL  code_heavy#2  verdict=other  raw=fra  text="const config = { retries: 3, timeout: 5000, baseUrl: 'https://api.exam"
+  FALSE REFUSAL  headers_plus_tech_only#0  verdict=other  raw=pol  text="Jamie Okonkwo"
+  FALSE REFUSAL  headers_plus_tech_only#1  verdict=other  raw=ron  text="Contact: jamie.okonkwo@example.com, Springfield"
+  FALSE REFUSAL  headers_plus_tech_only#2  verdict=other  raw=fra  text="Skills: AWS, GCP, Terraform, Ansible, Docker, Kubernetes, Python, Bash"
+  FALSE REFUSAL  headers_plus_tech_only#3  verdict=other  raw=fra  text="Experience: DevOps Engineer, 2016-present"
+  FALSE REFUSAL  headers_plus_tech_only#4  verdict=other  raw=fra  text="Certifications: CKA, AWS SysOps Administrator"
+  FALSE REFUSAL  chef_terse#0  verdict=other  raw=pam  text="Dmitri Karalis - Head Chef"
+  FALSE REFUSAL  chef_terse#3  verdict=other  raw=sco  text="- Designed seasonal menus changing four times a year"
+  FALSE REFUSAL  chef_terse#5  verdict=other  raw=fra  text="- Trained six commis chefs to chef de partie level"
+  FALSE REFUSAL  electrician_terse#0  verdict=other  raw=ita  text="Sione Fifita - Qualified Electrician"
+  FALSE REFUSAL  logistics_headers#0  verdict=other  raw=nds  text="Anneliese Vogt-Ramirez"
+  FALSE REFUSAL  logistics_headers#1  verdict=other  raw=fra  text="Contact: a.vogt.ramirez@example.com"
+  FALSE REFUSAL  logistics_headers#2  verdict=other  raw=fra  text="Skills: Warehouse Management, SAP, Forecasting, Route Planning, Invent"
+  FALSE REFUSAL  logistics_headers#3  verdict=other  raw=fra  text="Experience: Logistics Coordinator, 2017-present"
+  FALSE REFUSAL  logistics_headers#4  verdict=other  raw=sco  text="Certifications: Forklift, IOSH Managing Safely"
+  FALSE REFUSAL  paralegal_mixed_shape#0  verdict=other  raw=lug  text="Thaddeus Ngcobo"
+  FALSE REFUSAL  paralegal_mixed_shape#2  verdict=other  raw=dan  text="Skills: Drafting, Title Review, Case Management Systems"
+  FALSE REFUSAL  driver_very_terse#0  verdict=other  raw=sot  text="Kwabena Boateng - HGV Driver"
+  FALSE REFUSAL  driver_very_terse#1  verdict=other  raw=epo  text="Class 1 licence, clean record, twelve years"
+  FALSE REFUSAL  driver_very_terse#3  verdict=other  raw=sco  text="Digital tachograph and drivers hours compliant"
+  FALSE REFUSAL  driver_very_terse#4  verdict=other  raw=dan  text="Manual handling trained"
+  FALSE REFUSAL  vtu_headers#0  verdict=other  raw=jav  text="Rajesh Thiruvananthapuram"
+  FALSE REFUSAL  vtu_headers#1  verdict=other  raw=sco  text="Contact: r.thiru@example.com"
+  FALSE REFUSAL  vtu_headers#2  verdict=other  raw=swe  text="Skills: Java, Spring, Hibernate, Microservices, Kafka, Docker, Kuberne"
+  FALSE REFUSAL  vtu_headers#3  verdict=other  raw=fra  text="Experience: Senior Software Engineer, 2018-present"
+  FALSE REFUSAL  jntu_terse#0  verdict=other  raw=ace  text="Lakshmi Narasimhan - Data Engineer"
+  FALSE REFUSAL  mixed_unis#0  verdict=other  raw=emk  text="Priyanka Balasubramanian"
+  FALSE REFUSAL  mixed_unis#1  verdict=other  raw=ita  text="Education: B.Tech, Amrita Vishwa Vidyapeetham, Coimbatore, 2016"
+  FALSE REFUSAL  mixed_unis#2  verdict=other  raw=nld  text="Postgraduate: M.Tech, Vellore Institute of Technology, 2019"
+  FALSE REFUSAL  uni_lines_only#0  verdict=und  raw=und  text="Education"
+  FALSE REFUSAL  uni_lines_only#1  verdict=other  raw=nld  text="Indian Institute of Technology Kharagpur"
+  FALSE REFUSAL  uni_lines_only#2  verdict=other  raw=zlm  text="Visvesvaraya Technological University Belagavi"
+  FALSE REFUSAL  uni_lines_only#3  verdict=other  raw=spa  text="Jawaharlal Nehru Technological University Hyderabad"
+  FALSE REFUSAL  uni_lines_only#4  verdict=other  raw=ita  text="Amrita Vishwa Vidyapeetham Coimbatore"
+
+[franc-min] 56/96 correctly EN  (40 false refusals, 0 threw)
+  FALSE REFUSAL  skills_list_1#0  verdict=other  raw=jav  text="Priya Chandrasekaran"
+  FALSE REFUSAL  skills_list_1#1  verdict=other  raw=fra  text="Skills: Python, Docker, Kubernetes, AWS, React, Node.js, PostgreSQL, G"
+  FALSE REFUSAL  skills_list_2#1  verdict=other  raw=swe  text="Skills: Java, Spring, Hibernate, MySQL, Kafka, Jenkins, Terraform, Lin"
+  FALSE REFUSAL  skills_list_2#2  verdict=other  raw=por  text="Tools: IntelliJ, Postman, Grafana, Prometheus"
+  FALSE REFUSAL  terse_bullets_1#0  verdict=other  raw=swh  text="Casey Nakamura - Site Reliability Engineer"
+  FALSE REFUSAL  terse_bullets_2#4  verdict=other  raw=por  text="- Presented quarterly results to senior leadership"
+  FALSE REFUSAL  code_heavy#0  verdict=other  raw=fra  text="Sam Iverson - Software Engineer"
+  FALSE REFUSAL  code_heavy#1  verdict=other  raw=ron  text="function calculateTotal(items) { return items.reduce((sum, item) => su"
+  FALSE REFUSAL  code_heavy#2  verdict=other  raw=fra  text="const config = { retries: 3, timeout: 5000, baseUrl: 'https://api.exam"
+  FALSE REFUSAL  headers_plus_tech_only#0  verdict=other  raw=pol  text="Jamie Okonkwo"
+  FALSE REFUSAL  headers_plus_tech_only#1  verdict=other  raw=ron  text="Contact: jamie.okonkwo@example.com, Springfield"
+  FALSE REFUSAL  headers_plus_tech_only#2  verdict=other  raw=fra  text="Skills: AWS, GCP, Terraform, Ansible, Docker, Kubernetes, Python, Bash"
+  FALSE REFUSAL  headers_plus_tech_only#3  verdict=other  raw=fra  text="Experience: DevOps Engineer, 2016-present"
+  FALSE REFUSAL  headers_plus_tech_only#4  verdict=other  raw=fra  text="Certifications: CKA, AWS SysOps Administrator"
+  FALSE REFUSAL  chef_terse#0  verdict=other  raw=swh  text="Dmitri Karalis - Head Chef"
+  FALSE REFUSAL  chef_terse#3  verdict=other  raw=fra  text="- Designed seasonal menus changing four times a year"
+  FALSE REFUSAL  chef_terse#5  verdict=other  raw=fra  text="- Trained six commis chefs to chef de partie level"
+  FALSE REFUSAL  electrician_terse#0  verdict=other  raw=ita  text="Sione Fifita - Qualified Electrician"
+  FALSE REFUSAL  logistics_headers#0  verdict=other  raw=plt  text="Anneliese Vogt-Ramirez"
+  FALSE REFUSAL  logistics_headers#1  verdict=other  raw=fra  text="Contact: a.vogt.ramirez@example.com"
+  FALSE REFUSAL  logistics_headers#2  verdict=other  raw=fra  text="Skills: Warehouse Management, SAP, Forecasting, Route Planning, Invent"
+  FALSE REFUSAL  logistics_headers#3  verdict=other  raw=fra  text="Experience: Logistics Coordinator, 2017-present"
+  FALSE REFUSAL  paralegal_mixed_shape#0  verdict=other  raw=vie  text="Thaddeus Ngcobo"
+  FALSE REFUSAL  paralegal_mixed_shape#2  verdict=other  raw=fra  text="Skills: Drafting, Title Review, Case Management Systems"
+  FALSE REFUSAL  driver_very_terse#0  verdict=other  raw=mad  text="Kwabena Boateng - HGV Driver"
+  FALSE REFUSAL  driver_very_terse#1  verdict=other  raw=fra  text="Class 1 licence, clean record, twelve years"
+  FALSE REFUSAL  driver_very_terse#4  verdict=other  raw=jav  text="Manual handling trained"
+  FALSE REFUSAL  vtu_headers#0  verdict=other  raw=jav  text="Rajesh Thiruvananthapuram"
+  FALSE REFUSAL  vtu_headers#1  verdict=other  raw=fra  text="Contact: r.thiru@example.com"
+  FALSE REFUSAL  vtu_headers#2  verdict=other  raw=swe  text="Skills: Java, Spring, Hibernate, Microservices, Kafka, Docker, Kuberne"
+  FALSE REFUSAL  vtu_headers#3  verdict=other  raw=fra  text="Experience: Senior Software Engineer, 2018-present"
+  FALSE REFUSAL  jntu_terse#0  verdict=other  raw=jav  text="Lakshmi Narasimhan - Data Engineer"
+  FALSE REFUSAL  mixed_unis#0  verdict=other  raw=hau  text="Priyanka Balasubramanian"
+  FALSE REFUSAL  mixed_unis#1  verdict=other  raw=ita  text="Education: B.Tech, Amrita Vishwa Vidyapeetham, Coimbatore, 2016"
+  FALSE REFUSAL  mixed_unis#2  verdict=other  raw=nld  text="Postgraduate: M.Tech, Vellore Institute of Technology, 2019"
+  FALSE REFUSAL  uni_lines_only#0  verdict=und  raw=und  text="Education"
+  FALSE REFUSAL  uni_lines_only#1  verdict=other  raw=nld  text="Indian Institute of Technology Kharagpur"
+  FALSE REFUSAL  uni_lines_only#2  verdict=other  raw=zlm  text="Visvesvaraya Technological University Belagavi"
+  FALSE REFUSAL  uni_lines_only#3  verdict=other  raw=spa  text="Jawaharlal Nehru Technological University Hyderabad"
+  FALSE REFUSAL  uni_lines_only#4  verdict=other  raw=ita  text="Amrita Vishwa Vidyapeetham Coimbatore"
+
+[franc-all] 44/96 correctly EN  (52 false refusals, 0 threw)
+  FALSE REFUSAL  skills_list_1#0  verdict=other  raw=jav  text="Priya Chandrasekaran"
+  FALSE REFUSAL  skills_list_1#1  verdict=other  raw=fra  text="Skills: Python, Docker, Kubernetes, AWS, React, Node.js, PostgreSQL, G"
+  FALSE REFUSAL  skills_list_2#0  verdict=other  raw=crs  text="Devon Okafor"
+  FALSE REFUSAL  skills_list_2#1  verdict=other  raw=tzo  text="Skills: Java, Spring, Hibernate, MySQL, Kafka, Jenkins, Terraform, Lin"
+  FALSE REFUSAL  skills_list_2#2  verdict=other  raw=cha  text="Tools: IntelliJ, Postman, Grafana, Prometheus"
+  FALSE REFUSAL  skills_list_2#3  verdict=other  raw=cat  text="Experience: Backend Engineer, Vantage Retail, 2018-present"
+  FALSE REFUSAL  terse_bullets_1#0  verdict=other  raw=ina  text="Casey Nakamura - Site Reliability Engineer"
+  FALSE REFUSAL  terse_bullets_1#2  verdict=other  raw=mxi  text="- Automated deployment pipeline, cutting release time by 60 percent"
+  FALSE REFUSAL  terse_bullets_1#4  verdict=other  raw=mxi  text="- Migrated legacy infrastructure to containers, improving uptime"
+  FALSE REFUSAL  terse_bullets_1#6  verdict=other  raw=sco  text="- Mentored three new hires during their first six months"
+  FALSE REFUSAL  terse_bullets_2#1  verdict=other  raw=sco  text="- Launched three features that increased signups by 18 percent"
+  FALSE REFUSAL  terse_bullets_2#2  verdict=other  raw=sco  text="- Ran weekly experiments across the onboarding funnel"
+  FALSE REFUSAL  terse_bullets_2#4  verdict=other  raw=glg  text="- Presented quarterly results to senior leadership"
+  FALSE REFUSAL  code_heavy#0  verdict=other  raw=crs  text="Sam Iverson - Software Engineer"
+  FALSE REFUSAL  code_heavy#1  verdict=other  raw=ina  text="function calculateTotal(items) { return items.reduce((sum, item) => su"
+  FALSE REFUSAL  code_heavy#2  verdict=other  raw=fra  text="const config = { retries: 3, timeout: 5000, baseUrl: 'https://api.exam"
+  FALSE REFUSAL  headers_plus_tech_only#0  verdict=other  raw=pol  text="Jamie Okonkwo"
+  FALSE REFUSAL  headers_plus_tech_only#1  verdict=other  raw=ron  text="Contact: jamie.okonkwo@example.com, Springfield"
+  FALSE REFUSAL  headers_plus_tech_only#2  verdict=other  raw=fra  text="Skills: AWS, GCP, Terraform, Ansible, Docker, Kubernetes, Python, Bash"
+  FALSE REFUSAL  headers_plus_tech_only#3  verdict=other  raw=fra  text="Experience: DevOps Engineer, 2016-present"
+  FALSE REFUSAL  headers_plus_tech_only#4  verdict=other  raw=lat  text="Certifications: CKA, AWS SysOps Administrator"
+  FALSE REFUSAL  chef_terse#0  verdict=other  raw=quc  text="Dmitri Karalis - Head Chef"
+  FALSE REFUSAL  chef_terse#3  verdict=other  raw=sco  text="- Designed seasonal menus changing four times a year"
+  FALSE REFUSAL  chef_terse#5  verdict=other  raw=mxi  text="- Trained six commis chefs to chef de partie level"
+  FALSE REFUSAL  electrician_terse#0  verdict=other  raw=mxi  text="Sione Fifita - Qualified Electrician"
+  FALSE REFUSAL  electrician_terse#3  verdict=other  raw=ina  text="- Supervised two apprentices on site"
+  FALSE REFUSAL  logistics_headers#0  verdict=other  raw=bre  text="Anneliese Vogt-Ramirez"
+  FALSE REFUSAL  logistics_headers#1  verdict=other  raw=fra  text="Contact: a.vogt.ramirez@example.com"
+  FALSE REFUSAL  logistics_headers#2  verdict=other  raw=fra  text="Skills: Warehouse Management, SAP, Forecasting, Route Planning, Invent"
+  FALSE REFUSAL  logistics_headers#3  verdict=other  raw=fur  text="Experience: Logistics Coordinator, 2017-present"
+  FALSE REFUSAL  logistics_headers#4  verdict=other  raw=sco  text="Certifications: Forklift, IOSH Managing Safely"
+  FALSE REFUSAL  paralegal_mixed_shape#0  verdict=other  raw=gla  text="Thaddeus Ngcobo"
+  FALSE REFUSAL  paralegal_mixed_shape#2  verdict=other  raw=dan  text="Skills: Drafting, Title Review, Case Management Systems"
+  FALSE REFUSAL  paralegal_mixed_shape#4  verdict=other  raw=ina  text="Additional: Conversational Portuguese"
+  FALSE REFUSAL  driver_very_terse#0  verdict=other  raw=sot  text="Kwabena Boateng - HGV Driver"
+  FALSE REFUSAL  driver_very_terse#1  verdict=other  raw=oci  text="Class 1 licence, clean record, twelve years"
+  FALSE REFUSAL  driver_very_terse#3  verdict=other  raw=sco  text="Digital tachograph and drivers hours compliant"
+  FALSE REFUSAL  driver_very_terse#4  verdict=other  raw=dan  text="Manual handling trained"
+  FALSE REFUSAL  vtu_headers#0  verdict=other  raw=lus  text="Rajesh Thiruvananthapuram"
+  FALSE REFUSAL  vtu_headers#1  verdict=other  raw=sco  text="Contact: r.thiru@example.com"
+  FALSE REFUSAL  vtu_headers#2  verdict=other  raw=swe  text="Skills: Java, Spring, Hibernate, Microservices, Kafka, Docker, Kuberne"
+  FALSE REFUSAL  vtu_headers#3  verdict=other  raw=ido  text="Experience: Senior Software Engineer, 2018-present"
+  FALSE REFUSAL  jntu_terse#0  verdict=other  raw=ace  text="Lakshmi Narasimhan - Data Engineer"
+  FALSE REFUSAL  jntu_terse#1  verdict=other  raw=ina  text="- Built ingestion pipelines processing twelve million records daily"
+  FALSE REFUSAL  mixed_unis#0  verdict=other  raw=emk  text="Priyanka Balasubramanian"
+  FALSE REFUSAL  mixed_unis#1  verdict=other  raw=cni  text="Education: B.Tech, Amrita Vishwa Vidyapeetham, Coimbatore, 2016"
+  FALSE REFUSAL  mixed_unis#2  verdict=other  raw=fry  text="Postgraduate: M.Tech, Vellore Institute of Technology, 2019"
+  FALSE REFUSAL  uni_lines_only#0  verdict=und  raw=und  text="Education"
+  FALSE REFUSAL  uni_lines_only#1  verdict=other  raw=nld  text="Indian Institute of Technology Kharagpur"
+  FALSE REFUSAL  uni_lines_only#2  verdict=other  raw=ppl  text="Visvesvaraya Technological University Belagavi"
+  FALSE REFUSAL  uni_lines_only#3  verdict=other  raw=ppl  text="Jawaharlal Nehru Technological University Hyderabad"
+  FALSE REFUSAL  uni_lines_only#4  verdict=other  raw=gyr  text="Amrita Vishwa Vidyapeetham Coimbatore"
+
+[tinyld/light] 43/96 correctly EN  (53 false refusals, 0 threw)
+  FALSE REFUSAL  skills_list_1#0  verdict=other  raw="tr"  text="Priya Chandrasekaran"
+  FALSE REFUSAL  skills_list_1#1  verdict=other  raw="sv"  text="Skills: Python, Docker, Kubernetes, AWS, React, Node.js, PostgreSQL, G"
+  FALSE REFUSAL  skills_list_1#3  verdict=other  raw="pt"  text="Education: Bachelor of Science in Computer Science, 2015."
+  FALSE REFUSAL  skills_list_1#4  verdict=other  raw="fr"  text="Certifications: AWS Certified Solutions Architect - Associate"
+  FALSE REFUSAL  skills_list_2#0  verdict=other  raw="no"  text="Devon Okafor"
+  FALSE REFUSAL  skills_list_2#2  verdict=other  raw="nl"  text="Tools: IntelliJ, Postman, Grafana, Prometheus"
+  FALSE REFUSAL  skills_list_2#3  verdict=other  raw="nl"  text="Experience: Backend Engineer, Vantage Retail, 2018-present"
+  FALSE REFUSAL  skills_list_2#4  verdict=other  raw="nl"  text="Education: BS Computer Engineering, 2014"
+  FALSE REFUSAL  terse_bullets_1#0  verdict=other  raw="tr"  text="Casey Nakamura - Site Reliability Engineer"
+  FALSE REFUSAL  terse_bullets_1#2  verdict=other  raw="pl"  text="- Automated deployment pipeline, cutting release time by 60 percent"
+  FALSE REFUSAL  code_heavy#0  verdict=other  raw="nl"  text="Sam Iverson - Software Engineer"
+  FALSE REFUSAL  code_heavy#1  verdict=other  raw="ro"  text="function calculateTotal(items) { return items.reduce((sum, item) => su"
+  FALSE REFUSAL  code_heavy#2  verdict=other  raw="ru"  text="const config = { retries: 3, timeout: 5000, baseUrl: 'https://api.exam"
+  FALSE REFUSAL  headers_plus_tech_only#0  verdict=other  raw="pl"  text="Jamie Okonkwo"
+  FALSE REFUSAL  headers_plus_tech_only#1  verdict=other  raw="pt"  text="Contact: jamie.okonkwo@example.com, Springfield"
+  FALSE REFUSAL  headers_plus_tech_only#2  verdict=other  raw="sv"  text="Skills: AWS, GCP, Terraform, Ansible, Docker, Kubernetes, Python, Bash"
+  FALSE REFUSAL  headers_plus_tech_only#3  verdict=other  raw="es"  text="Experience: DevOps Engineer, 2016-present"
+  FALSE REFUSAL  headers_plus_tech_only#4  verdict=other  raw="pl"  text="Certifications: CKA, AWS SysOps Administrator"
+  FALSE REFUSAL  headers_plus_tech_only#5  verdict=other  raw="hu"  text="Education: BS, Information Technology"
+  FALSE REFUSAL  chef_terse#0  verdict=other  raw="it"  text="Dmitri Karalis - Head Chef"
+  FALSE REFUSAL  chef_terse#4  verdict=other  raw="nl"  text="- Managed supplier relationships and weekly ordering"
+  FALSE REFUSAL  chef_terse#5  verdict=other  raw="fr"  text="- Trained six commis chefs to chef de partie level"
+  FALSE REFUSAL  electrician_terse#0  verdict=other  raw="it"  text="Sione Fifita - Qualified Electrician"
+  FALSE REFUSAL  electrician_terse#1  verdict=other  raw="fr"  text="- Completed domestic and light commercial installations"
+  FALSE REFUSAL  electrician_terse#3  verdict=other  raw="pl"  text="- Supervised two apprentices on site"
+  FALSE REFUSAL  electrician_terse#5  verdict=other  raw="tr"  text="- Held responsibility for site safety documentation"
+  FALSE REFUSAL  logistics_headers#0  verdict=other  raw="hu"  text="Anneliese Vogt-Ramirez"
+  FALSE REFUSAL  logistics_headers#1  verdict=other  raw="pt"  text="Contact: a.vogt.ramirez@example.com"
+  FALSE REFUSAL  logistics_headers#2  verdict=other  raw="fr"  text="Skills: Warehouse Management, SAP, Forecasting, Route Planning, Invent"
+  FALSE REFUSAL  logistics_headers#3  verdict=other  raw="hu"  text="Experience: Logistics Coordinator, 2017-present"
+  FALSE REFUSAL  logistics_headers#4  verdict=other  raw="it"  text="Certifications: Forklift, IOSH Managing Safely"
+  FALSE REFUSAL  logistics_headers#5  verdict=other  raw="it"  text="Education: Diploma in Supply Chain Management"
+  FALSE REFUSAL  paralegal_mixed_shape#2  verdict=other  raw="fr"  text="Skills: Drafting, Title Review, Case Management Systems"
+  FALSE REFUSAL  paralegal_mixed_shape#3  verdict=other  raw="es"  text="Education: LLB, 2016"
+  FALSE REFUSAL  paralegal_mixed_shape#4  verdict=other  raw="it"  text="Additional: Conversational Portuguese"
+  FALSE REFUSAL  driver_very_terse#0  verdict=other  raw="nl"  text="Kwabena Boateng - HGV Driver"
+  FALSE REFUSAL  driver_very_terse#2  verdict=other  raw="es"  text="Long distance and multi-drop experience"
+  FALSE REFUSAL  driver_very_terse#3  verdict=other  raw="pt"  text="Digital tachograph and drivers hours compliant"
+  FALSE REFUSAL  driver_very_terse#4  verdict=other  raw="it"  text="Manual handling trained"
+  FALSE REFUSAL  vtu_headers#1  verdict=other  raw="pt"  text="Contact: r.thiru@example.com"
+  FALSE REFUSAL  vtu_headers#2  verdict=other  raw="sv"  text="Skills: Java, Spring, Hibernate, Microservices, Kafka, Docker, Kuberne"
+  FALSE REFUSAL  vtu_headers#3  verdict=other  raw="nl"  text="Experience: Senior Software Engineer, 2018-present"
+  FALSE REFUSAL  vtu_headers#4  verdict=other  raw="nl"  text="Education: Bachelor of Engineering, Visvesvaraya Technological Univers"
+  FALSE REFUSAL  vtu_headers#5  verdict=other  raw="fr"  text="Certifications: Oracle Certified Professional, AWS Solutions Architect"
+  FALSE REFUSAL  jntu_terse#0  verdict=other  raw="nl"  text="Lakshmi Narasimhan - Data Engineer"
+  FALSE REFUSAL  jntu_terse#1  verdict=other  raw="no"  text="- Built ingestion pipelines processing twelve million records daily"
+  FALSE REFUSAL  mixed_unis#0  verdict=other  raw="tr"  text="Priyanka Balasubramanian"
+  FALSE REFUSAL  mixed_unis#2  verdict=other  raw="de"  text="Postgraduate: M.Tech, Vellore Institute of Technology, 2019"
+  FALSE REFUSAL  mixed_unis#3  verdict=other  raw="sv"  text="Also attended: Birla Institute of Technology and Science Pilani, summe"
+  FALSE REFUSAL  uni_lines_only#0  verdict=und  raw=""  text="Education"
+  FALSE REFUSAL  uni_lines_only#2  verdict=other  raw="tr"  text="Visvesvaraya Technological University Belagavi"
+  FALSE REFUSAL  uni_lines_only#3  verdict=other  raw="pl"  text="Jawaharlal Nehru Technological University Hyderabad"
+  FALSE REFUSAL  uni_lines_only#4  verdict=other  raw="tr"  text="Amrita Vishwa Vidyapeetham Coimbatore"
+
+[tinyld (normal)] 49/96 correctly EN  (47 false refusals, 0 threw)
+  FALSE REFUSAL  skills_list_1#0  verdict=other  raw="tl"  text="Priya Chandrasekaran"
+  FALSE REFUSAL  skills_list_1#1  verdict=other  raw="sv"  text="Skills: Python, Docker, Kubernetes, AWS, React, Node.js, PostgreSQL, G"
+  FALSE REFUSAL  skills_list_1#3  verdict=other  raw="la"  text="Education: Bachelor of Science in Computer Science, 2015."
+  FALSE REFUSAL  skills_list_2#0  verdict=other  raw="eo"  text="Devon Okafor"
+  FALSE REFUSAL  skills_list_2#1  verdict=other  raw="ber"  text="Skills: Java, Spring, Hibernate, MySQL, Kafka, Jenkins, Terraform, Lin"
+  FALSE REFUSAL  skills_list_2#4  verdict=other  raw="nl"  text="Education: BS Computer Engineering, 2014"
+  FALSE REFUSAL  terse_bullets_1#0  verdict=other  raw="af"  text="Casey Nakamura - Site Reliability Engineer"
+  FALSE REFUSAL  terse_bullets_1#4  verdict=other  raw="fr"  text="- Migrated legacy infrastructure to containers, improving uptime"
+  FALSE REFUSAL  terse_bullets_2#2  verdict=other  raw="no"  text="- Ran weekly experiments across the onboarding funnel"
+  FALSE REFUSAL  code_heavy#0  verdict=other  raw="nl"  text="Sam Iverson - Software Engineer"
+  FALSE REFUSAL  code_heavy#1  verdict=other  raw="la"  text="function calculateTotal(items) { return items.reduce((sum, item) => su"
+  FALSE REFUSAL  code_heavy#2  verdict=other  raw="it"  text="const config = { retries: 3, timeout: 5000, baseUrl: 'https://api.exam"
+  FALSE REFUSAL  headers_plus_tech_only#0  verdict=other  raw="rn"  text="Jamie Okonkwo"
+  FALSE REFUSAL  headers_plus_tech_only#1  verdict=other  raw="pt"  text="Contact: jamie.okonkwo@example.com, Springfield"
+  FALSE REFUSAL  headers_plus_tech_only#2  verdict=other  raw="sv"  text="Skills: AWS, GCP, Terraform, Ansible, Docker, Kubernetes, Python, Bash"
+  FALSE REFUSAL  headers_plus_tech_only#4  verdict=other  raw="ber"  text="Certifications: CKA, AWS SysOps Administrator"
+  FALSE REFUSAL  headers_plus_tech_only#5  verdict=other  raw="hu"  text="Education: BS, Information Technology"
+  FALSE REFUSAL  chef_terse#0  verdict=other  raw="et"  text="Dmitri Karalis - Head Chef"
+  FALSE REFUSAL  chef_terse#5  verdict=other  raw="is"  text="- Trained six commis chefs to chef de partie level"
+  FALSE REFUSAL  electrician_terse#0  verdict=other  raw="it"  text="Sione Fifita - Qualified Electrician"
+  FALSE REFUSAL  electrician_terse#1  verdict=other  raw="fr"  text="- Completed domestic and light commercial installations"
+  FALSE REFUSAL  electrician_terse#3  verdict=other  raw="et"  text="- Supervised two apprentices on site"
+  FALSE REFUSAL  electrician_terse#5  verdict=other  raw="no"  text="- Held responsibility for site safety documentation"
+  FALSE REFUSAL  logistics_headers#0  verdict=other  raw="it"  text="Anneliese Vogt-Ramirez"
+  FALSE REFUSAL  logistics_headers#1  verdict=other  raw="pt"  text="Contact: a.vogt.ramirez@example.com"
+  FALSE REFUSAL  logistics_headers#4  verdict=other  raw="la"  text="Certifications: Forklift, IOSH Managing Safely"
+  FALSE REFUSAL  logistics_headers#5  verdict=other  raw="ga"  text="Education: Diploma in Supply Chain Management"
+  FALSE REFUSAL  paralegal_mixed_shape#0  verdict=other  raw="ga"  text="Thaddeus Ngcobo"
+  FALSE REFUSAL  paralegal_mixed_shape#2  verdict=other  raw="is"  text="Skills: Drafting, Title Review, Case Management Systems"
+  FALSE REFUSAL  paralegal_mixed_shape#3  verdict=other  raw="ber"  text="Education: LLB, 2016"
+  FALSE REFUSAL  paralegal_mixed_shape#4  verdict=und  raw=""  text="Additional: Conversational Portuguese"
+  FALSE REFUSAL  driver_very_terse#0  verdict=other  raw="de"  text="Kwabena Boateng - HGV Driver"
+  FALSE REFUSAL  driver_very_terse#3  verdict=other  raw="fr"  text="Digital tachograph and drivers hours compliant"
+  FALSE REFUSAL  driver_very_terse#4  verdict=other  raw="et"  text="Manual handling trained"
+  FALSE REFUSAL  iit_prose#3  verdict=other  raw="tl"  text="Education: Bachelor of Technology in Computer Science, Indian Institut"
+  FALSE REFUSAL  vtu_headers#1  verdict=other  raw="pt"  text="Contact: r.thiru@example.com"
+  FALSE REFUSAL  vtu_headers#2  verdict=other  raw="sv"  text="Skills: Java, Spring, Hibernate, Microservices, Kafka, Docker, Kuberne"
+  FALSE REFUSAL  vtu_headers#3  verdict=other  raw="la"  text="Experience: Senior Software Engineer, 2018-present"
+  FALSE REFUSAL  jntu_terse#0  verdict=other  raw="af"  text="Lakshmi Narasimhan - Data Engineer"
+  FALSE REFUSAL  jntu_terse#4  verdict=other  raw="id"  text="Education: Master of Technology, Jawaharlal Nehru Technological Univer"
+  FALSE REFUSAL  mixed_unis#0  verdict=other  raw="tl"  text="Priyanka Balasubramanian"
+  FALSE REFUSAL  mixed_unis#1  verdict=other  raw="id"  text="Education: B.Tech, Amrita Vishwa Vidyapeetham, Coimbatore, 2016"
+  FALSE REFUSAL  uni_lines_only#0  verdict=und  raw=""  text="Education"
+  FALSE REFUSAL  uni_lines_only#1  verdict=other  raw="tl"  text="Indian Institute of Technology Kharagpur"
+  FALSE REFUSAL  uni_lines_only#2  verdict=other  raw="id"  text="Visvesvaraya Technological University Belagavi"
+  FALSE REFUSAL  uni_lines_only#3  verdict=other  raw="id"  text="Jawaharlal Nehru Technological University Hyderabad"
+  FALSE REFUSAL  uni_lines_only#4  verdict=other  raw="id"  text="Amrita Vishwa Vidyapeetham Coimbatore"
+
+[tinyld/heavy] 63/96 correctly EN  (33 false refusals, 0 threw)
+  FALSE REFUSAL  skills_list_1#0  verdict=other  raw="rn"  text="Priya Chandrasekaran"
+  FALSE REFUSAL  skills_list_1#1  verdict=other  raw="sv"  text="Skills: Python, Docker, Kubernetes, AWS, React, Node.js, PostgreSQL, G"
+  FALSE REFUSAL  skills_list_1#3  verdict=other  raw="la"  text="Education: Bachelor of Science in Computer Science, 2015."
+  FALSE REFUSAL  skills_list_2#0  verdict=other  raw="eo"  text="Devon Okafor"
+  FALSE REFUSAL  skills_list_2#1  verdict=other  raw="hu"  text="Skills: Java, Spring, Hibernate, MySQL, Kafka, Jenkins, Terraform, Lin"
+  FALSE REFUSAL  skills_list_2#4  verdict=other  raw="vo"  text="Education: BS Computer Engineering, 2014"
+  FALSE REFUSAL  code_heavy#0  verdict=other  raw="nl"  text="Sam Iverson - Software Engineer"
+  FALSE REFUSAL  code_heavy#1  verdict=other  raw="la"  text="function calculateTotal(items) { return items.reduce((sum, item) => su"
+  FALSE REFUSAL  headers_plus_tech_only#0  verdict=other  raw="pl"  text="Jamie Okonkwo"
+  FALSE REFUSAL  headers_plus_tech_only#1  verdict=other  raw="pt"  text="Contact: jamie.okonkwo@example.com, Springfield"
+  FALSE REFUSAL  headers_plus_tech_only#2  verdict=other  raw="rn"  text="Skills: AWS, GCP, Terraform, Ansible, Docker, Kubernetes, Python, Bash"
+  FALSE REFUSAL  headers_plus_tech_only#3  verdict=other  raw="ro"  text="Experience: DevOps Engineer, 2016-present"
+  FALSE REFUSAL  logistics_headers#0  verdict=other  raw="de"  text="Anneliese Vogt-Ramirez"
+  FALSE REFUSAL  logistics_headers#1  verdict=other  raw="pt"  text="Contact: a.vogt.ramirez@example.com"
+  FALSE REFUSAL  logistics_headers#4  verdict=other  raw="la"  text="Certifications: Forklift, IOSH Managing Safely"
+  FALSE REFUSAL  paralegal_mixed_shape#0  verdict=other  raw="ga"  text="Thaddeus Ngcobo"
+  FALSE REFUSAL  paralegal_mixed_shape#2  verdict=other  raw="is"  text="Skills: Drafting, Title Review, Case Management Systems"
+  FALSE REFUSAL  paralegal_mixed_shape#3  verdict=other  raw="es"  text="Education: LLB, 2016"
+  FALSE REFUSAL  paralegal_mixed_shape#4  verdict=other  raw="fr"  text="Additional: Conversational Portuguese"
+  FALSE REFUSAL  driver_very_terse#0  verdict=other  raw="tl"  text="Kwabena Boateng - HGV Driver"
+  FALSE REFUSAL  vtu_headers#0  verdict=other  raw="rn"  text="Rajesh Thiruvananthapuram"
+  FALSE REFUSAL  vtu_headers#1  verdict=other  raw="pt"  text="Contact: r.thiru@example.com"
+  FALSE REFUSAL  vtu_headers#2  verdict=other  raw="sv"  text="Skills: Java, Spring, Hibernate, Microservices, Kafka, Docker, Kuberne"
+  FALSE REFUSAL  vtu_headers#4  verdict=other  raw="tr"  text="Education: Bachelor of Engineering, Visvesvaraya Technological Univers"
+  FALSE REFUSAL  jntu_terse#0  verdict=other  raw="fi"  text="Lakshmi Narasimhan - Data Engineer"
+  FALSE REFUSAL  jntu_terse#4  verdict=other  raw="id"  text="Education: Master of Technology, Jawaharlal Nehru Technological Univer"
+  FALSE REFUSAL  jntu_terse#5  verdict=other  raw="vi"  text="Previously: Savitribai Phule Pune University, Bachelor of Computer App"
+  FALSE REFUSAL  mixed_unis#0  verdict=other  raw="et"  text="Priyanka Balasubramanian"
+  FALSE REFUSAL  mixed_unis#1  verdict=other  raw="rn"  text="Education: B.Tech, Amrita Vishwa Vidyapeetham, Coimbatore, 2016"
+  FALSE REFUSAL  uni_lines_only#0  verdict=other  raw="la"  text="Education"
+  FALSE REFUSAL  uni_lines_only#2  verdict=other  raw="tr"  text="Visvesvaraya Technological University Belagavi"
+  FALSE REFUSAL  uni_lines_only#3  verdict=other  raw="id"  text="Jawaharlal Nehru Technological University Hyderabad"
+  FALSE REFUSAL  uni_lines_only#4  verdict=other  raw="rn"  text="Amrita Vishwa Vidyapeetham Coimbatore"
+
+[eld] 87/96 correctly EN  (9 false refusals, 0 threw)
+  FALSE REFUSAL  skills_list_1#0  verdict=other  raw="eu" reliable=true  text="Priya Chandrasekaran"
+  FALSE REFUSAL  headers_plus_tech_only#0  verdict=other  raw="fr" reliable=false  text="Jamie Okonkwo"
+  FALSE REFUSAL  chef_terse#0  verdict=other  raw="tl" reliable=true  text="Dmitri Karalis - Head Chef"
+  FALSE REFUSAL  logistics_headers#0  verdict=other  raw="no" reliable=true  text="Anneliese Vogt-Ramirez"
+  FALSE REFUSAL  paralegal_mixed_shape#0  verdict=other  raw="de" reliable=false  text="Thaddeus Ngcobo"
+  FALSE REFUSAL  driver_very_terse#0  verdict=other  raw="tl" reliable=true  text="Kwabena Boateng - HGV Driver"
+  FALSE REFUSAL  vtu_headers#0  verdict=other  raw="sq" reliable=false  text="Rajesh Thiruvananthapuram"
+  FALSE REFUSAL  mixed_unis#0  verdict=other  raw="eu" reliable=false  text="Priyanka Balasubramanian"
+  FALSE REFUSAL  uni_lines_only#4  verdict=other  raw="it" reliable=false  text="Amrita Vishwa Vidyapeetham Coimbatore"
+
+[cld3-asm] 60/96 correctly EN  (36 false refusals, 0 threw)
+  FALSE REFUSAL  skills_list_1#0  verdict=other  raw=ku p=0.88 reliable=true  text="Priya Chandrasekaran"
+  FALSE REFUSAL  skills_list_1#1  verdict=other  raw=no p=0.49 reliable=false  text="Skills: Python, Docker, Kubernetes, AWS, React, Node.js, PostgreSQL, G"
+  FALSE REFUSAL  skills_list_2#0  verdict=other  raw=tr p=0.44 reliable=false  text="Devon Okafor"
+  FALSE REFUSAL  skills_list_2#1  verdict=other  raw=et p=0.44 reliable=false  text="Skills: Java, Spring, Hibernate, MySQL, Kafka, Jenkins, Terraform, Lin"
+  FALSE REFUSAL  skills_list_2#2  verdict=other  raw=sr p=0.23 reliable=false  text="Tools: IntelliJ, Postman, Grafana, Prometheus"
+  FALSE REFUSAL  terse_bullets_1#0  verdict=other  raw=sn p=0.30 reliable=false  text="Casey Nakamura - Site Reliability Engineer"
+  FALSE REFUSAL  code_heavy#0  verdict=other  raw=de p=0.29 reliable=false  text="Sam Iverson - Software Engineer"
+  FALSE REFUSAL  code_heavy#1  verdict=other  raw=la p=0.99 reliable=true  text="function calculateTotal(items) { return items.reduce((sum, item) => su"
+  FALSE REFUSAL  code_heavy#2  verdict=other  raw=pt p=0.87 reliable=true  text="const config = { retries: 3, timeout: 5000, baseUrl: 'https://api.exam"
+  FALSE REFUSAL  headers_plus_tech_only#0  verdict=other  raw=pl p=0.63 reliable=false  text="Jamie Okonkwo"
+  FALSE REFUSAL  headers_plus_tech_only#1  verdict=other  raw=lt p=0.76 reliable=true  text="Contact: jamie.okonkwo@example.com, Springfield"
+  FALSE REFUSAL  headers_plus_tech_only#2  verdict=other  raw=zu p=0.17 reliable=false  text="Skills: AWS, GCP, Terraform, Ansible, Docker, Kubernetes, Python, Bash"
+  FALSE REFUSAL  headers_plus_tech_only#3  verdict=other  raw=af p=0.64 reliable=false  text="Experience: DevOps Engineer, 2016-present"
+  FALSE REFUSAL  chef_terse#0  verdict=other  raw=gd p=0.57 reliable=false  text="Dmitri Karalis - Head Chef"
+  FALSE REFUSAL  chef_terse#3  verdict=other  raw=jv p=0.51 reliable=false  text="- Designed seasonal menus changing four times a year"
+  FALSE REFUSAL  chef_terse#5  verdict=other  raw=fr p=0.88 reliable=true  text="- Trained six commis chefs to chef de partie level"
+  FALSE REFUSAL  logistics_headers#0  verdict=other  raw=de p=1.00 reliable=true  text="Anneliese Vogt-Ramirez"
+  FALSE REFUSAL  logistics_headers#1  verdict=other  raw=pt p=0.58 reliable=false  text="Contact: a.vogt.ramirez@example.com"
+  FALSE REFUSAL  logistics_headers#3  verdict=other  raw=ro p=0.57 reliable=false  text="Experience: Logistics Coordinator, 2017-present"
+  FALSE REFUSAL  paralegal_mixed_shape#0  verdict=other  raw=xh p=0.77 reliable=true  text="Thaddeus Ngcobo"
+  FALSE REFUSAL  paralegal_mixed_shape#3  verdict=other  raw=hmn p=0.78 reliable=true  text="Education: LLB, 2016"
+  FALSE REFUSAL  driver_very_terse#0  verdict=other  raw=ny p=0.55 reliable=false  text="Kwabena Boateng - HGV Driver"
+  FALSE REFUSAL  vtu_headers#0  verdict=other  raw=sn p=0.99 reliable=true  text="Rajesh Thiruvananthapuram"
+  FALSE REFUSAL  vtu_headers#1  verdict=other  raw=pt p=0.92 reliable=true  text="Contact: r.thiru@example.com"
+  FALSE REFUSAL  vtu_headers#2  verdict=other  raw=et p=0.73 reliable=true  text="Skills: Java, Spring, Hibernate, Microservices, Kafka, Docker, Kuberne"
+  FALSE REFUSAL  vtu_headers#4  verdict=other  raw=st p=0.22 reliable=false  text="Education: Bachelor of Engineering, Visvesvaraya Technological Univers"
+  FALSE REFUSAL  jntu_terse#0  verdict=other  raw=ms p=0.67 reliable=false  text="Lakshmi Narasimhan - Data Engineer"
+  FALSE REFUSAL  jntu_terse#4  verdict=other  raw=zu p=0.63 reliable=false  text="Education: Master of Technology, Jawaharlal Nehru Technological Univer"
+  FALSE REFUSAL  jntu_terse#5  verdict=other  raw=ceb p=0.30 reliable=false  text="Previously: Savitribai Phule Pune University, Bachelor of Computer App"
+  FALSE REFUSAL  mixed_unis#0  verdict=other  raw=su p=0.48 reliable=false  text="Priyanka Balasubramanian"
+  FALSE REFUSAL  mixed_unis#1  verdict=other  raw=ny p=0.59 reliable=false  text="Education: B.Tech, Amrita Vishwa Vidyapeetham, Coimbatore, 2016"
+  FALSE REFUSAL  mixed_unis#2  verdict=other  raw=it p=0.51 reliable=false  text="Postgraduate: M.Tech, Vellore Institute of Technology, 2019"
+  FALSE REFUSAL  uni_lines_only#0  verdict=other  raw=ja p=0.48 reliable=false  text="Education"
+  FALSE REFUSAL  uni_lines_only#2  verdict=other  raw=hi-Latn p=0.39 reliable=false  text="Visvesvaraya Technological University Belagavi"
+  FALSE REFUSAL  uni_lines_only#3  verdict=other  raw=zu p=0.24 reliable=false  text="Jawaharlal Nehru Technological University Hyderabad"
+  FALSE REFUSAL  uni_lines_only#4  verdict=other  raw=sn p=0.97 reliable=true  text="Amrita Vishwa Vidyapeetham Coimbatore"
+
+================================================================================
+Germanic sub-floor lines: 13 (must classify NON-English; failure = miss)
+================================================================================
+
+[franc] 10/13 correctly caught as non-English  (3 missed, 0 threw)
+  MISSED  de_berufserfahrung_softwareentwicklung  verdict=en  raw=eng  text="Berufserfahrung: Softwareentwicklung, Systemintegration"
+  MISSED  de_qualifikationen_projektmanagement  verdict=en  raw=eng  text="Qualifikationen: Projektmanagement, Qualitaetssicherung"
+  MISSED  sv_kvalifikationer_projektledning  verdict=en  raw=eng  text="Kvalifikationer: Projektledning, Kvalitetssaekring"
+
+[franc-min] 10/13 correctly caught as non-English  (3 missed, 0 threw)
+  MISSED  de_berufserfahrung_softwareentwicklung  verdict=en  raw=eng  text="Berufserfahrung: Softwareentwicklung, Systemintegration"
+  MISSED  de_qualifikationen_projektmanagement  verdict=en  raw=eng  text="Qualifikationen: Projektmanagement, Qualitaetssicherung"
+  MISSED  sv_kvalifikationer_projektledning  verdict=en  raw=eng  text="Kvalifikationer: Projektledning, Kvalitetssaekring"
+
+[franc-all] 11/13 correctly caught as non-English  (2 missed, 0 threw)
+  MISSED  de_berufserfahrung_softwareentwicklung  verdict=en  raw=eng  text="Berufserfahrung: Softwareentwicklung, Systemintegration"
+  MISSED  sv_kvalifikationer_projektledning  verdict=en  raw=eng  text="Kvalifikationer: Projektledning, Kvalitetssaekring"
+
+[tinyld/light] 13/13 correctly caught as non-English  (0 missed, 0 threw)
+
+[tinyld (normal)] 13/13 correctly caught as non-English  (0 missed, 0 threw)
+
+[tinyld/heavy] 13/13 correctly caught as non-English  (0 missed, 0 threw)
+
+[eld] 13/13 correctly caught as non-English  (0 missed, 0 threw)
+
+[cld3-asm] 13/13 correctly caught as non-English  (0 missed, 0 threw)
+
+================================================================================
+Known hard English lines (documented in ADR-030 as the narrowest margin case)
+================================================================================
+
+[franc]
+  additional_conversational_portuguese: verdict=en raw=eng
+  headers_plus_tech_only_skills: verdict=other raw=fra
+  headers_plus_tech_only_education: verdict=en raw=eng
+
+[franc-min]
+  additional_conversational_portuguese: verdict=en raw=eng
+  headers_plus_tech_only_skills: verdict=other raw=fra
+  headers_plus_tech_only_education: verdict=en raw=eng
+
+[franc-all]
+  additional_conversational_portuguese: verdict=other raw=ina
+  headers_plus_tech_only_skills: verdict=other raw=fra
+  headers_plus_tech_only_education: verdict=en raw=eng
+
+[tinyld/light]
+  additional_conversational_portuguese: verdict=other raw="it"
+  headers_plus_tech_only_skills: verdict=other raw="sv"
+  headers_plus_tech_only_education: verdict=other raw="hu"
+
+[tinyld (normal)]
+  additional_conversational_portuguese: verdict=und raw=""
+  headers_plus_tech_only_skills: verdict=other raw="sv"
+  headers_plus_tech_only_education: verdict=other raw="hu"
+
+[tinyld/heavy]
+  additional_conversational_portuguese: verdict=other raw="fr"
+  headers_plus_tech_only_skills: verdict=other raw="rn"
+  headers_plus_tech_only_education: verdict=en raw="en"
+
+[eld]
+  additional_conversational_portuguese: verdict=en raw="en" reliable=true
+  headers_plus_tech_only_skills: verdict=en raw="en" reliable=true
+  headers_plus_tech_only_education: verdict=en raw="en" reliable=true
+
+[cld3-asm]
+  additional_conversational_portuguese: verdict=en raw=en p=0.43 reliable=false
+  headers_plus_tech_only_skills: verdict=other raw=zu p=0.17 reliable=false
+  headers_plus_tech_only_education: verdict=en raw=en p=0.94 reliable=true
+
+================================================================================
+Below-documented-minimum-length behaviour
+================================================================================
+
+[franc]
+  input="" (len 0) -> verdict=und raw=und
+  input="a" (len 1) -> verdict=und raw=und
+  input="OK" (len 2) -> verdict=und raw=und
+  input="Hi" (len 2) -> verdict=und raw=und
+  input="Java" (len 4) -> verdict=und raw=und
+  input="123" (len 3) -> verdict=und raw=und
+  input="BE" (len 2) -> verdict=und raw=und
+  input="CV" (len 2) -> verdict=und raw=und
+
+[franc-min]
+  input="" (len 0) -> verdict=und raw=und
+  input="a" (len 1) -> verdict=und raw=und
+  input="OK" (len 2) -> verdict=und raw=und
+  input="Hi" (len 2) -> verdict=und raw=und
+  input="Java" (len 4) -> verdict=und raw=und
+  input="123" (len 3) -> verdict=und raw=und
+  input="BE" (len 2) -> verdict=und raw=und
+  input="CV" (len 2) -> verdict=und raw=und
+
+[franc-all]
+  input="" (len 0) -> verdict=und raw=und
+  input="a" (len 1) -> verdict=und raw=und
+  input="OK" (len 2) -> verdict=und raw=und
+  input="Hi" (len 2) -> verdict=und raw=und
+  input="Java" (len 4) -> verdict=und raw=und
+  input="123" (len 3) -> verdict=und raw=und
+  input="BE" (len 2) -> verdict=und raw=und
+  input="CV" (len 2) -> verdict=und raw=und
+
+[tinyld/light]
+  input="" (len 0) -> verdict=und raw=""
+  input="a" (len 1) -> verdict=und raw=""
+  input="OK" (len 2) -> verdict=und raw=""
+  input="Hi" (len 2) -> verdict=und raw=""
+  input="Java" (len 4) -> verdict=und raw=""
+  input="123" (len 3) -> verdict=und raw=""
+  input="BE" (len 2) -> verdict=en raw="en"
+  input="CV" (len 2) -> verdict=und raw=""
+
+[tinyld (normal)]
+  input="" (len 0) -> verdict=und raw=""
+  input="a" (len 1) -> verdict=und raw=""
+  input="OK" (len 2) -> verdict=und raw=""
+  input="Hi" (len 2) -> verdict=und raw=""
+  input="Java" (len 4) -> verdict=und raw=""
+  input="123" (len 3) -> verdict=und raw=""
+  input="BE" (len 2) -> verdict=en raw="en"
+  input="CV" (len 2) -> verdict=und raw=""
+
+[tinyld/heavy]
+  input="" (len 0) -> verdict=und raw=""
+  input="a" (len 1) -> verdict=und raw=""
+  input="OK" (len 2) -> verdict=und raw=""
+  input="Hi" (len 2) -> verdict=und raw=""
+  input="Java" (len 4) -> verdict=und raw=""
+  input="123" (len 3) -> verdict=und raw=""
+  input="BE" (len 2) -> verdict=en raw="en"
+  input="CV" (len 2) -> verdict=other raw="sk"
+
+[eld]
+  input="" (len 0) -> verdict=und raw="" reliable=false
+  input="a" (len 1) -> verdict=other raw="hu" reliable=false
+  input="OK" (len 2) -> verdict=other raw="pl" reliable=false
+  input="Hi" (len 2) -> verdict=other raw="ca" reliable=false
+  input="Java" (len 4) -> verdict=en raw="en" reliable=false
+  input="123" (len 3) -> verdict=und raw="" reliable=false
+  input="BE" (len 2) -> verdict=en raw="en" reliable=false
+  input="CV" (len 2) -> verdict=other raw="ca" reliable=false
+
+[cld3-asm]
+  input="" (len 0) -> verdict=other raw=ja p=0.78 reliable=true
+  input="a" (len 1) -> verdict=other raw=lb p=0.97 reliable=true
+  input="OK" (len 2) -> verdict=other raw=pl p=0.66 reliable=false
+  input="Hi" (len 2) -> verdict=other raw=ca p=1.00 reliable=true
+  input="Java" (len 4) -> verdict=other raw=et p=0.99 reliable=true
+  input="123" (len 3) -> verdict=other raw=ja p=0.78 reliable=true
+  input="BE" (len 2) -> verdict=en raw=en p=1.00 reliable=true
+  input="CV" (len 2) -> verdict=other raw=gl p=0.93 reliable=true
+
+================================================================================
+SUMMARY TABLE (n/total, never a bare percentage)
+================================================================================
+candidate | false_refusals/english_total | germanic_caught/germanic_total | threw_on_short_input
+franc | 47/96 | 10/13 | 0/8
+franc-min | 40/96 | 10/13 | 0/8
+franc-all | 52/96 | 11/13 | 0/8
+tinyld/light | 53/96 | 13/13 | 0/8
+tinyld (normal) | 47/96 | 13/13 | 0/8
+tinyld/heavy | 33/96 | 13/13 | 0/8
+eld | 9/96 | 13/13 | 0/8
+cld3-asm | 36/96 | 13/13 | 0/8
+
+================================================================================
+PER-CV ROLLUP: CVs with >=1 falsely-refused line (veto-only architecture cost)
+================================================================================
+[franc] 15/23 CVs would be wrongly refused: skills_list_1, skills_list_2, terse_bullets_1, terse_bullets_2, code_heavy, headers_plus_tech_only, chef_terse, electrician_terse, logistics_headers, paralegal_mixed_shape, driver_very_terse, vtu_headers, jntu_terse, mixed_unis, uni_lines_only
+[franc-min] 15/23 CVs would be wrongly refused: skills_list_1, skills_list_2, terse_bullets_1, terse_bullets_2, code_heavy, headers_plus_tech_only, chef_terse, electrician_terse, logistics_headers, paralegal_mixed_shape, driver_very_terse, vtu_headers, jntu_terse, mixed_unis, uni_lines_only
+[franc-all] 15/23 CVs would be wrongly refused: skills_list_1, skills_list_2, terse_bullets_1, terse_bullets_2, code_heavy, headers_plus_tech_only, chef_terse, electrician_terse, logistics_headers, paralegal_mixed_shape, driver_very_terse, vtu_headers, jntu_terse, mixed_unis, uni_lines_only
+[tinyld/light] 14/23 CVs would be wrongly refused: skills_list_1, skills_list_2, terse_bullets_1, code_heavy, headers_plus_tech_only, chef_terse, electrician_terse, logistics_headers, paralegal_mixed_shape, driver_very_terse, vtu_headers, jntu_terse, mixed_unis, uni_lines_only
+[tinyld (normal)] 16/23 CVs would be wrongly refused: skills_list_1, skills_list_2, terse_bullets_1, terse_bullets_2, code_heavy, headers_plus_tech_only, chef_terse, electrician_terse, logistics_headers, paralegal_mixed_shape, driver_very_terse, iit_prose, vtu_headers, jntu_terse, mixed_unis, uni_lines_only
+[tinyld/heavy] 11/23 CVs would be wrongly refused: skills_list_1, skills_list_2, code_heavy, headers_plus_tech_only, logistics_headers, paralegal_mixed_shape, driver_very_terse, vtu_headers, jntu_terse, mixed_unis, uni_lines_only
+[eld] 9/23 CVs would be wrongly refused: skills_list_1, headers_plus_tech_only, chef_terse, logistics_headers, paralegal_mixed_shape, driver_very_terse, vtu_headers, mixed_unis, uni_lines_only
+[cld3-asm] 13/23 CVs would be wrongly refused: skills_list_1, skills_list_2, terse_bullets_1, code_heavy, headers_plus_tech_only, chef_terse, logistics_headers, paralegal_mixed_shape, driver_very_terse, vtu_headers, jntu_terse, mixed_unis, uni_lines_only

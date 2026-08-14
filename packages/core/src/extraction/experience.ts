@@ -40,7 +40,33 @@ const MONTH_NAMES: Readonly<Record<string, number>> = {
 
 const MONTH_PATTERN =
   '(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)';
-const DATE_TOKEN = String.raw`(?:${MONTH_PATTERN}\.?\s+\d{4}|\d{1,2}\/\d{4}|\d{4})`;
+
+/**
+ * A two-digit number outside 1-12 can only ever be a DAY, never a month —
+ * true in every locale. That is the ONE fact that makes any part of a
+ * numeric `NN/NN/YYYY` or `NN-NN-YYYY` date unambiguous (B.4, H-040's shape
+ * for Indian/European date formats): whichever of the two leading numbers
+ * falls in 13-31 is the day, and the OTHER number must then be the month,
+ * regardless of which side it is written on. `13/04/2019` is unambiguously
+ * 13 April (DD/MM/YYYY, the Indian/European convention) and `04/13/2019` is
+ * unambiguously 13 April also (MM/DD/YYYY, the US convention) — both read
+ * to month 4.
+ *
+ * When BOTH leading numbers are 1-12 (`03/04/2019`), the format is
+ * genuinely ambiguous between DD/MM/YYYY and MM/DD/YYYY and nothing here
+ * resolves it — measured, not assumed, and deliberately left unresolved
+ * rather than silently guessing a locale (see the B.4 write-up). This
+ * pattern is therefore built to structurally match ONLY the unambiguous
+ * shape; the ambiguous shape never reaches `parseDateToken` as a 3-part
+ * token at all; it falls through to the existing `\d{1,2}\/\d{4}` and
+ * `\d{4}` alternatives exactly as before this change, so the ambiguous case
+ * is provably unchanged by this fix.
+ */
+const UNAMBIGUOUS_DAY_NUMBER = '(?:1[3-9]|2[0-9]|3[01])';
+const THREE_PART_UNAMBIGUOUS_DATE = `(?:${UNAMBIGUOUS_DAY_NUMBER}[\\/\\-]\\d{1,2}|\\d{1,2}[\\/\\-]${UNAMBIGUOUS_DAY_NUMBER})[\\/\\-]\\d{4}`;
+const THREE_PART_DATE_SHAPE = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/;
+
+const DATE_TOKEN = String.raw`(?:${MONTH_PATTERN}\.?\s+\d{4}|${THREE_PART_UNAMBIGUOUS_DATE}|\d{1,2}\/\d{4}|\d{4})`;
 const PRESENT_TOKEN = '(?:Present|Current|Now|Ongoing)';
 
 const EXPLICIT_YEARS_PATTERN = /(\d{1,2}(?:\.\d)?)\+?\s*(?:years?|yrs?)\b(\s+of\s+experience)?/gi;
@@ -106,6 +132,29 @@ function isBareRangeWithoutEmploymentContext(
 
 function parseDateToken(token: string): ParsedDate | null {
   const trimmed = token.trim();
+
+  // Unambiguous DD/MM/YYYY or MM/DD/YYYY (B.4): only reached when the token
+  // matched THREE_PART_UNAMBIGUOUS_DATE above, which structurally requires
+  // one of the two leading numbers to be 13-31. Re-parsing generically here
+  // (rather than trusting alternation branch) keeps the day-vs-month choice
+  // in one place. The day value itself is never used — this module tracks
+  // only year and month, never day-of-month.
+  const threePart = THREE_PART_DATE_SHAPE.exec(trimmed);
+  if (threePart !== null) {
+    const first = threePart[1];
+    const second = threePart[2];
+    const rawYear = threePart[3];
+    if (first === undefined || second === undefined || rawYear === undefined) return null;
+    const d1 = Number(first);
+    const d2 = Number(second);
+    const year = Number(rawYear);
+    // Exactly one side must be an unambiguous day (13-31) for this branch to
+    // have matched at all; whichever side is NOT that is the month. If both
+    // sides ended up >12 (e.g. "13/25/2019") the month candidate is invalid
+    // and this correctly falls through to null below.
+    const month = d1 > 12 ? d2 : d1;
+    return month >= 1 && month <= 12 && Number.isFinite(year) ? { year, month } : null;
+  }
 
   const monthYear = /^([A-Za-z]+)\.?\s+(\d{4})$/.exec(trimmed);
   if (monthYear !== null) {
