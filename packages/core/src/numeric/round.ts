@@ -24,6 +24,27 @@ import { QUANTIZATION_DECIMALS } from '@matchdesk/shared';
  * @throws RangeError on a non-finite `value` or an out-of-range `decimals`,
  *         rather than silently returning `NaN` (rule 0.2.4: never swallow).
  */
+/**
+ * Exact powers of ten for every `decimals` this function accepts, [0, 15].
+ *
+ * **Why a table instead of `10 ** decimals` (H-076).** `**` is ECMAScript's
+ * `Number::exponentiate`, which the spec leaves implementation-approximated —
+ * the same latitude as `Math.pow`. It was the ONLY operation in the entire
+ * scoring path not required to be correctly rounded, and it sat inside
+ * `quantize`, which is the mitigation ADR-009 introduced for H-002's
+ * cross-machine drift. The mitigation was built from the one primitive with no
+ * cross-platform guarantee.
+ *
+ * In practice every engine returns these exactly. "In practice" is not a
+ * guarantee, this project's history is defects that survived because a check
+ * was absent, and the cost of removing the doubt is sixteen literals. Every
+ * value here is below 2^53 and therefore exactly representable.
+ */
+const POWERS_OF_TEN: readonly number[] = [
+  1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000, 10000000000,
+  100000000000, 1000000000000, 10000000000000, 100000000000000, 1000000000000000,
+];
+
 export function roundHalfUp(value: number, decimals = 0): number {
   if (!Number.isFinite(value)) {
     throw new RangeError(`roundHalfUp: value must be finite, received ${String(value)}`);
@@ -34,7 +55,7 @@ export function roundHalfUp(value: number, decimals = 0): number {
     );
   }
 
-  const factor = 10 ** decimals;
+  const factor = POWERS_OF_TEN[decimals] ?? 1;
   const scaled = value * factor;
 
   // Guard the correction step: toPrecision throws outside its own domain, and

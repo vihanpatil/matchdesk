@@ -2638,3 +2638,123 @@ including a test asserting the heading matcher does **not** match prose
 mentions of an id, because a matcher that did would make the check vacuous.
 That is the H-060 shape, and writing the guard without that test would have
 repeated it.
+
+## 2026-08-13 — Triage of the two findings the registry surfaced
+
+### H-076 · The mitigation for H-002 was built from the one operation with no cross-platform guarantee
+
+`roundHalfUp` computed its scaling factor as `10 ** decimals`. **`**` is
+ECMAScript's `Number::exponentiate`, which the spec leaves
+implementation-approximated — the same latitude as `Math.pow`.** It was the
+only operation in the entire scoring path not required to be correctly rounded.
+
+It sat inside `quantize`. **`quantize` is the mitigation ADR-009 introduced for
+H-002's cross-machine drift.** The guard against float drift was the one place
+float drift was permitted.
+
+In practice every engine returns `10 ** 6` exactly, and no drift has ever been
+observed. "In practice" is not a guarantee, and the cost of removing the doubt
+was sixteen literals — `decimals` is already validated to `[0, 15]`, and every
+power of ten in that range is below 2^53 and exactly representable. Verified
+equal to `10 ** n` across the whole accepted domain before replacing it.
+
+**Found by the test written to pin H-002's classification, on that test's first
+run** — not by reading the code. The first two failures that test produced were
+false positives from matching `**bold**` in comments; the third was real.
+
+### H-002 · Triaged: not wrong-score today, and the basis is now enforced
+
+**This is the one call in this session that LOOSENS the gate, so the basis is
+stated in full rather than summarised.**
+
+H-002's stated mechanism is ONNX Runtime float kernels not being bit-identical
+across CPU architecture, thread count or ORT version. **Measured: that
+mechanism is not present.**
+
+```
+ONNX Runtime / @huggingface/transformers in packages/core:  none
+transcendental or approximated Math in core:                none
+Math.* actually used:  max, min, abs, round, floor  (all exact)
+score across 3 processes, UV_THREADPOOL_SIZE 1/2/4:  94|0.9445|0.9445 identical
+```
+
+IEEE-754 requires `+ - * /` to be correctly rounded, and the `Math` helpers in
+use are exact selections or integer roundings. After H-076, there is no
+operation left in the scoring path whose result a conforming platform may vary.
+**So no mechanism exists today by which two machines can produce different
+scores.** Classified **coverage-gap**: real, deferred, non-blocking.
+
+**Honest limits of that measurement.** Three processes on one machine is not a
+cross-architecture test. It cannot be one — I have one architecture. The claim
+resting the classification is the _absence of a mechanism_, which is an
+argument from the code, and arguments rot.
+
+**So the argument is pinned rather than asserted.**
+`packages/core/src/scoring/determinism.arch.test.ts` fails if a transcendental,
+an exponentiation operator, an inference runtime, or `Math.random` enters core.
+**A failure there is the signal to re-triage H-002 — not to relax the test.**
+It also asserts it scanned a non-empty file set, because a scan over nothing
+passes vacuously, which is H-004's shape.
+
+**H-002 becomes a live wrong-score risk the moment cascade step 4 lands.** That
+is written into the registry note and into the test's header comment, in the
+two places someone adding embeddings would be looking.
+
+### H-040 · Triaged: WRONG-SCORE. It is H-041 wearing different clothes.
+
+The same test that decided H-041 — same person, same facts, one presentational
+difference:
+
+```
+A · earlier roles as "Mar 2006 - Aug 2016"   19.6 years   SCORE 100   eligible
+B · earlier roles as "03.2006 - 08.2016"      2.9 years   SCORE  66   INELIGIBLE
+      unmet: Requires at least 9 years of experience; found 2.9.
+```
+
+**The difference is the date format a previous employer used on the CV.**
+`03.2006` is ordinary European numeric notation; `MONTH_NAMES` is English-only,
+so the range does not parse, the short recent role is the only one that does,
+and the D5b rule discards every explicit claim whenever any range parses.
+
+**The engine is not missing the information. It extracts it and throws it
+away:**
+
+```
+years_experience attributes (version B): 20y(explicit=true), 2.9y(explicit=false)
+```
+
+It holds an extracted, explicit 20-year statement and then tells the recruiter
+the candidate has 2.9 years. That is ADR-023's wrong-score definition on both
+clauses — a number that is wrong, and fabricated evidence for it.
+
+**Nothing warns anyone.** I checked the explanation object rather than assuming,
+and my first keyword scan produced a false positive on the word "caveat". The
+actual `caveats` array holds two generic notes, neither about this. **The
+relevant one is worse than silent — it is wrong:**
+
+> "it measures cumulative years found in explicit statements **and** parsed
+> employment date ranges"
+
+The explicit statement was extracted and discarded. The caveat tells the
+recruiter the number was computed in a way it was not.
+
+**The counter-argument, which is real and which I am rejecting.** H-040 argues
+the discard is _correct_: a verifiable date range should beat a self-reported
+claim, or an inflated claim overrides evidence. **That argument is about
+whether the RULE is right. The classification is about whether the OUTPUT is
+wrong**, and ADR-027 already settled the general form of this: classify by what
+the system does, not by whether the component behaved as designed. A defensible
+rule that silently emits a false number about a person is still a wrong score.
+
+H-040's own entry names the remedy — surface the disagreement instead of
+resolving it silently in arithmetic. **That is the same remedy family as
+H-041's**: both are the engine being confidently quiet about something it knows
+it cannot account for. One fix pattern plausibly closes both, which is the
+argument for doing them together.
+
+### What this leaves
+
+**E5 has two blockers, both wrong-score, both the same shape: H-040 and H-041.
+Zero unclassified.** The registry's job is done — the untriaged set is empty
+and every remaining blocker is a defect with a measurement attached, not a
+question about a definition.

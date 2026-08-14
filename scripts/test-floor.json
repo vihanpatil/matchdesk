@@ -1,4 +1,4 @@
 {
   "$comment": "Minimum number of tests that must actually execute. Raise this as the suite grows; lowering it requires a HONESTY_LOG.md entry explaining why. Guards against tests that vanish without registering (e.g. an empty it.each array), which produce no 'skipped' status to detect.",
-  "minTests": 814
+  "minTests": 820
 }

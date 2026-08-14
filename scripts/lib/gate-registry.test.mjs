@@ -154,11 +154,24 @@ describe('the REAL registry, as shipped', () => {
 
   it('E5 is NOT MET at HEAD, and says so for the reasons on record', () => {
     // Asserts the CURRENT, WRONG state on purpose, like the corpus's
-    // documented-gap fixtures. When the H-041 remediation lands this test
-    // must be updated deliberately, which is the point — the gate result
-    // cannot change silently.
+    // documented-gap fixtures. When a remediation lands this must be updated
+    // deliberately, which is the point — the gate result cannot change
+    // silently.
+    //
+    // It has already earned that: it failed when H-002 was triaged out of the
+    // blocking set on 2026-08-13, forcing this edit rather than letting the
+    // gate quietly get easier. Updated from ['H-002','H-040','H-041'].
     const gate = computeGate(registry.findings);
     expect(gate.e5).toBe(false);
-    expect(gate.blockingE5.map((f) => f.id).sort()).toEqual(['H-002', 'H-040', 'H-041']);
+    expect(gate.blockingE5.map((f) => f.id).sort()).toEqual(['H-040', 'H-041']);
+  });
+
+  it('every remaining E5 blocker is a measured defect, not an untriaged one', () => {
+    // The registry's job was to empty the untriaged set. This asserts it did,
+    // so `unclassified` reappearing is a visible regression rather than a
+    // slow accumulation nobody notices.
+    const gate = computeGate(registry.findings);
+    expect(gate.blockingE5.every((f) => f.severity === 'wrong-score')).toBe(true);
+    expect(gate.openBySeverity['unclassified']).toBeUndefined();
   });
 });

@@ -32,9 +32,9 @@
     },
     {
       "id": "H-002",
-      "severity": "unclassified",
+      "severity": "coverage-gap",
       "status": "open",
-      "note": "Cross-machine determinism not guaranteed (limits C4). Never triaged under ADR-023. Same score on two machines could differ, which has wrong-score SHAPE, but is mitigated by 6dp quantization and has never been measured across machines. Needs the H-041 treatment."
+      "note": "TRIAGED 2026-08-13, NOT wrong-score today, and this is the one call that LOOSENS the gate. H-002's stated mechanism is ONNX Runtime float kernels — measured: there is no ORT, no embedding model, and no transcendental or approximated float operation anywhere in packages/core. Only IEEE-754 + - * / (correctly rounded on every conforming platform) and exact Math.max/min/abs/round/floor. So no mechanism exists by which two conforming machines can differ. PINNED by determinism.arch.test.ts, which fails if a transcendental, an exponentiation operator or an inference runtime enters core — that failure is the signal to RE-TRIAGE, not to relax the test. Becomes live wrong-score risk the moment cascade step 4 (embeddings) lands."
     },
     {
       "id": "H-003",
@@ -232,9 +232,9 @@
     },
     {
       "id": "H-040",
-      "severity": "unclassified",
+      "severity": "wrong-score",
       "status": "open",
-      "note": "BLOCKS E5 UNTIL TRIAGED. totalYearsExperience prefers parsed date ranges, so a 3-year parsed role beats an explicit 20-year claim. That understates tenure and can flip an eligibility gate — the same shape as H-041, and never triaged under ADR-023. Accepted as a deliberate tradeoff before the split existed."
+      "note": "TRIAGED 2026-08-13 as WRONG-SCORE. Measured, same person and same dates, only the date FORMAT differing: earlier roles as 'Mar 2006 - Aug 2016' give 19.6 years, score 100, eligible; the identical roles as '03.2006 - 08.2016' (standard European numeric, unparseable) give 2.9 years, score 66, INELIGIBLE, with 'Requires at least 9 years of experience; found 2.9.' shown as the reason. The engine EXTRACTS the explicit 20-year claim (isExplicitStatement=true) and discards it. Nothing warns the recruiter, and the one caveat that touches this says tenure counts 'explicit statements AND parsed ranges' — which misdescribes what happened. Same remedy family as H-041: make the silence visible."
     },
     {
       "id": "H-041",
@@ -434,6 +434,12 @@
       "severity": "process",
       "status": "closed",
       "note": "The gate reform itself (ADR-028). Recorded, not open work."
+    },
+    {
+      "id": "H-076",
+      "severity": "integrity",
+      "status": "closed",
+      "note": "quantize/roundHalfUp used `10 ** decimals`, ECMAScript's only implementation-approximated operation in the whole scoring path — inside the very function ADR-009 added to mitigate H-002. Replaced with a 16-entry table of exact literals, verified equal to 10**n across the accepted [0,15] domain. Found by the arch test written to pin H-002."
     }
   ]
 }

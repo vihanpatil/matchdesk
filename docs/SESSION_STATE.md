@@ -4,12 +4,13 @@
 the end of every working session. If this file disagrees with the code, **the
 code is right and this file is a bug** — fix it.
 
-**Last updated:** 2026-08-13 · **HEAD at last update:** `1d63547` (the commit
-recording this file follows it). Working tree clean, `pnpm verify` exit 0 —
-see H-058 before quoting any branch-coverage figure.
+**Last updated:** 2026-08-13. This file is committed together with the work it
+describes, so **HEAD is the commit that last touched it** — `git log -1 --
+docs/SESSION_STATE.md`. A hardcoded hash here went stale twice; don't add one
+back. Working tree clean, `pnpm verify` exit 0 — see H-058 before quoting any
+branch-coverage figure, and H-074 before quoting a coverage total.
 
-**Current work: remediating H-041. The E3 corpus is finished (all 6 phases
-re-planned below).**
+**Current work: remediating H-040 + H-041 — one remedy, both defects.**
 
 **START HERE — run `pnpm gate` FIRST. It prints the gate; do not read one.**
 
@@ -36,16 +37,31 @@ when their earlier role and degree are written in Spanish and **100 and
 eligible** in English — and the recruiter is told "Requires at least 9 years of
 experience; found 4.8" about someone with 9.1 years. `warnings: []`.
 
-**Three findings block E5, not one.** `pnpm gate` surfaced two that had never
-been triaged at all: **H-002** (cross-machine determinism) and **H-040**
-(_"a 3-year parsed role beats a 20-year claim"_ — the same shape as H-041,
-open since before ADR-023 existed). **Triaging those two is cheaper than the
-H-041 fix and should go first**, because either could turn out to need the
-same remediation.
+**Two findings block E5, both wrong-score, both the same shape.** The triage
+of 2026-08-13 is done and **zero findings are now unclassified**:
 
-**Then the code: choose and measure the H-041 remediation.** Deliberately left
-open (user's call — "classify now, choose the fix next"). The three candidates,
-none yet measured:
+- **H-041** — mixed-language veto silent below 15-word lines (ADR-027).
+- **H-040** — **newly classified wrong-score.** Measured: the same person with
+  the same dates scores **19.6 years / 100 / eligible** when an old employer
+  wrote `Mar 2006 - Aug 2016`, and **2.9 years / 66 / INELIGIBLE** when they
+  wrote `03.2006 - 08.2016`. The engine extracts the explicit 20-year claim
+  and discards it, then reports "found 2.9". See H-040's entry.
+- **H-002 — triaged OUT.** Not wrong-score: the ORT mechanism it describes does
+  not exist in the engine, and that basis is now **pinned by
+  `scripts/core-determinism.test.mjs`**, which fails if a transcendental, an
+  exponentiation operator or an inference runtime enters core. **A failure
+  there means re-triage H-002, not relax the test.**
+
+**H-040 and H-041 are one problem wearing two hats** — the engine emitting a
+confident number while silently discarding something it knows it could not
+account for. **Design one remedy for both**, and measure it before choosing.
+
+**The code: choose and measure the remedy.** Deliberately left open (user's
+call — "classify now, choose the fix next"). For H-041 the three candidates,
+none yet measured, are below. **H-040 needs the same shape of answer** — its
+own entry names it: surface the disagreement when an extracted explicit claim
+materially exceeds computed tenure, rather than resolving it silently in
+arithmetic.
 
 1. **Aggregate consecutive short lines** until they clear the 15-word floor,
    then judge the block with the existing n-gram method. Cheapest; reuses the
@@ -75,15 +91,15 @@ it.
 | 3 · Text tier, 13 fixtures                    | **Done** — `075b908`                        |
 | 4 · Binary tier + D8 triage → **E3 MET**      | **Done** — `1d63547`                        |
 | 5 · **E5 decision (ADR-027)**                 | **Done** — this commit. E5 + E2 NOT MET     |
-| 6 · **H-041 remediation → E5**                | **NEXT.** Measure, choose, fix, re-classify |
+| 6 · **H-040 + H-041 remediation → E5**        | **NEXT.** Measure, choose, fix, re-classify |
 | 7 · **Length-generating relation → E2**       | Blocked on 6 (H-070)                        |
 | 8 · Adversarial round 1 (E1)                  | Blocked on 6 and 7                          |
 | 9 · Adversarial round 2 (E1)                  | Not started                                 |
 
-**E1-E5 as of now:** E1 NOT MET (counter 0), **E2 NOT MET (H-070)**, E3 MET,
-E4 see §2 (`pnpm mutate` re-run this session), **E5 NOT MET (ADR-027).**
-**Three of five fail.** This is a correction to the record, not a regression in
-the code — the measurements already existed and were classified wrong.
+**Do not read the gate from here — run `pnpm gate`.** As of the triage
+commit: E1 NOT MET (checklist rows A1, A4 open; A5 never run), **E2 NOT MET**
+(derived from E5 per ADR-028), E3 MET, E4 see §2, **E5 NOT MET — two
+wrong-score blockers, zero unclassified.**
 
 **Agreed working constraints (user):** both fixture tiers; hybrid pass criteria
 (targeted assertions **plus** committed snapshots); binaries generated
@@ -92,8 +108,8 @@ the adversarial rounds, with an independent verifier that did not author the
 corpus. **When a judgement call decides a gate, it goes to the independent
 verifier — and the verifier is not told the lead's view.**
 
-**Push status: 26 commits unpushed, and the user explicitly HELD the push on
-2026-08-13** until the E2/E5 re-plan is settled. An ADR-014 content scan has
+**Push status: the user explicitly HELD the push on 2026-08-13** (run
+`git log --oneline @{u}..HEAD | wc -l` for the current count) until the E2/E5 re-plan is settled. An ADR-014 content scan has
 already been run and is **clean**: no real CV or job-description content, all
 fixture names synthetic, and the single absolute path in `PROJECT_STATUS.md` is
 already public in this file, so it adds no new exposure. **Do not push without
