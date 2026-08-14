@@ -111,13 +111,50 @@ function activeDimensions(
 }
 
 /**
+ * Rejects a job that states no requirement for ANY dimension (H-028 D8,
+ * triaged and closed by H-066).
+ *
+ * Measured before the fix: `scoreCandidate({ id: 'j' }, candidate)` returned
+ * **score 0 with `eligible: true`, for every candidate.** Zero is a claim
+ * about a person — that they match nothing — and it is indistinguishable to a
+ * recruiter from a genuine no-match. Under ADR-005 a dimension is N/A only
+ * when the job states no requirement for it; a job where that is true of every
+ * dimension has not said what it wants, so there is nothing to be a match
+ * with. No number is defensible, not 0 and not 100.
+ *
+ * Throws for the same reason {@link assertUsableWeights} throws rather than
+ * clamping (H-050): a degenerate job configuration is a caller error, and a
+ * tool whose premise is traceable numbers must not answer a question that was
+ * never asked.
+ *
+ * **Why this was fixed rather than filed as unreachable.** No caller can build
+ * such a job today — there is no API and no UI, so the only construction site
+ * is a test. That argument is worthless as a gate precondition, because ADR-023
+ * E5 exists to certify the engine BEFORE `apps/web` is built, and the argument
+ * expires the moment it is. A defect whose only defence is "nothing calls it
+ * yet" is one that lands the day something does.
+ */
+function assertJobStatesRequirements(job: Job, active: readonly ActiveDimension[]): void {
+  if (active.length > 0) return;
+  throw new Error(
+    `scoreCandidate: job "${job.id}" activates no scoring dimension — it states no skills, ` +
+      'experience, seniority or education requirement. A score against a job that asked for ' +
+      "nothing is not a match score (ADR-005); confirm the job's requirements before scoring.",
+  );
+}
+
+/**
  * Renormalizes weights across active dimensions (Section 6.4). If every
  * active weight is non-positive — a degenerate job configuration — falls
- * back to equal weighting rather than dividing by zero, so no scoring
- * function ever throws on an all-zero-weight job.
+ * back to equal weighting rather than dividing by zero, so an all-zero-weight
+ * job still scores rather than throwing.
+ *
+ * `active` is never empty here: {@link assertJobStatesRequirements} runs
+ * first, so `1 / active.length` cannot be `Infinity`. The guard that used to
+ * sit at the top of this function became unreachable when that check landed
+ * and was removed rather than left as dead code a mutant could survive in.
  */
 function contributionsFor(active: readonly ActiveDimension[]): readonly DimensionContribution[] {
-  if (active.length === 0) return [];
   const totalWeight = active.reduce((acc, d) => acc + d.weight, 0);
   const useEqualWeights = totalWeight <= 0;
   const equalWeight = 1 / active.length;
@@ -146,6 +183,8 @@ export function scoreCandidate(
   assertUsableWeights(job);
 
   const active = activeDimensions(job, candidate, semanticMatcher);
+  assertJobStatesRequirements(job, active);
+
   const dimensions = contributionsFor(active);
   const raw = Math.max(
     0,

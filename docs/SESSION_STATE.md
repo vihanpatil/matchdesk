@@ -8,14 +8,53 @@ code is right and this file is a bug** — fix it.
 recording this file follows it). Working tree clean, `pnpm verify` exit 0,
 re-run twice on this date — see H-058 before quoting any branch-coverage figure.
 
-**Current work: the E3 fixture corpus, Phases 1-3 of 6 complete.** The phase plan
-lives outside this repo in the user's private notes; the phases are
-(1) ADR-025 + ADR-026, (2) fixture generator, (3) ~12 text fixtures,
-(4) ~5 binary + refusal fixtures → **E3 MET**, (5) adversarial round 1,
-(6) adversarial round 2 → **E1 MET, UI unblocked**. Agreed constraints: both
-fixture tiers; hybrid pass criteria (targeted assertions **plus** a committed
-snapshot); binaries generated deterministically, never committed as blobs;
-commit per milestone, push only at the end with explicit confirmation.
+**Current work: the E3 fixture corpus. Phases 1-4 of 6 COMPLETE.**
+
+**START HERE — the next session's first task is a DECISION, not code.**
+
+E3 is **MET**. E1's two adversarial rounds are the remaining work — but do not
+start them yet. **E5's status is genuinely in question**, and running E1 rounds
+while E5 is unsettled wastes them: the gate cannot open on four of five
+criteria.
+
+**The decision to make first:** is **H-041 an open wrong-score entry?**
+ADR-023 names _"a half-French CV scored on its English half"_ as wrong-score,
+which BLOCKS. H-068 measured a **35%-French, full-length, non-terse CV being
+scored** — `parseStatus: ok`, `language: en`. If that is the same class, E5 is
+NOT MET and the corpus/gate work is not finished. If it is not, write down why.
+H-063 raised the same shape for H-028's D8 items; those are now triaged
+(H-066), and H-041 is the one left. **Nobody has ever made this call
+explicitly** — H-055 asserted E5 on the assumption that H-052 was the only open
+wrong-score entry, and that assumption was never checked.
+
+Read, in order: **H-068**, then **H-063**, then **H-066**, then ADR-023's
+severity split.
+
+| Phase                                         | State                                |
+| --------------------------------------------- | ------------------------------------ |
+| 1 · ADR-025 (E1 contingency) + ADR-026 (deps) | **Done** — `1e6cd96`                 |
+| 2 · Deterministic fixture generator           | **Done** — `24eba4b`                 |
+| 3 · Text tier, 13 fixtures                    | **Done** — `075b908`                 |
+| 4 · Binary tier + D8 triage → **E3 MET**      | **Done** — this commit               |
+| 5 · Adversarial round 1 (E1)                  | **Blocked on the E5 decision above** |
+| 6 · Adversarial round 2 (E1)                  | Not started                          |
+
+**E1-E5 as of now:** E1 NOT MET (counter 0), E2 MET, E3 **MET**, E4 MET
+(80.42%, not re-run since Phase 1 — Phase 4 changed `score.ts`, `explain.ts`
+and `migrate.ts`, so **`pnpm mutate` should be re-run before asserting E4**),
+E5 **DISPUTED — see above.**
+
+**Agreed working constraints (user, this session):** both fixture tiers; hybrid
+pass criteria (targeted assertions **plus** committed snapshots); binaries
+generated deterministically, never committed; commit per milestone; **push to
+GitHub only at the end, with explicit confirmation first** — 25 commits are
+currently unpushed; full ADR-004 team for the adversarial rounds, with an
+independent verifier that did not author the corpus.
+
+**Where the corpus lives:** `fixtures/corpus/definitions.mjs` (data, shared by
+both tiers), `text-tier.test.mjs`, `binary-tier.test.mjs`,
+`__snapshots__/`. `pnpm fixtures:build` writes real PDFs/DOCXs to
+`fixtures/generated/` (gitignored) if you want to open one.
 
 ---
 
@@ -76,9 +115,9 @@ work until it is done** (ADR-018).
 | `pnpm lint`          | pass                                                       |
 | `pnpm format:check`  | pass                                                       |
 | `pnpm license:audit` | pass (1 waiver: `duck@0.1.12`, ADR-016)                    |
-| `pnpm test:cov`      | **772 passed / 44 files**, none skipped, manifest complete |
+| `pnpm test:cov`      | **794 passed / 45 files**, none skipped, manifest complete |
 
-Coverage after Phase 3: **98.90% statements, ~93.1-93.4% branches, 100%
+Coverage after Phase 4: **98.90% statements, ~93.1-93.4% branches, 100%
 functions** repo-wide. **The branch figure is a range on purpose (H-058):** no
 `fast-check` seed is pinned, so property tests reach a slightly different branch
 set each run — 638/684 and 639/684 were both observed on 2026-08-13 from an

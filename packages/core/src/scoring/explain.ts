@@ -23,19 +23,49 @@ function dimensionOf(
 /** Non-skill dimension ids — the only ones `representativeSpan`/`dimensionLabel` are ever called with. */
 type NonSkillDimensionId = Exclude<DimensionId, 'skills'>;
 
-/** Evidence span for a non-skill dimension: the first supporting attribute of the relevant kind. */
+/**
+ * The EARLIEST supporting attribute of a kind, by source span.
+ *
+ * Deliberately not "the first one in the array" (H-028 D8, closed by H-066).
+ * That is what this did, and measured, reversing a candidate's attribute array
+ * moved the reported tenure evidence from "10 years of experience" (span
+ * 21..43) to "Jan 2016 - Jan 2026" (span 98..133) while the score stayed
+ * identical at 100. Both spans are genuine evidence, so nothing was
+ * fabricated — but which one a recruiter is shown depended on array order,
+ * and array order is not a contract anyone had stated.
+ *
+ * Earliest-span is the tie-break `cascade.ts` already uses for skills, so this
+ * makes the two halves of the explanation agree instead of one being ordered
+ * and the other incidental.
+ *
+ * **This was latent, not live.** Since ADR-024 attributes are always re-derived
+ * by `extractAttributes`, whose order is deterministic (verified over repeated
+ * runs), so no current path shuffles them. It is fixed anyway: the defence was
+ * "nothing reorders them yet", and the array is public API.
+ */
+function earliestOfKind(
+  candidate: Candidate,
+  kind: 'years_experience' | 'education' | 'certification',
+): SourceSpan | null {
+  let earliest: SourceSpan | null = null;
+  for (const attribute of candidate.attributes) {
+    if (attribute.kind !== kind) continue;
+    if (earliest === null || attribute.sourceSpan.start < earliest.start) {
+      earliest = attribute.sourceSpan;
+    }
+  }
+  return earliest;
+}
+
+/** Evidence span for a non-skill dimension. */
 function representativeSpan(
   candidate: Candidate,
   dimension: NonSkillDimensionId,
 ): SourceSpan | null {
   if (dimension === 'experience_relevance' || dimension === 'seniority') {
-    const attr = candidate.attributes.find((a) => a.kind === 'years_experience');
-    return attr?.sourceSpan ?? null;
+    return earliestOfKind(candidate, 'years_experience');
   }
-  const edu = candidate.attributes.find((a) => a.kind === 'education');
-  if (edu) return edu.sourceSpan;
-  const cert = candidate.attributes.find((a) => a.kind === 'certification');
-  return cert?.sourceSpan ?? null;
+  return earliestOfKind(candidate, 'education') ?? earliestOfKind(candidate, 'certification');
 }
 
 /**

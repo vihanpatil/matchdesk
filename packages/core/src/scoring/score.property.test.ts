@@ -144,16 +144,35 @@ const educationCertsSpecArb = fc.record({
   ),
 });
 
-const jobArb: fc.Arbitrary<Job> = fc.record(
-  {
-    id: idArb,
-    skills: skillsSpecArb,
-    experience: experienceSpecArb,
-    seniority: seniSpecArb,
-    educationCerts: educationCertsSpecArb,
-  },
-  { requiredKeys: ['id'] },
-);
+/**
+ * Jobs that state at least one requirement.
+ *
+ * The filter is load-bearing, not cosmetic. With all four dimensions optional
+ * this arbitrary could generate a job that activates NO dimension, which is
+ * now rejected input (H-066) — so without the filter these properties fail
+ * only on the runs where fast-check happens to produce the empty shape, which
+ * is H-058's non-determinism turned into an intermittently red suite. A
+ * dimensionless job gets its own explicit test instead of arriving here by
+ * chance.
+ */
+const jobArb: fc.Arbitrary<Job> = fc
+  .record(
+    {
+      id: idArb,
+      skills: skillsSpecArb,
+      experience: experienceSpecArb,
+      seniority: seniSpecArb,
+      educationCerts: educationCertsSpecArb,
+    },
+    { requiredKeys: ['id'] },
+  )
+  .filter(
+    (job) =>
+      job.skills !== undefined ||
+      job.experience !== undefined ||
+      job.seniority !== undefined ||
+      job.educationCerts !== undefined,
+  );
 
 describe('scoring property tests', () => {
   it('the score is always an integer in [0, 100]', () => {
@@ -201,7 +220,21 @@ describe('scoring property tests', () => {
     fc.assert(
       fc.property(idArb, createdAtArb, (id, createdAt) => {
         const emptyCandidate: Candidate = { id, createdAt, attributes: [] };
-        expect(() => scoreCandidate({ id: 'j' }, emptyCandidate)).not.toThrow();
+
+        // NARROWED, with the reason stated (SESSION_STATE §7 forbids doing
+        // this silently). This property previously asserted that a job with
+        // NO dimensions also does not throw. It now must throw: it returned
+        // score 0 with eligible:true for every candidate, and zero is a claim
+        // about a person that a recruiter cannot distinguish from a genuine
+        // no-match (H-028 D8, closed by H-066).
+        //
+        // The property's real subject — that degenerate but ANSWERABLE input
+        // is handled totally rather than by crashing — is unchanged and is
+        // still asserted below. This is the same narrowing H-050 made for
+        // negative weights.
+        expect(() => scoreCandidate({ id: 'j' }, emptyCandidate)).toThrow(
+          /activates no scoring dimension/,
+        );
         expect(() =>
           scoreCandidate(
             {
@@ -434,6 +467,28 @@ describe('explanation anti-fabrication properties (H-036)', () => {
         }
       }),
       { numRuns: 300 },
+    );
+  });
+
+  /**
+   * H-028 D8, closed by H-066. Measured before the fix: reversing a
+   * candidate's attribute array moved the reported tenure evidence from
+   * "10 years of experience" to "Jan 2016 - Jan 2026" while the score stayed
+   * at 100. Which genuine piece of evidence a recruiter sees must not depend
+   * on an array order nobody ever contracted.
+   */
+  it('the explanation does not depend on the ORDER of a candidate’s attributes', () => {
+    fc.assert(
+      fc.property(jobArb, candidateArb, (job, candidate) => {
+        const forward = scoreCandidate(job, candidate);
+        const reversed = scoreCandidate(job, {
+          ...candidate,
+          attributes: [...candidate.attributes].reverse(),
+        });
+
+        expect(reversed.score).toBe(forward.score);
+        expect(reversed.explanation).toEqual(forward.explanation);
+      }),
     );
   });
 

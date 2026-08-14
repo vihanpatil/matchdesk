@@ -26,7 +26,8 @@
     "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm license:audit && pnpm test:cov",
     "prepare": "husky",
     "test:manifest": "node scripts/update-test-manifest.mjs",
-    "mutate": "stryker run"
+    "mutate": "stryker run",
+    "fixtures:build": "node scripts/build-fixtures.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

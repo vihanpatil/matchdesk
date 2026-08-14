@@ -2237,3 +2237,150 @@ format-parity metamorphic relation (approved by the user this session — it
 needs binaries, so it belongs with the binary tier), and
 `scripts/build-fixtures.mjs`, the CLI that writes fixtures to disk for a human
 to open, for the same reason.
+
+---
+
+## 2026-08-13 — Phase 4: binary tier, D8 triage, and E3
+
+### H-066 · D8 triaged under ADR-023 at last — three items fixed
+
+H-063 recorded that H-028's D8 sub-items were never classified under ADR-023's
+severity split, so E5's "zero open wrong-score entries" rested on a judgement
+nobody had made. Done now, each measured rather than reasoned about.
+
+| D8 item                                | Verdict                        | Action                  |
+| -------------------------------------- | ------------------------------ | ----------------------- |
+| Negative dimension weights             | wrong-score                    | Already closed by H-050 |
+| `confidence` computed, read by nothing | **not wrong-score**            | Recorded; see below     |
+| Evidence spans order-dependent         | **wrong-score, latent**        | **FIXED**               |
+| Empty-requirement job scores everyone  | **wrong-score, latent**        | **FIXED**               |
+| Certification level variants collapse  | coverage-gap (argued, H-063)   | Pinned by fixture       |
+| `migrate.ts` `localeCompare`           | **integrity, not wrong-score** | **FIXED**               |
+
+**`confidence` is unread and therefore cannot move a number.** Left in place:
+it is part of the attribute contract and removing it is a wider change than
+this triage. The trap it leaves is a future consumer assuming it means
+something; it does not.
+
+**Empty-requirement job — measured before the fix:**
+
+```
+scoreCandidate({ id: 'j' }, candidate)  ->  score 0, eligible: true
+```
+
+Zero is a claim about a person, and a recruiter cannot tell it from a genuine
+no-match. `scoreCandidate` now throws, exactly as it throws on a negative
+weight (H-050). **A previous test asserted the old behaviour explicitly** —
+"does not throw and scores 0 for a job with zero active dimensions" — so this
+was deliberate, not accidental, and replacing it is a narrowing recorded here
+and in the test itself.
+
+**The reachability argument was considered and rejected**, and the reasoning
+generalises. No caller can build such a job today: there is no API and no UI,
+so the only construction site is a test. That defence is worthless as a gate
+precondition, because **E5 exists to certify the engine BEFORE `apps/web` is
+built, and the argument expires the moment it is.** A defect whose only defence
+is "nothing calls it yet" lands the day something does. The same reasoning
+applies to the order-dependence fix.
+
+**Evidence spans — measured before the fix:** reversing a candidate's attribute
+array moved the reported tenure evidence from `"10 years of experience"`
+(span 21..43) to `"Jan 2016 - Jan 2026"` (span 98..133) with the score
+unchanged at 100. Both are genuine evidence, so nothing was fabricated — but
+which one a recruiter sees depended on array order, which was never a contract.
+`representativeSpan` now takes the EARLIEST span, matching the tie-break
+`cascade.ts` already used for skills. Pinned by a new property.
+
+**`migrate.ts`** now sorts migration filenames by code unit rather than
+`localeCompare(b, 'en')`. That sort decides the order migrations RUN IN, and
+collation can differ with the ICU data compiled into a given Node build; a
+schema built in the wrong order is a corrupt database. Classified integrity,
+like D7 — it cannot produce a wrong score — but fixed because it was one line.
+
+### H-067 · The PDF generator cannot render the characters the corpus exists to test
+
+`pdf-lib`'s `StandardFonts` are WinAnsi-encoded. Anything outside that set
+throws at draw time:
+
+```
+WinAnsi cannot encode "Ł" (0x0141)
+WinAnsi cannot encode "​"  (0x200b)
+```
+
+Two fixtures cannot be rendered as PDF and are covered through DOCX only:
+
+- **`d5b`** — the name `Łukasz Nowak`. Kept rather than swapped for an ASCII
+  name: non-English names are exactly where H-028 D3 went wrong, and
+  sanitising the corpus to suit the generator would delete the property the
+  corpus exists to test.
+- **`h034`** — zero-width space, soft hyphen, BOM. **This is the costly one.**
+  H-034 records that soft hyphens are _routine in PDF extraction_ — so the one
+  container where these characters actually occur in the wild is precisely the
+  one this generator cannot produce them in. The binary tier therefore does NOT
+  cover invisible characters arriving by their most common real route.
+
+Excluded fixtures are listed by name in the test output via `it.fails`, not
+skipped silently: a corpus that quietly covers less than it appears to is the
+H-004 shape. Closing this needs an embedded Unicode font — a new dependency
+plus a font file with its own licence review under ADR-016 — and is **not**
+done here.
+
+### H-068 · The mixed-language blind spot is wider than H-041 describes
+
+H-041 frames the ADR-022 veto's blind spot as _"terse CVs — pure bullets,
+skills lists, header-and-technology layouts"_. Measured this session, that
+framing understates it.
+
+The document tested is **not terse**: a full-length prose CV, two employment
+sections, roughly **35% French by character count**, including a complete
+French employment section with four full sentences. Result:
+
+```
+parseStatus = ok      language = en      reason = null      -> SCORED
+judgedSegmentCount = 0
+```
+
+**Cause:** `MIN_WORDS_FOR_SEGMENT_JUDGEMENT` is 15, and ordinary CV lines run
+8–13 words. Not one segment — English or French — is ever judged, so the veto
+is structurally silent. That is not a property of terse CVs. **It is a property
+of CVs.** Sweeping the French proportion: 5%, 14%, 22%, 29% and 35% all scored;
+only at 44% did the WHOLE-DOCUMENT classifier refuse, and even then as
+`non_english_language_not_supported` — the segment veto never fired at any
+proportion tested.
+
+**Verified NOT format-dependent.** I hypothesised that PDF's loss of blank
+lines (H-062/H-065) collapsed paragraph segmentation and caused this. Measured:
+PDF and DOCX give `judgedSegmentCount = 0` identically. **The hypothesis was
+wrong and is recorded as wrong** rather than quietly dropped.
+
+**Gate implication, stated and not resolved.** ADR-023 names _"a half-French CV
+scored on its English half"_ as **wrong-score, which blocks**. A 35%-French CV
+being scored is at minimum adjacent to that example, and H-041 is open. Whether
+E5 can be asserted therefore turns on a judgement about H-041 that, like the D8
+items in H-063, **has never been made explicitly.** I am not making it
+unilaterally at the end of a phase; it is the first thing the next session must
+settle, because E1's rounds are pointless if E5 is not actually met.
+
+Pinned meanwhile by a binary-tier fixture asserting today's behaviour — that
+the document IS scored — so the question cannot be skipped by accident.
+
+### Phase 4 record — E3 status
+
+**`pnpm verify` exit 0. 794 tests, 45 files, floor 772 → 794.**
+
+Delivered: the binary tier (`fixtures/corpus/binary-tier.test.mjs`), three C7
+refusal fixtures, the PDF-vs-DOCX **format-parity metamorphic relation** over
+every renderable fixture, two documented-gap fixtures, `scripts/build-fixtures.mjs`
+plus `pnpm fixtures:build`, and the D8 triage above with three fixes.
+
+Four fixtures were **lengthened** because they sat under the 100-character
+ingestion floor and were refused as probable scans — a fixture the pipeline
+will not accept cannot test the pipeline. Text-tier snapshots were regenerated
+for that reason and no other.
+
+**E3: MET, with its coverage stated rather than implied.** At least one fixture
+exists and passes per known wrong-score defect class, plus clean baselines,
+plus refusals. **What E3 does NOT cover, in writing:** invisible characters
+through PDF (H-067), and any behaviour requiring non-WinAnsi text in a PDF.
+
+**E5 is now the open question, not E1.** See H-063 and H-068.

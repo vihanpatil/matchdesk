@@ -149,11 +149,38 @@ describe('scoreCandidate', () => {
     expect(result.explanation.composition.total).toBeCloseTo(result.raw, 6);
   });
 
-  it('does not throw and scores 0 for a job with zero active dimensions', () => {
+  /**
+   * REPLACES a test that asserted the opposite: "does not throw and scores 0
+   * for a job with zero active dimensions".
+   *
+   * That behaviour was deliberate and codified, which is why it survived — but
+   * it was wrong. Measured: score 0 with `eligible: true`, for every candidate,
+   * against a job that stated no requirement of any kind. Zero is a claim about
+   * a person, and a recruiter cannot tell it apart from a real no-match
+   * (H-028 D8, closed by H-066). No number is defensible here, so the engine
+   * refuses to produce one rather than picking an arbitrary default.
+   */
+  it('throws for a job that activates no scoring dimension', () => {
     const job: Job = { id: 'j1' };
+    expect(() => scoreCandidate(job, candidate('c1', '2026-01-01T00:00:00.000Z', []))).toThrow(
+      /activates no scoring dimension/,
+    );
+  });
+
+  it('still scores a job that states a requirement but matches nothing', () => {
+    // The contrast that makes the rule above meaningful: a job that DID ask for
+    // something and got no match legitimately scores 0. That number is a real
+    // statement about the candidate, and it must not be swept up by the guard.
+    const job: Job = {
+      id: 'j1',
+      skills: {
+        weight: 1,
+        requirements: [{ id: 'r1', canonicalSkillId: 'python', label: 'Python', mustHave: false }],
+      },
+    };
     const result = scoreCandidate(job, candidate('c1', '2026-01-01T00:00:00.000Z', []));
     expect(result.score).toBe(0);
-    expect(result.dimensions).toEqual([]);
+    expect(result.dimensions).toHaveLength(1);
   });
 
   it('does not throw when every active dimension has weight 0 (falls back to equal weighting)', () => {
