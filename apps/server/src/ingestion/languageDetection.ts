@@ -1,212 +1,108 @@
 /**
- * Deterministic English-vs-not language detector (ADR-006: non-English CVs
- * are never scored — `all-MiniLM-L6-v2` and the rule-based extraction are
- * both English-only, so a confident score on a non-English document would
- * be C7's exact failure: a confident, meaningless number).
+ * English-vs-not language detector (ADR-006: non-English CVs are never
+ * scored — `all-MiniLM-L6-v2` and the rule-based extraction are both
+ * English-only, so a confident score on a non-English document would be
+ * C7's exact failure: a confident, meaningless number).
  *
- * **Replaces the stopword-ratio heuristic (H-023 / H-028 D6).** The
- * stopword cut failed because it measured only whitespace-delimited
- * function words, and several of English's commonest function words
- * ("in", "on", "an", "a", "i", "for") are *also* common tokens in French,
- * German and the Scandinavian languages — either as their own function
- * words or as short inflections. That put a real English CV *below* French,
- * German and Scandinavian samples on the exact axis being thresholded; the
- * classes were never separated, so no threshold could have worked.
+ * **Method: `eld` (efficient-language-detector), `extrasmall` tier
+ * (ADR-031, replacing the hand-built Cavnar & Trenkle n-gram profiler this
+ * module used to carry).** `eld` is a trained language-ID library covering
+ * 60 languages; imported from the `eld/extrasmall` subpath specifically
+ * (not the default `eld` entry, which uses a computed dynamic `import()`
+ * that defeats static bundling). The classifier is a drop-in replacement
+ * behind the same seam — `detectLanguageHeuristic`'s public shape
+ * (`LanguageDetectionResult`) is unchanged, so `extractText.ts` and
+ * `findNonEnglishSegments` below are untouched by the swap itself.
  *
- * **Method: character n-gram profiling (Cavnar & Trenkle, "N-Gram-Based
- * Text Categorization", 1994).** For each language, count how often every
- * word-padded character n-gram (n = 1..4) occurs across a reference corpus
- * and keep the most frequent {@link PROFILE_SIZE}, ranked by frequency —
- * that ranked list is the language's "profile". A profile captures far more
- * than function words: letter frequency, common digraphs/trigraphs,
- * diacritics, and — because n-grams are taken from *padded* words —
- * word-initial and word-final morphology (English "-ing"/"-tion", French
- * "-ment"/"-eux", German "-ung"/"-chen", Scandinavian "-else"/"-het", …).
- * That is what a pure stopword count cannot see and what makes this
- * approach hold up on text with few or no function words.
+ * **Why the swap, precisely (ADR-031 — read before assuming this closes
+ * H-041, because it does not).** The n-gram profiler mis-scored a German
+ * compound-noun header block as English outright (`dEn 69621` vs
+ * `dOther 70385`) because compound-noun lists are out-of-domain for
+ * profiles built from prose; production caught that case only via a
+ * mean-word-length threshold, which then had to be exempted for Indian
+ * institution names after it falsely refused real Indian-English CVs
+ * (H-086). `eld` catches the same German block correctly with no such
+ * threshold and no exemption, measured clean across the eval corpora below
+ * — so this swap deletes three heuristics that existed only to patch the
+ * profiler's blind spots, at zero measured regression on English recall.
  *
- * The input document gets its own ranked profile the same way, and is
- * compared against each reference profile with the standard "out-of-place"
- * distance: for every n-gram in the input's top {@link PROFILE_SIZE}, add
- * the absolute difference between its rank in the input and its rank in the
- * reference (or a fixed penalty if the reference never saw it at all).
- * Lower distance = more similar. The document is classified English only
- * when its distance to the English profile is strictly lower than its
- * distance to the *closest* of the eight non-English reference profiles —
- * i.e. English has to actually win the comparison, not merely clear a fixed
- * bar.
- *
- * Deterministic, dependency-free (no npm package, no network, no model
- * weights) — the reference profiles are built once, synchronously, from the
- * hand-authored corpora below, every time this module loads.
+ * **What this does NOT do.** `eld` is swapped in at the same granularity
+ * the code already judged text at — whichever segment
+ * `findNonEnglishSegments` hands it (paragraph / sentence / line-window),
+ * or the whole document for the primary `extractText.ts` gate. It is
+ * measured, not assumed, that this configuration costs zero English CVs
+ * while still refusing every non-English one — see
+ * `languageDetection.eval.test.ts`. It does **not** close the H-041
+ * Germanic sub-floor gap (a short foreign line too small to form a line
+ * window): that is a segmentation defect, not a classifier one, and
+ * `languageDetection.eval.test.ts:591`'s `DOCUMENTED GAP` test asserts it
+ * stays open on purpose.
  *
  * **Honest limitations, stated per Section 0.1 / ADR-006:**
- * - The reference corpora are ~150-word hand-authored paragraphs per
- *   language, not a mined corpus of thousands of documents. This gives each
- *   language a real, distinctive profile, but the profiles are narrower
- *   than a production language-ID model's — see
- *   `apps/server/src/ingestion/languageDetection.eval.test.ts` for the
- *   measured confusion matrix this produces on a held-out CV-shaped corpus,
- *   reported honestly rather than tuned to pass.
- * - Only distinguishes "recognizably English" from "one of the eight
- *   covered non-English languages" (French, German, Spanish, Italian,
- *   Dutch, Danish, Norwegian, Swedish); it was not built or tested to
- *   identify *which* language a non-English document is in, nor to handle
- *   non-Latin scripts (Cyrillic, CJK, Arabic, …) — those will simply score
- *   far from every reference profile, which in practice still yields
- *   `isEnglish: false` (extremely large distance to English), but that
- *   behaviour is a side effect, not a designed guarantee.
  * - Short documents (see {@link MIN_WORDS_FOR_JUDGEMENT}) do not carry
  *   enough signal to judge either way; the result is `isEnglish: null`
  *   ("unknown"), which callers must treat the same as "do not score" —
  *   silence is not evidence of English.
  * - A CV that is almost entirely proper nouns and technology names shared
  *   verbatim across languages ("Python", "Docker", "AWS", "Kubernetes") is
- *   the hardest case for *any* character-statistics approach, English or
- *   not: those tokens are near-identical strings in every language's CV.
- *   Real CVs of this shape still carry enough surrounding structure
- *   (section headers, connective phrasing, verb endings) to separate
- *   correctly in the measured eval set, but a document that is *purely* a
- *   comma-separated technology list with zero structural English text is a
- *   genuine edge the corpus-based approach cannot promise to get right —
- *   flagged rather than papered over.
+ *   a hard case for any language-ID approach: those tokens are
+ *   near-identical strings in every language's CV. Real CVs of this shape
+ *   still carry enough surrounding structure (section headers, connective
+ *   phrasing, verb endings) to separate correctly in the measured eval set,
+ *   but a document that is *purely* a comma-separated technology list with
+ *   zero structural English text is a genuine edge no character-statistics
+ *   approach can promise to get right — flagged rather than papered over.
  * - A bilingual or code-switched document (e.g. an English CV with a French
- *   cover paragraph) is scored as one blob of text; the verdict reflects
- *   whichever language's statistics dominate the combined n-gram counts,
- *   not a per-section judgement.
+ *   cover paragraph) is scored as one blob of text at the whole-document
+ *   gate; the verdict reflects whichever language dominates. The
+ *   per-segment veto below (`findNonEnglishSegments`, ADR-022) exists
+ *   precisely because of this.
+ * - `nearestOtherLanguage`/`distanceToNearestOther` are diagnostic only,
+ *   restricted to the eight languages this module has historically
+ *   reported on (French, German, Spanish, Italian, Dutch, Danish,
+ *   Norwegian, Swedish) — `eld` itself covers 60 and its own top pick
+ *   (used for `isEnglish`) is not restricted to this set.
  */
+import { eld } from 'eld/extrasmall';
 
 /** Below this token count, there is not enough text to judge either way. */
 const MIN_WORDS_FOR_JUDGEMENT = 8;
 
-/** How many top-ranked n-grams make up a language profile. */
-const PROFILE_SIZE = 300;
-
-/** Character n-gram lengths pooled into one ranked profile (word-padded). */
-const MIN_N = 1;
-const MAX_N = 4;
-
-/** Cavnar & Trenkle's fixed penalty for an n-gram absent from a reference
- *  profile — conventionally the profile size itself. */
-const MAX_PENALTY = PROFILE_SIZE;
-
-/** Non-English languages this detector is trained to recognize as "not
- *  English" (ADR-006 only requires English-vs-not, not identifying which
- *  language a non-English document is in). */
+/** Non-English languages this detector has historically reported a
+ *  "nearest other" diagnostic for (ADR-006 only requires English-vs-not,
+ *  not identifying which language a non-English document is in — `eld`'s
+ *  own top-pick verdict, used for `isEnglish`, is not limited to this
+ *  set). */
 const NON_ENGLISH_LANGUAGES = ['fr', 'de', 'es', 'it', 'nl', 'da', 'no', 'sv'] as const;
 type NonEnglishLanguage = (typeof NON_ENGLISH_LANGUAGES)[number];
 
-/**
- * Reference corpora: ~150-word original, hand-authored paragraphs
- * describing a generic software-engineering career (matching the CV
- * domain this detector is used for), one per language. Written
- * independently of the evaluation fixtures in
- * `languageDetection.eval.test.ts` and `extractText.test.ts` so the
- * profiles are not fitted to the documents that grade them.
- */
-const LANGUAGE_TRAINING_TEXT: Record<'en' | NonEnglishLanguage, string> = {
-  en: 'This document describes a professional background in software engineering. The candidate has several years of experience building and maintaining web applications, working with modern programming languages and cloud infrastructure. Responsibilities have included designing systems, reviewing code, mentoring junior colleagues and collaborating closely with product and design teams. Skills include strong communication, problem solving and a solid understanding of databases, testing and deployment pipelines. The individual holds a university degree and has completed additional professional certifications. Previous roles were held at technology companies of varying size, ranging from small startups to large established firms. Day to day work involves planning, implementing, testing and shipping features, as well as fixing defects reported by users. Strong attention to detail and a collaborative attitude are valued highly in every team the candidate has joined.',
-  fr: "Ce document décrit un parcours professionnel dans le domaine du génie logiciel. Le candidat possède plusieurs années d'expérience dans la conception et la maintenance d'applications web, en travaillant avec des langages de programmation modernes et une infrastructure infonuagique. Les responsabilités ont inclus la conception de systèmes, la révision de code, l'encadrement de collègues juniors et la collaboration étroite avec les équipes de produit et de design. Les compétences comprennent une forte communication, la résolution de problèmes et une bonne compréhension des bases de données, des tests et des chaînes de déploiement. La personne est titulaire d'un diplôme universitaire et a suivi des certifications professionnelles supplémentaires. Les postes précédents ont été occupés dans des entreprises technologiques de tailles variées, allant de petites entreprises en démarrage à de grandes entreprises établies. Le travail quotidien comprend la planification, la mise en œuvre, les tests et la livraison de fonctionnalités, ainsi que la correction des anomalies signalées par les utilisateurs.",
-  de: 'Dieses Dokument beschreibt einen beruflichen Werdegang im Bereich der Softwareentwicklung. Die Kandidatin verfügt über mehrere Jahre Erfahrung in der Entwicklung und Wartung von Webanwendungen und arbeitet mit modernen Programmiersprachen und Cloud-Infrastruktur. Zu den Aufgaben gehörten der Entwurf von Systemen, die Überprüfung von Quellcode, die Betreuung jüngerer Kolleginnen und die enge Zusammenarbeit mit den Produkt- und Designteams. Zu den Fähigkeiten zählen starke Kommunikation, Problemlösung sowie ein solides Verständnis von Datenbanken, Tests und Bereitstellungsprozessen. Die Person besitzt einen Hochschulabschluss und hat zusätzliche berufliche Zertifizierungen abgeschlossen. Frühere Positionen wurden bei Technologieunternehmen unterschiedlicher Größe wahrgenommen, von kleinen Neugründungen bis hin zu großen etablierten Firmen. Die tägliche Arbeit umfasst Planung, Umsetzung, Tests und die Auslieferung neuer Funktionen sowie die Behebung von Fehlern, die von Nutzern gemeldet wurden.',
-  es: 'Este documento describe una trayectoria profesional en el ámbito de la ingeniería de software. El candidato cuenta con varios años de experiencia en el diseño y mantenimiento de aplicaciones web, trabajando con lenguajes de programación modernos e infraestructura en la nube. Las responsabilidades incluyeron el diseño de sistemas, la revisión de código, la orientación de compañeros junior y la colaboración estrecha con los equipos de producto y diseño. Las habilidades incluyen una fuerte comunicación, la resolución de problemas y una buena comprensión de bases de datos, pruebas y procesos de despliegue. La persona posee un título universitario y ha completado certificaciones profesionales adicionales. Los puestos anteriores se ocuparon en empresas tecnológicas de diferentes tamaños, desde pequeñas empresas emergentes hasta grandes compañías establecidas. El trabajo diario incluye planificación, implementación, pruebas y entrega de funciones, además de la corrección de errores reportados por los usuarios.',
-  it: "Questo documento descrive un percorso professionale nell'ambito dell'ingegneria del software. Il candidato possiede diversi anni di esperienza nella progettazione e nella manutenzione di applicazioni web, lavorando con linguaggi di programmazione moderni e infrastrutture in cloud. Le responsabilità hanno incluso la progettazione di sistemi, la revisione del codice, l'affiancamento di colleghi junior e la stretta collaborazione con i team di prodotto e design. Le competenze comprendono una forte comunicazione, la risoluzione dei problemi e una buona comprensione di basi di dati, test e processi di distribuzione. La persona possiede una laurea universitaria e ha completato ulteriori certificazioni professionali. I ruoli precedenti sono stati ricoperti presso aziende tecnologiche di dimensioni diverse, da piccole start-up a grandi aziende affermate. Il lavoro quotidiano comprende la pianificazione, l'implementazione, i test e il rilascio di funzionalità, oltre alla correzione di difetti segnalati dagli utenti.",
-  nl: "Dit document beschrijft een professionele achtergrond op het gebied van softwareontwikkeling. De kandidaat heeft meerdere jaren ervaring met het bouwen en onderhouden van webapplicaties en werkt met moderne programmeertalen en cloudinfrastructuur. De verantwoordelijkheden omvatten het ontwerpen van systemen, het beoordelen van code, het begeleiden van jongere collega's en nauwe samenwerking met de product- en designteams. Vaardigheden omvatten sterke communicatie, probleemoplossing en een goed begrip van databases, testen en implementatieprocessen. De persoon heeft een universitaire graad behaald en aanvullende professionele certificeringen afgerond. Eerdere functies werden vervuld bij technologiebedrijven van verschillende grootte, van kleine startups tot grote gevestigde bedrijven. Het dagelijkse werk omvat plannen, bouwen, testen en het uitleveren van functies, evenals het oplossen van fouten die door gebruikers zijn gemeld.",
-  da: 'Dette dokument beskriver en professionel baggrund inden for softwareudvikling. Kandidaten har flere års erfaring med at bygge og vedligeholde webapplikationer og arbejder med moderne programmeringssprog og skyinfrastruktur. Ansvarsområderne har omfattet design af systemer, gennemgang af kode, oplæring af yngre kolleger og tæt samarbejde med produkt- og designteams. Færdighederne omfatter stærk kommunikation, problemløsning og en god forståelse af databaser, test og udrulningsprocesser. Personen har en universitetsgrad og har gennemført yderligere professionelle certificeringer. Tidligere stillinger har været hos teknologivirksomheder af forskellig størrelse, fra små nystartede virksomheder til store etablerede firmaer. Det daglige arbejde omfatter planlægning, implementering, test og levering af nye funktioner samt rettelse af fejl rapporteret af brugere.',
-  no: 'Dette dokumentet beskriver en profesjonell bakgrunn innen programvareutvikling. Kandidaten har flere års erfaring med å bygge og vedlikeholde webapplikasjoner og arbeider med moderne programmeringsspråk og skyinfrastruktur. Ansvarsområdene har omfattet design av systemer, gjennomgang av kode, opplæring av yngre kolleger og tett samarbeid med produkt- og designteam. Ferdighetene omfatter sterk kommunikasjon, problemløsning og en god forståelse av databaser, testing og utrullingsprosesser. Personen har en universitetsgrad og har fullført ytterligere profesjonelle sertifiseringer. Tidligere stillinger har vært hos teknologiselskaper av ulik størrelse, fra små oppstartsselskaper til store etablerte firmaer. Det daglige arbeidet omfatter planlegging, implementering, testing og levering av nye funksjoner, samt retting av feil rapportert av brukere.',
-  sv: 'Detta dokument beskriver en professionell bakgrund inom mjukvaruutveckling. Kandidaten har flera års erfarenhet av att bygga och underhålla webbapplikationer och arbetar med moderna programmeringsspråk och molninfrastruktur. Ansvarsområdena har omfattat design av system, granskning av kod, handledning av yngre kollegor och nära samarbete med produkt- och designteam. Färdigheterna omfattar stark kommunikation, problemlösning och en god förståelse för databaser, testning och utrullningsprocesser. Personen har en universitetsexamen och har genomfört ytterligare professionella certifieringar. Tidigare tjänster har innehafts hos teknikföretag av olika storlek, från små nystartade företag till stora etablerade företag. Det dagliga arbetet omfattar planering, implementering, testning och leverans av nya funktioner, samt rättelse av fel som rapporterats av användare.',
-};
-
 /** Word tokens: runs of Unicode letters and apostrophes (keeps contractions
- *  like "d'expérience" and "colleague's" as single tokens). */
+ *  like "d'expérience" and "colleague's" as single tokens). Used only for
+ *  the word-count floor and the sub-floor function-word pass below — `eld`
+ *  does its own tokenization internally. */
 function wordsOf(text: string): string[] {
   return text.toLowerCase().match(/[\p{L}']+/gu) ?? [];
 }
 
-/** All n-grams (n = minN..maxN) of one word, padded with a single boundary
- *  space on each side so word-initial/word-final n-grams are distinct from
- *  mid-word ones (Cavnar & Trenkle's padding convention). */
-function ngramsOfWord(word: string, minN: number, maxN: number): string[] {
-  const padded = ` ${word} `;
-  const grams: string[] = [];
-  for (let n = minN; n <= maxN; n++) {
-    for (let i = 0; i + n <= padded.length; i++) {
-      grams.push(padded.slice(i, i + n));
-    }
-  }
-  return grams;
-}
-
-function ngramCounts(text: string, minN: number, maxN: number): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const word of wordsOf(text)) {
-    for (const gram of ngramsOfWord(word, minN, maxN)) {
-      counts.set(gram, (counts.get(gram) ?? 0) + 1);
-    }
-  }
-  return counts;
-}
-
-/** Ranks n-grams by descending frequency, breaking ties lexicographically
- *  so the profile is fully deterministic regardless of Map iteration order. */
-function rankedProfile(counts: Map<string, number>, size: number): string[] {
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
-    .slice(0, size)
-    .map(([gram]) => gram);
-}
-
-/** Cavnar & Trenkle "out-of-place" distance: lower means more similar. Every
- *  n-gram in `inputProfile` contributes the absolute difference between its
- *  rank there and its rank in `referenceProfile`, or `maxPenalty` if the
- *  reference profile never saw that n-gram at all. */
-function outOfPlaceDistance(
-  inputProfile: readonly string[],
-  referenceProfile: readonly string[],
-  maxPenalty: number,
-): number {
-  const referenceRank = new Map(referenceProfile.map((gram, i) => [gram, i]));
-  let distance = 0;
-  for (const [inputRank, gram] of inputProfile.entries()) {
-    const refRank = referenceRank.get(gram);
-    distance += refRank === undefined ? maxPenalty : Math.abs(inputRank - refRank);
-  }
-  return distance;
-}
-
-function buildProfile(text: string): string[] {
-  return rankedProfile(ngramCounts(text, MIN_N, MAX_N), PROFILE_SIZE);
-}
-
-/** Built once, synchronously, at module load — deterministic and cheap
- *  (~150 words per language, no I/O, no async work). */
-const LANGUAGE_PROFILES: Record<'en' | NonEnglishLanguage, readonly string[]> = {
-  en: buildProfile(LANGUAGE_TRAINING_TEXT.en),
-  fr: buildProfile(LANGUAGE_TRAINING_TEXT.fr),
-  de: buildProfile(LANGUAGE_TRAINING_TEXT.de),
-  es: buildProfile(LANGUAGE_TRAINING_TEXT.es),
-  it: buildProfile(LANGUAGE_TRAINING_TEXT.it),
-  nl: buildProfile(LANGUAGE_TRAINING_TEXT.nl),
-  da: buildProfile(LANGUAGE_TRAINING_TEXT.da),
-  no: buildProfile(LANGUAGE_TRAINING_TEXT.no),
-  sv: buildProfile(LANGUAGE_TRAINING_TEXT.sv),
-};
-
 export interface LanguageDetectionResult {
   /** true = judged English, false = judged not English, null = not enough
-   *  text to judge either way. */
+   *  text to judge either way. `eld`'s own top-pick verdict (not restricted
+   *  to the eight `NON_ENGLISH_LANGUAGES`) decides this. */
   isEnglish: boolean | null;
   /** Total alphabetic word tokens considered. */
   wordCount: number;
-  /** Out-of-place distance to the English reference profile (lower = more
-   *  English-like). `null` when there was not enough text to judge. */
+  /** Pseudo-distance to English, `1 - eld`'s confidence score for `en`
+   *  (lower = more English-like). `null` when there was not enough text to
+   *  judge. Diagnostic only. */
   distanceToEnglish: number | null;
-  /** Out-of-place distance to the closest non-English reference profile.
-   *  `null` when there was not enough text to judge. */
+  /** Pseudo-distance to the closest of the eight covered non-English
+   *  languages, `1 -` that language's `eld` confidence score. `null` when
+   *  there was not enough text to judge. Diagnostic only. */
   distanceToNearestOther: number | null;
-  /** Which non-English reference profile was closest (diagnostic only —
-   *  this detector does not claim to identify the language, only that it
-   *  was the best match among the eight covered). `null` when there was
-   *  not enough text to judge. */
+  /** Which of the eight covered non-English languages had the highest `eld`
+   *  confidence score (diagnostic only — this field does not decide
+   *  `isEnglish`, and `eld`'s actual top pick may be a language outside this
+   *  set of eight). `null` when there was not enough text to judge. */
   nearestOtherLanguage: NonEnglishLanguage | null;
 }
 
@@ -223,21 +119,28 @@ export function detectLanguageHeuristic(text: string): LanguageDetectionResult {
     };
   }
 
-  const inputProfile = buildProfile(text);
-  const distanceToEnglish = outOfPlaceDistance(inputProfile, LANGUAGE_PROFILES.en, MAX_PENALTY);
+  const detection = eld.detect(text);
+  const scores = detection.getScores();
+  const distanceToEnglish = 1 - (scores['en'] ?? 0);
 
   let distanceToNearestOther = Infinity;
   let nearestOtherLanguage: NonEnglishLanguage | null = null;
   for (const lang of NON_ENGLISH_LANGUAGES) {
-    const distance = outOfPlaceDistance(inputProfile, LANGUAGE_PROFILES[lang], MAX_PENALTY);
+    const distance = 1 - (scores[lang] ?? 0);
     if (distance < distanceToNearestOther) {
       distanceToNearestOther = distance;
       nearestOtherLanguage = lang;
     }
   }
 
+  // `eld`'s own top pick decides English-vs-not, unrestricted to the eight
+  // reported languages (a document confidently in, say, Portuguese must not
+  // read as "English" merely because English beats each of the eight in
+  // `NON_ENGLISH_LANGUAGES` individually).
+  const isEnglish = detection.language === 'en';
+
   return {
-    isEnglish: distanceToEnglish < distanceToNearestOther,
+    isEnglish,
     wordCount: words.length,
     distanceToEnglish,
     distanceToNearestOther,
@@ -370,110 +273,6 @@ const MIN_LETTERS_FOR_WINDOW = 100;
 const MAX_LINES_PER_WINDOW = 12;
 
 /**
- * A foreign verdict on a judged segment is only acted on when the foreign
- * profile beats English by this relative margin. A coin-flip verdict on
- * language-neutral text has a tiny margin by construction; real foreign
- * morphology has a large one. Measured over every window of all 18 English CVs
- * and the foreign blocks:
- *
- *     English soup, worst (headers_plus_tech_only)   +0.0180
- *     Dutch header block                            +0.0399
- *     French prose block                            +0.0968
- *     French header block                            +0.1413
- *
- * 0.03 is mid-gap between the worst English window and the weakest genuine
- * foreign one. **This is language-symmetric** — it asks how confident the
- * verdict is, never what the text looks like, which is the property the
- * lowercase heuristic lacked.
- *
- * H-041 rejected a margin threshold for WHOLE DOCUMENTS, where the classes
- * genuinely did not separate. This is a different question — not "English CV vs
- * code-switched document" but "is this segment's foreign verdict meaningful" —
- * and it was re-measured rather than assumed to fail.
- */
-const MIN_FOREIGN_MARGIN = 0.03;
-
-/**
- * Mean letters per word above which text carries morphology English does not
- * have. This is the signal that catches German, where the n-gram profiles
- * themselves fail: a German compound-noun list is out-of-domain for every
- * reference profile (they are built from prose), and it classifies as ENGLISH
- * with Italian as the nearest other — measured `dEn` 69621 vs `dOther` 70385.
- * **No amount of gating fixes a wrong verdict**, so a second, orthogonal
- * signal is needed.
- *
- *     worst English window (headers_plus_tech_only)   8.36
- *     Swedish header block                           10.45
- *     Dutch header block                             11.00
- *     German header block                            12.00
- *
- * 9.4 is mid-gap. **This is the narrowest margin in this module** — 8.36 to
- * 10.45 — and it is stated rather than smoothed over: an English CV built from
- * unusually long compounds ("Telecommunications Infrastructure Modernisation
- * Programme") could exceed it and be falsely refused. Only 18 English CVs back
- * this number.
- *
- * It deliberately does NOT try to identify which language; ADR-006 only needs
- * English-vs-not.
- */
-const MAX_ENGLISH_MEAN_WORD_LENGTH = 9.4;
-
-/**
- * English institution and qualification vocabulary.
- *
- * **Why this exists (H-086).** {@link MAX_ENGLISH_MEAN_WORD_LENGTH} was
- * calibrated on English, Romance and Germanic CVs and immediately falsely
- * refused **2 of 5 synthetic Indian-English CVs**: "Visvesvaraya Technological
- * University" measured 9.43 and read as Swedish, and an education section of
- * Indian university names measured 9.54 and read as Italian. Long
- * transliterated proper nouns look exactly like compound morphology.
- *
- * That matters concretely — this tool's recruiter works with Indian clients,
- * so Indian degrees are a primary case, not an edge.
- *
- * A segment carrying two or more of these words is an English-structured
- * education or institution line with long proper nouns embedded in it, not a
- * foreign compound-noun list. The German, Dutch and Swedish header blocks this
- * signal exists to catch contain **none** of them — they use `Universitaet`,
- * `Hogeschool`, `Handelshoegskolan` — so the exemption does not weaken it.
- *
- * Measured: with this exemption, 0/18 English CVs, 0/5 Indian-English CVs and
- * 0 regressions on DE/NL/SV detection. Raising the threshold to 10.0 instead
- * was also measured clean, but was rejected: it would leave only 0.45 of
- * headroom above the Swedish header block (10.45), and this rule is
- * semantically correct rather than a threshold nudge.
- *
- * **Residual, stated:** an Indian institution name appearing with no English
- * institution word anywhere in the same window would still fire. Indian
- * university names almost always contain "University", "Institute" or
- * "College", but this has been measured on five synthetic CVs, not a corpus.
- */
-const ENGLISH_INSTITUTION_WORDS = new Set([
-  'university',
-  'institute',
-  'institution',
-  'college',
-  'school',
-  'academy',
-  'polytechnic',
-  'technology',
-  'technological',
-  'bachelor',
-  'master',
-  'masters',
-  'doctorate',
-  'diploma',
-  'degree',
-  'engineering',
-  'science',
-  'sciences',
-  'studies',
-  'education',
-  'faculty',
-  'campus',
-]);
-
-/**
  * Function words common across the eight covered languages and rare or absent
  * in English, used as a SUB-FLOOR signal (H-085 remedy).
  *
@@ -492,15 +291,18 @@ const ENGLISH_INSTITUTION_WORDS = new Set([
  *
  * **This covers Romance inserts only, by construction.** Germanic
  * compound-noun lines contain no function words at all — measured, 0 hits on
- * German, Dutch and Swedish header lines. Mean word length cannot rescue them
- * at line level either: English lines reach 11.3 there
- * ("Additional: Conversational Portuguese"), so the classes do not separate on
- * 3-5 words. **The Germanic sub-floor insert remains open** and is what the
- * language-ID library is for.
+ * German, Dutch and Swedish header lines. **The Germanic sub-floor insert
+ * remains open even with `eld` in place (ADR-031, H-092).** Running `eld` at
+ * LINE granularity does catch it (13/13), but costs 2/23 real English CVs —
+ * a regression the user rejected once already at a cheaper price (H-080) and
+ * rejected again here. `eld` was adopted at WINDOW granularity instead, where
+ * a line this short never forms a window at all — this is a segmentation gap,
+ * not a classifier one, and `languageDetection.eval.test.ts`'s
+ * `DOCUMENTED GAP` test asserts it stays open on purpose.
  *
  * Deliberately small and deliberately not a language identifier — it answers
  * only "does this short line carry non-English function words", which is the
- * narrowest question that closes the measured gap.
+ * narrowest question that closes the measured Romance gap.
  */
 const NON_ENGLISH_FUNCTION_WORDS = new Set([
   // French
@@ -579,9 +381,6 @@ const NON_ENGLISH_FUNCTION_WORDS = new Set([
  *  gives 1, so this margin is the safety. */
 const MIN_FUNCTION_WORD_HITS = 2;
 
-/** How many DISTINCT institution words a segment must carry to be exempt. */
-const MIN_INSTITUTION_WORDS_FOR_EXEMPTION = 2;
-
 const EMAIL_OR_URL = /\S+@\S+|https?:\/\/\S+/g;
 const ACRONYM = /^[A-Z][A-Z/&.-]{1,}$/;
 
@@ -609,26 +408,13 @@ function letterCount(text: string): number {
   return (text.match(/\p{L}/gu) ?? []).length;
 }
 
-/** Mean letters per word; 0 when there are no words. */
-function meanWordLength(text: string): number {
-  const words = wordsOf(text);
-  if (words.length === 0) return 0;
-  return letterCount(text) / words.length;
-}
-
 /**
  * True when a LINE carries enough non-English function words to be foreign,
- * used below the window floor where the n-gram method cannot operate.
+ * used below the window floor where even `eld` has nothing to judge (H-085).
  */
 function carriesNonEnglishFunctionWords(text: string): boolean {
   const distinct = new Set(wordsOf(text).filter((w) => NON_ENGLISH_FUNCTION_WORDS.has(w)));
   return distinct.size >= MIN_FUNCTION_WORD_HITS;
-}
-
-/** True when the segment reads as an English education/institution line. */
-function isEnglishInstitutionText(text: string): boolean {
-  const distinct = new Set(wordsOf(text).filter((w) => ENGLISH_INSTITUTION_WORDS.has(w)));
-  return distinct.size >= MIN_INSTITUTION_WORDS_FOR_EXEMPTION;
 }
 
 export interface NonEnglishSegment {
@@ -638,7 +424,9 @@ export interface NonEnglishSegment {
    *  exactly which part could not be read (PRODUCT_DECISIONS: every claim
    *  links to evidence in the source). */
   readonly sourceSpan: { readonly start: number; readonly end: number };
-  /** Closest reference profile — diagnostic only, not a language-ID claim. */
+  /** Closest of the eight covered non-English languages — diagnostic only,
+   *  not a language-ID claim (`null` for segments caught by the sub-floor
+   *  function-word pass, which does not identify a language). */
   readonly nearestLanguage: NonEnglishLanguage | null;
 }
 
@@ -801,27 +589,16 @@ export function findNonEnglishSegments(text: string): MixedLanguageResult {
 
     judgedSegmentCount++;
 
-    // Signal 1 — morphology English does not have. This catches German, where
-    // the n-gram profiles themselves return the WRONG verdict because a
-    // compound-noun list is out-of-domain for profiles built from prose.
-    // The institution exemption keeps Indian-English education lines out of the
-    // compounding signal (H-086) — long transliterated proper nouns are not
-    // foreign morphology.
-    const compounding =
-      meanWordLength(bearing) >= MAX_ENGLISH_MEAN_WORD_LENGTH && !isEnglishInstitutionText(bearing);
-
-    // Signal 2 — a foreign verdict, but only when it is confident. An
-    // unconfident foreign verdict on language-neutral text is a coin flip.
-    const margin =
-      verdict.distanceToEnglish !== null &&
-      verdict.distanceToNearestOther !== null &&
-      verdict.distanceToEnglish > 0
-        ? (verdict.distanceToEnglish - verdict.distanceToNearestOther) / verdict.distanceToEnglish
-        : 0;
-    // `isEnglish` is narrowed to boolean here — the null case already continued.
-    const confidentlyForeign = !verdict.isEnglish && margin >= MIN_FOREIGN_MARGIN;
-
-    if (!compounding && !confidentlyForeign) continue;
+    // `verdict.isEnglish` is narrowed to boolean here — the null case already
+    // continued above. Trusting `eld`'s verdict directly, with no separate
+    // morphology signal or confidence margin, is the ADR-031 change: those
+    // existed only to patch the old n-gram profiler's blind spots (it
+    // mis-scored German compound-noun lines as English outright, and produced
+    // coin-flip margins on language-neutral text). Measured clean at this
+    // window granularity — see `languageDetection.eval.test.ts` — with no
+    // regression on the Indian-English institution-name corpus that made the
+    // old morphology signal need an exemption in the first place (H-086).
+    if (verdict.isEnglish) continue;
 
     nonEnglishSegments.push({
       text: segment.text,

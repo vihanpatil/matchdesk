@@ -396,6 +396,138 @@ exports[`corpus · text tier · full snapshots > h040-overlapping-roles-not-doub
 ]
 `;
 
+exports[`corpus · text tier · full snapshots > indian-ambiguous-dash-date-surfaced · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "03-04-2019 - 05-08-2022",
+    "kind": "unreadable_date_range",
+    "minPossibleYears": 3.2,
+    "normalized": "3.2",
+    "span": "81..104",
+  },
+  {
+    "degreeLevel": "bachelor",
+    "evidence": "BE",
+    "field": "computer-science",
+    "kind": "education",
+    "normalized": "bachelor",
+    "span": "161..163",
+  },
+  {
+    "canonicalId": "java",
+    "evidence": "Java",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "java",
+    "span": "216..220",
+  },
+  {
+    "canonicalId": "sql",
+    "evidence": "SQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "sql",
+    "span": "222..225",
+  },
+  {
+    "canonicalId": "aws",
+    "evidence": "AWS",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "aws",
+    "span": "227..230",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > indian-ambiguous-dot-date-surfaced · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "03.04.2019 - 05.08.2022",
+    "kind": "unreadable_date_range",
+    "minPossibleYears": 3.2,
+    "normalized": "3.2",
+    "span": "86..109",
+  },
+  {
+    "degreeLevel": "bachelor",
+    "evidence": "BE",
+    "field": "computer-science",
+    "kind": "education",
+    "normalized": "bachelor",
+    "span": "166..168",
+  },
+  {
+    "canonicalId": "java",
+    "evidence": "Java",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "java",
+    "span": "221..225",
+  },
+  {
+    "canonicalId": "sql",
+    "evidence": "SQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "sql",
+    "span": "227..230",
+  },
+  {
+    "canonicalId": "aws",
+    "evidence": "AWS",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "aws",
+    "span": "232..235",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > indian-ambiguous-slash-date-surfaced · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "03/04/2019 - 05/08/2022",
+    "kind": "unreadable_date_range",
+    "minPossibleYears": 3.2,
+    "normalized": "3.2",
+    "span": "76..99",
+  },
+  {
+    "degreeLevel": "bachelor",
+    "evidence": "BE",
+    "field": "computer-science",
+    "kind": "education",
+    "normalized": "bachelor",
+    "span": "156..158",
+  },
+  {
+    "canonicalId": "java",
+    "evidence": "Java",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "java",
+    "span": "211..215",
+  },
+  {
+    "canonicalId": "sql",
+    "evidence": "SQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "sql",
+    "span": "217..220",
+  },
+  {
+    "canonicalId": "aws",
+    "evidence": "AWS",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "aws",
+    "span": "222..225",
+  },
+]
+`;
+
 exports[`corpus · text tier · full snapshots > indian-bca-hcl · extraction is unchanged 1`] = `
 [
   {
@@ -763,6 +895,58 @@ exports[`corpus · text tier · full snapshots > indian-me-structural-dash-dates
     "matchType": "exact",
     "normalized": "project-management",
     "span": "279..297",
+  },
+]
+`;
+
+exports[`corpus · text tier · full snapshots > indian-mixed-readable-and-unreadable-roles · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "13/06/2019 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "7.2",
+    "span": "78..98",
+    "years": 7.2,
+  },
+  {
+    "evidence": "04/07/2016 - 03/05/2019",
+    "kind": "unreadable_date_range",
+    "minPossibleYears": 2.8,
+    "normalized": "2.8",
+    "span": "199..222",
+  },
+  {
+    "degreeLevel": "bachelor",
+    "evidence": "BE",
+    "field": "computer-science",
+    "kind": "education",
+    "normalized": "bachelor",
+    "span": "287..289",
+  },
+  {
+    "canonicalId": "java",
+    "evidence": "Java",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "java",
+    "span": "342..346",
+  },
+  {
+    "canonicalId": "sql",
+    "evidence": "SQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "sql",
+    "span": "348..351",
+  },
+  {
+    "canonicalId": "aws",
+    "evidence": "AWS",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "aws",
+    "span": "353..356",
   },
 ]
 `;

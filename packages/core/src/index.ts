@@ -26,6 +26,7 @@ export type {
   SkillAttribute,
   SkillExtractionMatchType,
   SourceSpan,
+  UnreadableDateRangeAttribute,
   YearsExperienceAttribute,
 } from './extraction/index.js';
 
@@ -67,6 +68,7 @@ export type {
   Job,
   MatchType,
   RankedCandidates,
+  Reservation,
   ScoreComposition,
   ScoreResult,
   SemanticMatcher,
@@ -79,4 +81,6 @@ export type {
   SkillsDimensionSpec,
   StrengthItem,
   UnmetRequirement,
+  UnreadableEmploymentDatesReservation,
+  UnverifiedTenureClaimReservation,
 } from './scoring/index.js';

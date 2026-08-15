@@ -560,6 +560,12 @@
       "severity": "process",
       "status": "closed",
       "note": "Manifest shrink 916 -> 915 was a deliberate rename (one DOCUMENTED GAP test replaced by three that pin actual behaviour, H-094), requiring --allow-shrink because the tool cannot distinguish a rename from a deletion. Separately: the lead set minTests to 917 by arithmetic rather than measurement; the real count is 915 and the tool refused the guess. Trap 3 committed by the lead in the same session they removed a stale E4 figure from the handoff for the same reason."
+    },
+    {
+      "id": "H-097",
+      "severity": "process",
+      "status": "closed",
+      "note": "Six manifest identities removed, all deliberate renames: three in languageDetection.eval.test.ts (two H-086 tests whose TITLES asserted the now-deleted institution exemption as load-bearing - a passing test teaching a false mechanism; one KNOWN LIMITATION flipped because eld reads a comma-separated tech list as English, narrowly and in the safer direction) and three DOCUMENTED GAP tests in experience.test.ts flipped to FIXED. Manifest 952, floor 915 -> 952 taken from the tool's output rather than arithmetic (cf H-096). Also records that the extraction engineer correctly refused to fabricate a fourth DOCUMENTED GAP test the lead's brief wrongly claimed existed."
     }
   ]
 }

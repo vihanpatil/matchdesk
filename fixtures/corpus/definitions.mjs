@@ -320,13 +320,22 @@ export const CORPUS = [
  * institution/employer names are real public entities, which is what kept
  * that file's ADR-014 scan clean.
  *
- * **Date formats are deliberately UNAMBIGUOUS where a number is asserted.**
- * Every 3-component date below has at least one day value of 13-31 on at
- * least one side of the range, which is what B.4 established is the only
- * safe, non-guessing fix (`13/04/2019` cannot be anything but 13 April).
- * The genuinely locale-ambiguous shape (`03/04/2019`, both numbers <=12) is
- * NOT exercised here — B.4 left it an open residual and reports it to the
- * lead rather than picking a locale, so no fixture may quietly assume one.
+ * **Date formats are deliberately UNAMBIGUOUS where a NUMBER is asserted.**
+ * Every 3-component date in the qualification-form fixtures below has at
+ * least one day value of 13-31 on at least one side of the range, which is
+ * what B.4 established is the only safe, non-guessing fix (`13/04/2019`
+ * cannot be anything but 13 April).
+ *
+ * **The genuinely locale-ambiguous shape is exercised separately, by
+ * design (Task E/G, docs/NEXT_PHASE.md, closing H-022's shape a fifth
+ * time).** An earlier version of this corpus excluded it entirely — every
+ * one of its 13 numeric dates had day >= 13 — which meant the corpus built
+ * to prove Indian date handling systematically excluded the ONE notation
+ * that broke it (`03/04/2019`, both numbers <=12: H-089/H-095). The four
+ * `indian-ambiguous-*`/`indian-mixed-*` fixtures at the end of this array
+ * are that residual, closed: they assert the SURFACED reservation shape
+ * (`unreadable_date_range`, ADR-029) rather than a number, so they do not
+ * quietly pick a locale either.
  *
  * @type {readonly Fixture[]}
  */
@@ -570,6 +579,101 @@ export const INDIAN_CV_CORPUS = [
       'Java, Spring Boot, PostgreSQL, Docker, AWS',
     ],
   },
+
+  {
+    id: 'indian-ambiguous-slash-date-surfaced',
+    defectClass: 'H-089 (ambiguous DD/MM/YYYY range)',
+    severity: 'wrong-score',
+    why: '"03/04/2019 - 05/08/2022" is genuinely ambiguous — both leading numbers on both sides are <=12, so there is no fact (unlike a 13-31 day value) that picks DD/MM over MM/DD. Before E1-E3 this deleted the role entirely, reporting zero tenure with no warning (H-089). Now it must surface as a single `unreadable_date_range` attribute carrying a computed lower bound, and contribute NOTHING to `totalYearsExperience` — neither a wrong number nor silence.',
+    lines: [
+      'Aditi Nair',
+      '',
+      'Professional Experience',
+      '',
+      'Software Engineer, Cognizant, Chennai, 03/04/2019 - 05/08/2022',
+      'Built backend services for a retail client.',
+      '',
+      'Education',
+      '',
+      'BE in Computer Science, Anna University, 2016',
+      '',
+      'Skills',
+      '',
+      'Java, SQL, AWS',
+    ],
+  },
+
+  {
+    id: 'indian-ambiguous-dash-date-surfaced',
+    defectClass: 'H-095 (ambiguous DD-MM-YYYY range)',
+    severity: 'wrong-score',
+    why: 'The SAME ambiguous dates as indian-ambiguous-slash-date-surfaced, dash-separated. Before E1, a dash-separated 3-part date reached parseDateToken as an unambiguous shape only if one side was 13-31; an AMBIGUOUS dash date fell through further, to the bare `\\d{4}` alternative, and defaulted to January — silently INFLATING tenure (H-095) rather than deleting the role. E1 makes dash reach the same 3-part classification as slash, so this is surfaced identically: one `unreadable_date_range` attribute, zero contribution to the total.',
+    lines: [
+      'Rohan Kulkarni',
+      '',
+      'Professional Experience',
+      '',
+      'Software Engineer, Mindtree, Bengaluru, 03-04-2019 - 05-08-2022',
+      'Built backend services for a retail client.',
+      '',
+      'Education',
+      '',
+      'BE in Computer Science, Anna University, 2016',
+      '',
+      'Skills',
+      '',
+      'Java, SQL, AWS',
+    ],
+  },
+
+  {
+    id: 'indian-ambiguous-dot-date-surfaced',
+    defectClass: 'H-095 (ambiguous DD.MM.YYYY range)',
+    severity: 'wrong-score',
+    why: 'The SAME ambiguous dates again, dot-separated. Before E1, `DATE_TOKEN` had NO dot-separated 3-part alternative AT ALL — a dot form never reached `parseDateToken` as a 3-part token regardless of ambiguity, and fell to the bare `\\d{4}` alternative, defaulting to January exactly like the dash form (H-095). E1 adds the dot separator to `THREE_PART_DATE_TOKEN`, so it is now surfaced identically to slash and dash.',
+    lines: [
+      'Kavya Reddy',
+      '',
+      'Professional Experience',
+      '',
+      'Software Engineer, Larsen Infra Projects, Pune, 03.04.2019 - 05.08.2022',
+      'Built backend services for a retail client.',
+      '',
+      'Education',
+      '',
+      'BE in Computer Science, Anna University, 2016',
+      '',
+      'Skills',
+      '',
+      'Java, SQL, AWS',
+    ],
+  },
+
+  {
+    id: 'indian-mixed-readable-and-unreadable-roles',
+    defectClass: 'H-089/H-095 (mixed CV)',
+    severity: 'wrong-score',
+    why: 'A CV is rarely uniformly ambiguous — H-089/H-095 are usually ONE role among several. This candidate has two roles: the current one is unambiguous (day 13), and the earlier one is genuinely ambiguous (both leading numbers <=12 on both sides). `totalYearsExperience` must reflect ONLY the readable role (7.2y from 13/06/2019 - Present), and the unreadable role must be on the record as a separate `unreadable_date_range` attribute rather than either being silently dropped (understating tenure further, H-089) or silently resolved into the total (which would be a confident number nobody could verify).',
+    lines: [
+      'Ishaan Bhatt',
+      '',
+      'Professional Experience',
+      '',
+      'Software Engineer, Infosys, Bengaluru, 13/06/2019 - Present',
+      'Built and operated distributed services for a banking client.',
+      '',
+      'Software Engineer, Wipro, Hyderabad, 04/07/2016 - 03/05/2019',
+      'Maintained internal tooling for enterprise clients.',
+      '',
+      'Education',
+      '',
+      'BE in Computer Science, Anna University, 2016',
+      '',
+      'Skills',
+      '',
+      'Java, SQL, AWS',
+    ],
+  },
 ];
 
 /**
@@ -636,7 +740,7 @@ export const REFUSAL_CORPUS = [
   {
     id: 'refuse-mixed-language',
     format: 'pdf',
-    why: 'ADR-022, from a measured failure: a 50%-French document classified as English overall and was scored on its English half. This fixture carries French passages long enough for the detector to judge them, and the document is refused. NOTE the reason: with this much French the WHOLE-DOCUMENT classifier catches it, so the refusal is non_english_language_not_supported rather than the ADR-022 segment veto. The segment veto covers the narrower case where a document still reads as English overall — and reaching it requires non-English passages of 15+ words, which most CV lines are not. See refuse-mixed-language-SHORT-passages below and H-068.',
+    why: 'ADR-022, from a measured failure: a 50%-French document classified as English overall and was scored on its English half. This fixture carries French passages long enough for the detector to judge them, and the document is refused. REASON CHANGED DELIBERATELY at ADR-031 (eld replaced the Cavnar & Trenkle profiler): it was non_english_language_not_supported, because the retired whole-document profiler judged the whole thing non-English. eld reads the document as English-containing — which it is, half of it is English prose — so the whole-document gate no longer fires and the ADR-022 SEGMENT VETO catches the French instead, giving mixed_language_content. The refusal itself is unchanged (parseStatus stays needs_attention, C7 holds); only which mechanism caught it moved, and the new reason is the more truthful one to show a recruiter: this document is bilingual, not "in a language we do not support". It now exercises the segment veto on the binary path, which is what ADR-022 exists for and what D6 originally failed. See refuse-mixed-language-SHORT-passages below and H-068 for the narrower sub-floor case the veto still cannot reach.',
     lines: [
       'Rémi Dubois',
       '',
@@ -652,6 +756,6 @@ export const REFUSAL_CORPUS = [
       'Encadrement quotidien une équipe de six personnes, gestion des recrutements techniques et animation des réunions hebdomadaires avec les équipes commerciales de entreprise.',
     ],
     parseStatus: 'needs_attention',
-    reason: 'non_english_language_not_supported',
+    reason: 'mixed_language_content',
   },
 ];

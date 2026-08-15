@@ -146,18 +146,25 @@ describe('detectLanguageHeuristic — evaluation corpus and confusion matrix', (
 });
 
 describe('detectLanguageHeuristic — documented limitations (not requirements; tracked honestly)', () => {
-  it('KNOWN LIMITATION: an English document that is purely a comma-separated technology list with no structural English text at all can be misjudged as not English', () => {
+  it('EXPECTATION CHANGED (ADR-031): a comma-separated technology list with no structural English text is now classified English, though only narrowly', () => {
     // Deliberately more extreme than `headers_plus_tech_only` above (which
     // DOES pass): no header words, no section labels, no verbs, nothing but
-    // technology names that appear verbatim in every language's CV. No
-    // character-statistics approach can reliably win this comparison,
-    // because there is no English-specific signal left to measure — see the
-    // "Honest limitations" section of languageDetection.ts. Documented here,
-    // as current actual behaviour, rather than silently left unmentioned.
+    // technology names that appear verbatim in every language's CV.
+    //
+    // Under the retired n-gram profiler this misjudged as NOT English — the
+    // KNOWN LIMITATION this test used to assert. Measured under `eld`
+    // (`extrasmall`), the word "Skills" plus the acronym shapes ("SQL",
+    // "GraphQL") tip it narrowly to English: 0.454 vs 0.424 for the
+    // next-closest language (Swedish), `isReliable() === false`. This is a
+    // real behaviour change from the classifier swap, not a threshold picked
+    // to make the test pass — `eld`'s own top pick decides `isEnglish`
+    // everywhere in this module (see the file-level doc comment), and this
+    // input is not part of any pass-criteria corpus, so the change is
+    // recorded here rather than silently left to go stale.
     const text =
       'Skills: Python, Docker, AWS, Kubernetes, React, SQL, Git, Linux, Terraform, Jenkins, GraphQL, Redis';
     const result = detectLanguageHeuristic(text);
-    expect(result.isEnglish).toBe(false);
+    expect(result.isEnglish).toBe(true);
   });
 
   it('judges a code-switched (bilingual) document as one blob — which is why the segment veto exists (ADR-022)', () => {
@@ -534,28 +541,42 @@ describe('Indian-English CVs — a primary case, not an edge (H-086)', () => {
     expect(refused).toEqual([]);
   });
 
-  it('the institution exemption is what protects them, and it is load-bearing', () => {
-    // Asserts the MECHANISM, not just the outcome. Without this, someone could
-    // delete ENGLISH_INSTITUTION_WORDS, watch these CVs still pass for an
-    // unrelated reason, and reintroduce the defect later.
+  it("EXPECTATION'S MECHANISM CHANGED (ADR-031): long transliterated Indian institution names read as English with no lexicon exemption needed", () => {
+    // Historical note, kept because the shape of the old defect is what makes
+    // this worth a dedicated test rather than folding into the eight-name
+    // corpus above. Under the retired n-gram profiler, this exact string
+    // measured 10.0 letters per word — above the (now-deleted)
+    // `MAX_ENGLISH_MEAN_WORD_LENGTH` compounding threshold of 9.4, and higher
+    // than the Swedish header block (10.45) that threshold existed to catch.
+    // Only an explicit `ENGLISH_INSTITUTION_WORDS` exemption list kept it from
+    // being falsely refused (H-086).
     //
-    // An education block of Indian university names measures 10.0 letters per
-    // word — above the 9.4 compounding threshold, and higher than the Swedish
-    // header block (10.45) is above English. Only the institution exemption
-    // separates them.
+    // ADR-031 deleted both the threshold and the exemption list: `eld` reads
+    // long compounding-looking proper nouns like these as English on their
+    // own morphology, with no lexicon protecting them. This test keeps the
+    // letters/word computation as evidence the shape that used to trip the
+    // deleted heuristic is still present, then asserts the CURRENT mechanism
+    // needs no exemption to get it right.
     const indianUniversities =
       'Visvesvaraya Technological University Belagavi Jawaharlal Nehru Technological University Hyderabad';
     const letters = (indianUniversities.match(/\p{L}/gu) ?? []).length;
     const words = (indianUniversities.toLowerCase().match(/[\p{L}']+/gu) ?? []).length;
     expect(letters / words).toBeGreaterThan(9.4);
 
-    // ...and yet it is not treated as foreign.
+    // ...and yet it is not treated as foreign, with no exemption list involved.
     expect(findNonEnglishSegments(indianUniversities).hasNonEnglishSegment).toBe(false);
   });
 
-  it('and the German block it exists to catch contains no English institution word', () => {
-    // Why the exemption does not weaken the signal it guards: German, Dutch and
-    // Swedish use Universitaet / Hogeschool / Handelshoegskolan.
+  it('the German block that shape used to risk confusing with is still caught', () => {
+    // Companion to the above: a German institution block that superficially
+    // resembles the Indian one (long, capitalised, education-section words)
+    // must still be refused. There is no lexicon exemption left to
+    // accidentally cover it either way — `eld` separates the two on their own
+    // morphology. German, Dutch and Swedish institution vocabulary
+    // (`Universitaet`, `Hogeschool`, `Handelshoegskolan`) never overlapped
+    // with `ENGLISH_INSTITUTION_WORDS` even when that list existed, so this
+    // was never at risk from the exemption — see the H-079 test above for the
+    // broader sweep this is a focused instance of.
     const german = `Kenntnisse: Lagerverwaltung, Bedarfsplanung, Tourenplanung, Bestandskontrolle
 Ausbildung: Diplom Logistikmanagement, Universitaet Koeln`;
     expect(findNonEnglishSegments(german).hasNonEnglishSegment).toBe(true);

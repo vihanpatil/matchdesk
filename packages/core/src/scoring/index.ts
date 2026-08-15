@@ -19,6 +19,7 @@ export {
   senioritySubscore,
   skillsSubscore,
   totalYearsExperience,
+  unreadableEmploymentDates,
 } from './dimensions.js';
 export { evaluateEligibility } from './eligibility.js';
 export { buildExplanation } from './explain.js';
@@ -48,4 +49,6 @@ export type {
   SkillsDimensionSpec,
   StrengthItem,
   UnmetRequirement,
+  UnreadableEmploymentDatesReservation,
+  UnverifiedTenureClaimReservation,
 } from './types.js';

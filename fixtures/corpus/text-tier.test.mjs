@@ -67,6 +67,11 @@ function certificationsOf(attrs) {
   return attrs.flatMap((a) => (a.kind === 'certification' ? [a] : []));
 }
 
+/** @param {readonly ExtractedAttribute[]} attrs */
+function unreadableRangesOf(attrs) {
+  return attrs.flatMap((a) => (a.kind === 'unreadable_date_range' ? [a] : []));
+}
+
 /**
  * A stable, readable serialisation for snapshots.
  *
@@ -106,6 +111,8 @@ function snapshotOf(attrs, text) {
           years: a.years,
           isExplicitStatement: a.isExplicitStatement ?? false,
         };
+      case 'unreadable_date_range':
+        return { ...common, minPossibleYears: a.minPossibleYears };
     }
   });
 }
@@ -330,6 +337,54 @@ describe('corpus · text tier · Indian CV corpus (B.2/B.4)', () => {
     const education = educationOf(attributesOf('indian-bsc-zoho'));
     expect(education).toHaveLength(1);
     expect(education[0]?.degreeLevel).toBe('bachelor');
+  });
+
+  /**
+   * The residual Task E/G closes: every date above has day >= 13. These four
+   * fixtures are the notation the corpus used to systematically exclude
+   * (H-022's shape a fifth time) — a genuinely locale-ambiguous range, in
+   * each separator the engine supports, plus a mixed CV combining one
+   * unreadable role with one readable role.
+   */
+  it('indian-ambiguous-slash · a genuinely ambiguous DD/MM/YYYY range is SURFACED, not deleted (H-089)', () => {
+    const attrs = attributesOf('indian-ambiguous-slash-date-surfaced');
+    // No silently wrong number: this role never becomes years_experience.
+    expect(totalYearsExperience(attrs)).toBe(0);
+    // No silent deletion either: it is on the record, full span, with a
+    // computed (not guessed) lower bound.
+    const unreadable = unreadableRangesOf(attrs);
+    expect(unreadable).toHaveLength(1);
+    expect(unreadable[0]?.value).toBe('03/04/2019 - 05/08/2022');
+    expect(unreadable[0]?.minPossibleYears).toBe(3.2);
+  });
+
+  it('indian-ambiguous-dash · the SAME ambiguous range, dash-separated, no longer defaults to January (H-095)', () => {
+    const attrs = attributesOf('indian-ambiguous-dash-date-surfaced');
+    expect(totalYearsExperience(attrs)).toBe(0);
+    const unreadable = unreadableRangesOf(attrs);
+    expect(unreadable).toHaveLength(1);
+    expect(unreadable[0]?.value).toBe('03-04-2019 - 05-08-2022');
+    expect(unreadable[0]?.minPossibleYears).toBe(3.2);
+  });
+
+  it('indian-ambiguous-dot · the SAME ambiguous range, dot-separated, is now even PARSED as a date (H-095/E1)', () => {
+    const attrs = attributesOf('indian-ambiguous-dot-date-surfaced');
+    expect(totalYearsExperience(attrs)).toBe(0);
+    const unreadable = unreadableRangesOf(attrs);
+    expect(unreadable).toHaveLength(1);
+    expect(unreadable[0]?.value).toBe('03.04.2019 - 05.08.2022');
+    expect(unreadable[0]?.minPossibleYears).toBe(3.2);
+  });
+
+  it('indian-mixed · one unreadable role does not silently swallow or inflate a readable role alongside it', () => {
+    const attrs = attributesOf('indian-mixed-readable-and-unreadable-roles');
+    // Only the unambiguous role (13/06/2019 - Present, day 13) counts.
+    expect(totalYearsExperience(attrs)).toBe(7.2);
+
+    const unreadable = unreadableRangesOf(attrs);
+    expect(unreadable).toHaveLength(1);
+    expect(unreadable[0]?.value).toBe('04/07/2016 - 03/05/2019');
+    expect(unreadable[0]?.minPossibleYears).toBe(2.8);
   });
 
   /**

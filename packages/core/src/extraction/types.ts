@@ -8,7 +8,8 @@
  * this directory calls it before emitting an attribute.
  */
 
-export type AttributeKind = 'skill' | 'years_experience' | 'education' | 'certification';
+export type AttributeKind =
+  'skill' | 'years_experience' | 'education' | 'certification' | 'unreadable_date_range';
 
 /** Character offsets into the input text. `end` is exclusive. */
 export interface SourceSpan {
@@ -71,8 +72,40 @@ export interface CertificationAttribute extends BaseAttribute {
   readonly canonicalId: string | null;
 }
 
+/**
+ * An employment date range the engine can PROVE it read (E2/E3, ADR-029,
+ * closing H-089/H-095). `experience.ts` extends `DATE_TOKEN` to consume a
+ * full three-part numeric date whatever its separator, then classifies it:
+ * exactly one leading number in 13-31 resolves unambiguously (the existing
+ * B.4 rule); both numbers <=12 is genuinely ambiguous between DD/MM and
+ * MM/DD and this attribute is emitted instead of a guess.
+ *
+ * This is the "unaccounted-for evidence" ADR-029 Decision 1 requires the
+ * engine to surface rather than silently drop or silently resolve: a
+ * `\d{1,2}[/.-]\d{1,2}[/.-]\d{4}` token (or the "Present" it is paired
+ * with) that a range could not read. It is never summed into
+ * `totalYearsExperience` — see `unreadableEmploymentDates` in
+ * `../scoring/dimensions.js`, which turns this into a
+ * `unreadable_employment_dates` `Reservation` (`../scoring/types.js`).
+ */
+export interface UnreadableDateRangeAttribute extends BaseAttribute {
+  readonly kind: 'unreadable_date_range';
+  /**
+   * A LOWER BOUND, in years, on the tenure this range represents. Computed
+   * by resolving the ambiguous side(s) two ways — DD/MM and MM/DD — and
+   * taking the minimum resulting duration. That number is true under
+   * EITHER locale reading, so reporting it commits to neither (ADR-029's
+   * "materiality is computed, not guessed").
+   */
+  readonly minPossibleYears: number;
+}
+
 export type ExtractedAttribute =
-  SkillAttribute | YearsExperienceAttribute | EducationAttribute | CertificationAttribute;
+  | SkillAttribute
+  | YearsExperienceAttribute
+  | EducationAttribute
+  | CertificationAttribute
+  | UnreadableDateRangeAttribute;
 
 /**
  * Reference "now" for date-range parsing ("... - Present"). Section 6.6

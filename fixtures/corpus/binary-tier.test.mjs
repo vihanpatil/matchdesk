@@ -195,6 +195,8 @@ describe('corpus · binary tier · format parity (metamorphic)', () => {
                 return `certification:${String(a.canonicalId)}`;
               case 'years_experience':
                 return `years:${String(a.years)}:${String(a.isExplicitStatement ?? false)}`;
+              case 'unreadable_date_range':
+                return `unreadable:${String(a.minPossibleYears)}`;
             }
           })
           .sort();

@@ -3,27 +3,44 @@ import { describe, expect, it } from 'vitest';
 import { roundHalfUp } from '../numeric/round.js';
 import { assertValidSpan } from './span.js';
 import { extractYearsExperience } from './experience.js';
+import type { YearsExperienceAttribute } from './types.js';
 
 const REF = { year: 2024, month: 6 };
+
+/**
+ * `extractYearsExperience` can also emit `unreadable_date_range` attributes
+ * (E3, ADR-029) alongside `years_experience` ones, and the two kinds do not
+ * share `years`/`isExplicitStatement` (H-089/H-095's remedy is a distinct
+ * attribute shape, not a `years_experience` with a flag on it — see
+ * `./types.js`). Narrows to the `years_experience` kind, which is what every
+ * test in this file is about UNLESS it explicitly says otherwise (the E2/E3
+ * ambiguous-date tests near the end assert on `unreadable_date_range`
+ * directly, since that is the behaviour under test there).
+ */
+function years(
+  attrs: ReturnType<typeof extractYearsExperience>,
+): readonly YearsExperienceAttribute[] {
+  return attrs.filter((a): a is YearsExperienceAttribute => a.kind === 'years_experience');
+}
 
 describe('extractYearsExperience', () => {
   it('parses an explicit "X years of experience" statement', () => {
     const text = 'I have 5+ years of experience in software engineering.';
     const attrs = extractYearsExperience(text, REF);
     expect(attrs).toHaveLength(1);
-    expect(attrs[0]?.years).toBe(5);
+    expect(years(attrs)[0]?.years).toBe(5);
     expect(attrs[0]?.normalizedValue).toBe('5');
   });
 
   it('parses "X years" without the trailing "of experience"', () => {
     const attrs = extractYearsExperience('3 years experience with PostgreSQL.', REF);
-    expect(attrs.some((a) => a.years === 3)).toBe(true);
+    expect(years(attrs).some((a) => a.years === 3)).toBe(true);
   });
 
   it('parses a whole-year date range into a duration in years', () => {
     const text = 'Senior Engineer, Acme Corp, Jan 2019 - Jan 2022';
     const attrs = extractYearsExperience(text, REF);
-    const dateAttr = attrs.find((a) => a.value.includes('Jan 2019'));
+    const dateAttr = years(attrs).find((a) => a.value.includes('Jan 2019'));
     expect(dateAttr).toBeDefined();
     expect(dateAttr?.years).toBe(3);
   });
@@ -31,7 +48,7 @@ describe('extractYearsExperience', () => {
   it('resolves "Present" against the supplied reference date', () => {
     const text = 'Engineer, Acme Corp, 2019 - Present';
     const attrs = extractYearsExperience(text, { year: 2022, month: 1 });
-    const dateAttr = attrs.find((a) => a.value.toLowerCase().includes('present'));
+    const dateAttr = years(attrs).find((a) => a.value.toLowerCase().includes('present'));
     expect(dateAttr).toBeDefined();
     expect(dateAttr?.years).toBe(3);
   });
@@ -39,7 +56,7 @@ describe('extractYearsExperience', () => {
   it('parses numeric MM/YYYY date ranges', () => {
     const text = 'Engineer, Acme Corp, 06/2019 - 09/2021';
     const attrs = extractYearsExperience(text, REF);
-    const dateAttr = attrs.find((a) => a.value.includes('06/2019'));
+    const dateAttr = years(attrs).find((a) => a.value.includes('06/2019'));
     expect(dateAttr).toBeDefined();
     const months = (2021 - 2019) * 12 + (9 - 6);
     expect(dateAttr?.years).toBe(roundHalfUp(months / 12, 1));
@@ -54,7 +71,7 @@ describe('extractYearsExperience', () => {
   it('applies half-up rounding (via roundHalfUp) to a fractional-year duration', () => {
     const text = 'Engineer, Acme Corp, Jan 2019 - Mar 2022';
     const attrs = extractYearsExperience(text, REF);
-    const dateAttr = attrs.find((a) => a.value.includes('Jan 2019'));
+    const dateAttr = years(attrs).find((a) => a.value.includes('Jan 2019'));
     const months = (2022 - 2019) * 12 + (3 - 1);
     expect(dateAttr?.years).toBe(roundHalfUp(months / 12, 1));
   });
@@ -135,7 +152,7 @@ describe('extractYearsExperience', () => {
       'Consultant, Beta Inc, Jun 2020 - Jun 2021',
     ].join('\n');
     const attrs = extractYearsExperience(text, REF);
-    const total = attrs.reduce((acc, a) => acc + a.years, 0);
+    const total = years(attrs).reduce((acc, a) => acc + a.years, 0);
     // True merged coverage is Jan 2019 - Jan 2022 = 3 years, NOT 3 + 1 = 4.
     expect(total).toBe(3);
   });
@@ -143,7 +160,7 @@ describe('extractYearsExperience', () => {
   it('credits the full duration of two non-overlapping (adjacent) ranges', () => {
     const text = ['Jan 2012 - Dec 2015', 'Jan 2016 - Jan 2020'].join('\n');
     const attrs = extractYearsExperience(text, REF);
-    const total = attrs.reduce((acc, a) => acc + a.years, 0);
+    const total = years(attrs).reduce((acc, a) => acc + a.years, 0);
     expect(total).toBeCloseTo(3.9 + 4, 1);
   });
 
@@ -154,12 +171,12 @@ describe('extractYearsExperience', () => {
 
   it('marks an explicit "years of experience" statement as such', () => {
     const attrs = extractYearsExperience('I have 6 years of experience.', REF);
-    expect(attrs[0]?.isExplicitStatement).toBe(true);
+    expect(years(attrs)[0]?.isExplicitStatement).toBe(true);
   });
 
   it('does not mark a parsed date range as an explicit statement', () => {
     const attrs = extractYearsExperience('Engineer, Acme Corp, Jan 2019 - Jan 2022', REF);
-    expect(attrs.every((a) => a.isExplicitStatement !== true)).toBe(true);
+    expect(years(attrs).every((a) => a.isExplicitStatement !== true)).toBe(true);
   });
 });
 
@@ -311,7 +328,7 @@ describe('unambiguous numeric date formats (B.4)', () => {
     // Was `[]` — the whole role vanished and contributed zero years.
     const attrs = extractYearsExperience('Engineer, Acme, 13/04/2019 - 15/08/2022', REF);
     expect(attrs.length).toBeGreaterThan(0);
-    expect(attrs[0]?.years).toBe(3.3);
+    expect(years(attrs)[0]?.years).toBe(3.3);
   });
 
   it('parses a full DD-MM-YYYY range on both sides', () => {
@@ -319,66 +336,112 @@ describe('unambiguous numeric date formats (B.4)', () => {
     // to the bare `\d{4}` alternative.
     const attrs = extractYearsExperience('Engineer, Acme, 13-04-2019 - 15-08-2022', REF);
     expect(attrs.length).toBeGreaterThan(0);
-    expect(attrs[0]?.years).toBe(3.3);
+    expect(years(attrs)[0]?.years).toBe(3.3);
+  });
+
+  it('parses a full DD.MM.YYYY range on both sides (E1: the dot separator is new)', () => {
+    // Before E1, DATE_TOKEN had no dot-separated three-part alternative at
+    // all, so this fell to the bare `\d{4}` fallback on both sides.
+    const attrs = extractYearsExperience('Engineer, Acme, 13.04.2019 - 15.08.2022', REF);
+    expect(attrs.length).toBeGreaterThan(0);
+    expect(years(attrs)[0]?.years).toBe(3.3);
   });
 
   it('reads the month from the non-day side regardless of which side it is on', () => {
     // DD/MM (Indian/European) and MM/DD (US) must both resolve to April 2019.
     const indian = extractYearsExperience('Engineer, Acme, 13/04/2019 - 13/04/2021', REF);
     const us = extractYearsExperience('Engineer, Acme, 04/13/2019 - 04/13/2021', REF);
-    expect(indian[0]?.years).toBe(2);
-    expect(us[0]?.years).toBe(2);
+    expect(years(indian)[0]?.years).toBe(2);
+    expect(years(us)[0]?.years).toBe(2);
   });
 
   it('does not match when neither leading number can be a day', () => {
     // "13/25/2019" has no valid month on either side; it must not be trusted
-    // as a date. Pins the `month >= 1 && month <= 12` check in parseDateToken.
+    // as a date, and it is INVALID rather than AMBIGUOUS (E2) — 25 cannot be
+    // a month under either locale reading, so there is no lower bound to
+    // report either. Pins the `month >= 1 && month <= 12` check.
     const attrs = extractYearsExperience('Engineer, Acme, 13/25/2019 - 13/25/2021', REF);
     expect(attrs).toEqual([]);
   });
 
-  // ── DOCUMENTED GAPS ────────────────────────────────────────────────────
-  // All four assert the WRONG behaviour on purpose so it cannot be lost
-  // (H-085's lesson). An earlier version of this block had only the first and
-  // described the defect as "a two-sided ambiguous range is dropped". An
-  // independent verifier falsified that description on three counts (H-094);
-  // the other three tests below are those counts, pinned.
-
-  it('DOCUMENTED GAP (H-089): an ambiguous END date deletes the role', () => {
-    // Not "both sides ambiguous" — the END governs. An unambiguous start with
-    // an ambiguous end is dropped just the same, which makes the affected
-    // population 336/784 day-pairs rather than the 144/784 the original
-    // description implied.
-    expect(extractYearsExperience('Engineer, Acme, 03/04/2019 - 05/08/2022', REF)).toEqual([]);
-    expect(extractYearsExperience('Engineer, Acme, 13/04/2013 - 05/08/2022', REF)).toEqual([]);
+  it('does not disturb the MONTH_PATTERN dot form ("Jan. 2020") when adding the dot separator (E1)', () => {
+    // The concern named in Task E1: THREE_PART_DATE_TOKEN's new `.` separator
+    // must not shadow the existing "abbreviated month, dot, year" branch,
+    // which starts with a LETTER and can never match the digit-only 3-part
+    // pattern at the same text position.
+    const attrs = extractYearsExperience('Engineer, Acme, Jan. 2020 - Mar. 2022', REF);
+    expect(years(attrs)[0]?.years).toBe(roundHalfUp(((2022 - 2020) * 12 + (3 - 1)) / 12, 1));
   });
 
-  it('DOCUMENTED GAP (H-089): an open-ended ambiguous range silently GUESSES DD/MM', () => {
-    // This is the correction that matters most. The range does NOT abstain:
-    // the 3-part token fails, then `\d{1,2}\/\d{4}` matches a SUBSTRING,
-    // discarding the leading component. The engine commits to a locale by
-    // accident, and truncates the evidence span the recruiter is shown.
-    const attrs = extractYearsExperience('Engineer, Acme, 03/04/2019 - Present', REF);
-    expect(attrs[0]?.years).toBe(5.2);
-    expect(attrs[0]?.value).toBe('04/2019 - Present');
+  // ── E2/E3: the ambiguous shape (docs/NEXT_PHASE.md Task E) ─────────────
+  // Renamed and flipped from three `DOCUMENTED GAP` tests (H-085's lesson:
+  // pin what is WRONG so it cannot be silently reintroduced; once fixed,
+  // flip and rename rather than delete, per ADR-028). An earlier version of
+  // this block had only one gap test and described the defect as "a
+  // two-sided ambiguous range is dropped"; an independent verifier
+  // falsified that description on three counts (H-094) before the fix
+  // below existed, which is why there are three renamed tests rather than
+  // one.
 
-    // The same fallback reads a US-notation date as DD/MM: "04/03/2013" is
-    // 4 March to a US author, and the engine reports March — right answer,
-    // wrong reasoning, and it would be wrong for an Indian author.
-    expect(extractYearsExperience('Engineer, Acme, 04/03/2013 - Present', REF)[0]?.value).toBe(
-      '03/2013 - Present',
-    );
+  it('FIXED (E1-E3, H-089): an ambiguous date range is SURFACED, not silently deleted', () => {
+    // H-094 correction 2: the END date governs just as much as the START —
+    // an unambiguous start with an ambiguous end is unreadable too, so both
+    // inputs below must produce a reservation-triggering attribute rather
+    // than either a wrong number or an empty array.
+    for (const text of [
+      'Engineer, Acme, 03/04/2019 - 05/08/2022',
+      'Engineer, Acme, 13/04/2013 - 05/08/2022',
+    ]) {
+      const attrs = extractYearsExperience(text, REF);
+      // No silently wrong number: this range never becomes a
+      // `years_experience` attribute.
+      expect(years(attrs)).toEqual([]);
+      // No silent deletion either: the role is on the record.
+      const unreadable = attrs.find((a) => a.kind === 'unreadable_date_range');
+      expect(unreadable).toBeDefined();
+      expect(unreadable?.value).toBe(text.replace('Engineer, Acme, ', ''));
+    }
   });
 
-  it('DOCUMENTED GAP (H-095): dash and dot separators silently OVER-count', () => {
-    // Directionally opposite to H-089 and previously unregistered. The
-    // slash-only `\d{1,2}\/\d{4}` alternative cannot match a dash or dot
-    // form, so it falls all the way to bare `\d{4}` and defaults to January —
-    // inflating tenure and truncating the evidence to just the year.
+  it('FIXED (E1-E3, H-089): an open-ended ambiguous range keeps its FULL evidence span, and no longer guesses DD/MM', () => {
+    // H-094's biggest correction: the range used to NOT abstain — it
+    // silently committed to a locale via a truncated substring match. Now
+    // the full span is kept and no number is asserted.
+    const ddmmFirst = extractYearsExperience('Engineer, Acme, 03/04/2019 - Present', REF);
+    expect(years(ddmmFirst)).toEqual([]);
+    const ddmmUnreadable = ddmmFirst.find((a) => a.kind === 'unreadable_date_range');
+    expect(ddmmUnreadable?.value).toBe('03/04/2019 - Present'); // NOT truncated to "04/2019 - Present"
+    // The lower bound is computed (ADR-029), not merely "absent": true under
+    // BOTH the DD/MM (April 2019) and MM/DD (March 2019) readings.
+    expect(
+      ddmmUnreadable?.kind === 'unreadable_date_range' && ddmmUnreadable.minPossibleYears,
+    ).toBe(5.2);
+
+    // The US-notation twin: "04/03/2013" used to be silently read as DD/MM
+    // (4 March, right answer by accident) with a truncated span. Now it is
+    // surfaced with its full span too, not resolved either way.
+    const mmddFirst = extractYearsExperience('Engineer, Acme, 04/03/2013 - Present', REF);
+    const mmddUnreadable = mmddFirst.find((a) => a.kind === 'unreadable_date_range');
+    expect(mmddUnreadable?.value).toBe('04/03/2013 - Present'); // NOT truncated to "03/2013 - Present"
+  });
+
+  it('FIXED (E1, H-095): dash and dot separators no longer default to January and OVER-count', () => {
+    // The opposite-direction defect (H-095): dash/dot forms used to miss the
+    // slash-only 2-part fallback and default to January, inflating tenure.
+    // E1 makes the dash/dot form reach the SAME 3-part classification as
+    // slash, so an ambiguous dash/dot range is surfaced exactly like an
+    // ambiguous slash range — never silently resolved to any month.
     for (const sep of ['-', '.']) {
-      const attrs = extractYearsExperience(`Engineer, Acme, 03${sep}04${sep}2013 - Present`, REF);
-      expect(attrs[0]?.years).toBe(11.4); // truth is 11.2 — April, not January
-      expect(attrs[0]?.value).toBe('2013 - Present');
+      const text = `Engineer, Acme, 03${sep}04${sep}2013 - Present`;
+      const attrs = extractYearsExperience(text, REF);
+      expect(years(attrs)).toEqual([]);
+      const unreadable = attrs.find((a) => a.kind === 'unreadable_date_range');
+      expect(unreadable?.value).toBe(`03${sep}04${sep}2013 - Present`); // NOT truncated to "2013 - Present"
+      // truth is 11.2 (April 2013 - Jun 2024): the computed lower bound
+      // matches it exactly here, because the DD/MM reading IS the truth.
+      expect(unreadable?.kind === 'unreadable_date_range' && unreadable.minPossibleYears).toBe(
+        11.2,
+      );
     }
   });
 });

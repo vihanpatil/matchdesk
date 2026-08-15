@@ -492,13 +492,19 @@ describe('reservations (H-040, ADR-029)', () => {
     const blocking = result.reservations.filter((r) => r.blocking);
 
     expect(blocking).toHaveLength(1);
-    expect(blocking[0]?.kind).toBe('unverified_tenure_claim');
-    expect(blocking[0]?.claimed).toBe(20);
-    expect(blocking[0]?.computed).toBe(2.9);
+    const first = blocking[0];
+    expect(first?.kind).toBe('unverified_tenure_claim');
+    // Reservation is a discriminated union (E3, ADR-029); narrow before
+    // reading the `unverified_tenure_claim`-only fields.
+    if (first?.kind !== 'unverified_tenure_claim') {
+      throw new Error('expected an unverified_tenure_claim reservation');
+    }
+    expect(first.claimed).toBe(20);
+    expect(first.computed).toBe(2.9);
     // Names both numbers, so the recruiter can see the disagreement itself
     // rather than a bare "provisional" flag.
-    expect(blocking[0]?.detail).toContain('2.9');
-    expect(blocking[0]?.detail).toContain('20');
+    expect(first.detail).toContain('2.9');
+    expect(first.detail).toContain('20');
   });
 
   it('does NOT block when the claim would not change the verdict', () => {

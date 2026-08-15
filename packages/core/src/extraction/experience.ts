@@ -2,7 +2,11 @@ import { quantize, roundHalfUp } from '../numeric/round.js';
 import { extractIgnoringInvisibleCharacters } from './invisible.js';
 import { assertValidSpan } from './span.js';
 import { detectSections } from './sections.js';
-import type { ExtractionOptions, YearsExperienceAttribute } from './types.js';
+import type {
+  ExtractionOptions,
+  UnreadableDateRangeAttribute,
+  YearsExperienceAttribute,
+} from './types.js';
 
 const EXPLICIT_BASE_CONFIDENCE = 0.9;
 const EXPLICIT_OF_EXPERIENCE_BONUS = 0.05;
@@ -42,48 +46,62 @@ const MONTH_PATTERN =
   '(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)';
 
 /**
- * A two-digit number outside 1-12 can only ever be a DAY, never a month —
- * true in every locale. That is the ONE fact that makes any part of a
- * numeric `NN/NN/YYYY` or `NN-NN-YYYY` date unambiguous (B.4, H-040's shape
- * for Indian/European date formats): whichever of the two leading numbers
- * falls in 13-31 is the day, and the OTHER number must then be the month,
- * regardless of which side it is written on. `13/04/2019` is unambiguously
- * 13 April (DD/MM/YYYY, the Indian/European convention) and `04/13/2019` is
- * unambiguously 13 April also (MM/DD/YYYY, the US convention) — both read
- * to month 4.
+ * E1/E2/E3 (docs/NEXT_PHASE.md Task E, ADR-029, closing H-089/H-095).
  *
- * When BOTH leading numbers are 1-12 (`03/04/2019`), the format is genuinely
- * ambiguous between DD/MM/YYYY and MM/DD/YYYY, and this pattern is built to
- * match ONLY the unambiguous shape, so the ambiguous shape never reaches
- * `parseDateToken` as a 3-part token.
+ * **E1 — consume the whole token, always.** `THREE_PART_DATE_TOKEN` matches
+ * ANY `NN[sep]NN[sep]YYYY` with `sep` in `/ - .`, regardless of whether the
+ * two leading numbers are resolvable. It sits in `DATE_TOKEN`'s alternation
+ * BEFORE the two-part `\d{1,2}\/\d{4}` and bare `\d{4}` branches, so it
+ * always wins and a three-part date is never left for a shorter alternative
+ * to match a SUBSTRING of it. That substring fallback was the actual
+ * mechanism behind both H-089 and H-095 (an independent verifier's
+ * correction, H-094):
  *
- * ⚠ **DO NOT read that as "the ambiguous case is left unresolved".** An
- * earlier version of this comment claimed exactly that, and an independent
- * verifier falsified it (H-094). What actually happens is worse, because the
- * ambiguous token falls through to the alternatives BELOW, which match a
- * SUBSTRING of it:
+ *   `03/04/2019 - Present`  -> was `04/2019 - Present`  (leading `03/` lost)
+ *   `04/03/2013 - Present`  -> was `03/2013 - Present`  (silently read DD/MM)
+ *   `03-04-2013 - Present`  -> was `2013 - Present`     (dash missed the
+ *                                                        slash-only 2-part
+ *                                                        branch, defaulted
+ *                                                        to January)
  *
- *   `03/04/2019 - Present`  -> `04/2019 - Present`  (leading `03/` discarded)
- *   `04/03/2013 - Present`  -> `03/2013 - Present`  (reads MARCH — a US-form
- *                                                    date silently read DD/MM)
- *   `03-04-2013 - Present`  -> `2013 - Present`     (dash misses the
- *                                                    slash-only alternative
- *                                                    and defaults to January)
+ * All three now match the full three-part token and reach `parseDateToken`
+ * intact — no truncated evidence span is possible any more.
  *
- * So the engine DOES commit to a locale — accidentally, via a fallback,
- * rather than deliberately — and it truncates the recruiter-visible evidence
- * span while doing so. Two-sided ranges are governed by the END date and are
- * dropped entirely, deleting the role.
+ * **E2 — classify, never guess.** A two-digit number outside 1-12 can only
+ * ever be a DAY, never a month, in every locale. `parseDateToken` uses that
+ * to sort every three-part date into exactly one of three outcomes:
  *
- * These are tracked as H-089 (silent deletion / under-count) and H-095
- * (silent over-count). **Both are open wrong-score findings. Do not "tidy"
- * this comment back into a claim of safety.**
+ *   1. Exactly one of the two leading numbers is 13-31 -> RESOLVED. The
+ *      other number is the month, whichever side it is written on:
+ *      `13/04/2019` and `04/13/2019` both read April 2019 (B.4).
+ *   2. BOTH leading numbers are 1-12 (`03/04/2019`) -> AMBIGUOUS. Genuinely
+ *      undecidable between DD/MM (right for this project's Indian clients)
+ *      and MM/DD (right for a US CV), with no way to tell which the
+ *      document holds. **This module does not pick one** — that would be
+ *      exactly the accidental-locale bug above, only deliberate instead of
+ *      a fallback artefact.
+ *   3. Both leading numbers are 13-31 (`13/25/2019`) -> INVALID. Neither
+ *      can be a month; this is a malformed date, not an ambiguous one, and
+ *      is dropped exactly as before.
+ *
+ * **E3 — surface the ambiguity, never delete the role.** An AMBIGUOUS
+ * range does not become a `YearsExperienceAttribute` — there is no locale
+ * to compute one from — and it does not simply vanish either (that
+ * reproduces H-089). It becomes an `UnreadableDateRangeAttribute`
+ * (`./types.js`) instead: the engine's on-the-record admission that an
+ * employment range was present and could not be read. `scoreCandidate`
+ * turns this into a `Reservation` (ADR-029) rather than a silently smaller
+ * or larger number.
+ *
+ * **Deliberately still out of scope: the two-part dotted form `03.2006`**
+ * (H-040's original gap). `numericMonthYear` below stays slash-only, so a
+ * bare `MM.YYYY` still falls through to the bare-year branch. Not touched
+ * by this change.
  */
-const UNAMBIGUOUS_DAY_NUMBER = '(?:1[3-9]|2[0-9]|3[01])';
-const THREE_PART_UNAMBIGUOUS_DATE = `(?:${UNAMBIGUOUS_DAY_NUMBER}[\\/\\-]\\d{1,2}|\\d{1,2}[\\/\\-]${UNAMBIGUOUS_DAY_NUMBER})[\\/\\-]\\d{4}`;
-const THREE_PART_DATE_SHAPE = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/;
+const THREE_PART_DATE_TOKEN = String.raw`\d{1,2}[/.-]\d{1,2}[/.-]\d{4}`;
+const THREE_PART_DATE_SHAPE = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/;
 
-const DATE_TOKEN = String.raw`(?:${MONTH_PATTERN}\.?\s+\d{4}|${THREE_PART_UNAMBIGUOUS_DATE}|\d{1,2}\/\d{4}|\d{4})`;
+const DATE_TOKEN = String.raw`(?:${MONTH_PATTERN}\.?\s+\d{4}|${THREE_PART_DATE_TOKEN}|\d{1,2}\/\d{4}|\d{4})`;
 const PRESENT_TOKEN = '(?:Present|Current|Now|Ongoing)';
 
 const EXPLICIT_YEARS_PATTERN = /(\d{1,2}(?:\.\d)?)\+?\s*(?:years?|yrs?)\b(\s+of\s+experience)?/gi;
@@ -147,30 +165,62 @@ function isBareRangeWithoutEmploymentContext(
   return NON_EMPLOYMENT_CONTEXT.test(after);
 }
 
-function parseDateToken(token: string): ParsedDate | null {
+/**
+ * E2's three-way classification. `resolved` and `invalid` behave exactly
+ * like the old `ParsedDate | null` return did; `ambiguous` is new — it
+ * carries the raw leading numbers so the caller (E3) can compute a
+ * lower-bound duration under both possible locale readings without
+ * re-parsing the token.
+ */
+type DateParseResult =
+  | { readonly kind: 'resolved'; readonly date: ParsedDate }
+  | { readonly kind: 'ambiguous'; readonly d1: number; readonly d2: number; readonly year: number }
+  | { readonly kind: 'invalid' };
+
+const INVALID_DATE: DateParseResult = { kind: 'invalid' };
+
+function parseDateToken(token: string): DateParseResult {
   const trimmed = token.trim();
 
-  // Unambiguous DD/MM/YYYY or MM/DD/YYYY (B.4): only reached when the token
-  // matched THREE_PART_UNAMBIGUOUS_DATE above, which structurally requires
-  // one of the two leading numbers to be 13-31. Re-parsing generically here
-  // (rather than trusting alternation branch) keeps the day-vs-month choice
-  // in one place. The day value itself is never used — this module tracks
-  // only year and month, never day-of-month.
+  // Three-part numeric date (E1/E2): reached whenever the token matched
+  // THREE_PART_DATE_TOKEN above, which now accepts ANY two 1-2 digit
+  // numbers regardless of value — the range-vs-month decision happens only
+  // here, in one place, so it can be classified rather than guessed. The
+  // day value itself is never used for a RESOLVED date — this module
+  // tracks only year and month, never day-of-month.
   const threePart = THREE_PART_DATE_SHAPE.exec(trimmed);
   if (threePart !== null) {
     const first = threePart[1];
     const second = threePart[2];
     const rawYear = threePart[3];
-    if (first === undefined || second === undefined || rawYear === undefined) return null;
+    if (first === undefined || second === undefined || rawYear === undefined) {
+      return INVALID_DATE;
+    }
     const d1 = Number(first);
     const d2 = Number(second);
     const year = Number(rawYear);
-    // Exactly one side must be an unambiguous day (13-31) for this branch to
-    // have matched at all; whichever side is NOT that is the month. If both
-    // sides ended up >12 (e.g. "13/25/2019") the month candidate is invalid
-    // and this correctly falls through to null below.
-    const month = d1 > 12 ? d2 : d1;
-    return month >= 1 && month <= 12 && Number.isFinite(year) ? { year, month } : null;
+    if (!Number.isFinite(year)) return INVALID_DATE;
+
+    const d1IsUnambiguousDay = d1 >= 13 && d1 <= 31;
+    const d2IsUnambiguousDay = d2 >= 13 && d2 <= 31;
+
+    // Exactly one side is an unambiguous day (13-31, impossible as a month
+    // in any locale) -> RESOLVED. The other side is the month, whichever
+    // side it is written on (B.4).
+    if (d1IsUnambiguousDay && !d2IsUnambiguousDay) {
+      return d2 >= 1 && d2 <= 12 ? { kind: 'resolved', date: { year, month: d2 } } : INVALID_DATE;
+    }
+    if (d2IsUnambiguousDay && !d1IsUnambiguousDay) {
+      return d1 >= 1 && d1 <= 12 ? { kind: 'resolved', date: { year, month: d1 } } : INVALID_DATE;
+    }
+    // Both <=12 -> AMBIGUOUS (E2): genuinely undecidable between DD/MM and
+    // MM/DD. Refuse to resolve; the caller surfaces this rather than
+    // silently picking a locale.
+    if (!d1IsUnambiguousDay && !d2IsUnambiguousDay) {
+      return { kind: 'ambiguous', d1, d2, year };
+    }
+    // Both 13-31 (e.g. "13/25/2019") -> INVALID. Neither can be a month.
+    return INVALID_DATE;
   }
 
   const monthYear = /^([A-Za-z]+)\.?\s+(\d{4})$/.exec(trimmed);
@@ -179,23 +229,77 @@ function parseDateToken(token: string): ParsedDate | null {
     const rawYear = monthYear[2];
     const month = rawMonth !== undefined ? MONTH_NAMES[rawMonth.toLowerCase()] : undefined;
     const year = rawYear !== undefined ? Number(rawYear) : Number.NaN;
-    return month !== undefined && Number.isFinite(year) ? { year, month } : null;
+    return month !== undefined && Number.isFinite(year)
+      ? { kind: 'resolved', date: { year, month } }
+      : INVALID_DATE;
   }
 
+  // Slash-only, deliberately: the two-part dotted form ("03.2006", H-040's
+  // original gap) stays unreached here and falls through to the bare-year
+  // branch below, exactly as before. Out of scope for this change — see
+  // the module doc comment above DATE_TOKEN.
   const numericMonthYear = /^(\d{1,2})\/(\d{4})$/.exec(trimmed);
   if (numericMonthYear !== null) {
     const month = Number(numericMonthYear[1]);
     const year = Number(numericMonthYear[2]);
-    return month >= 1 && month <= 12 ? { year, month } : null;
+    return month >= 1 && month <= 12 ? { kind: 'resolved', date: { year, month } } : INVALID_DATE;
   }
 
   const yearOnly = /^(\d{4})$/.exec(trimmed);
   if (yearOnly !== null) {
     const rawYear = yearOnly[1];
-    return rawYear !== undefined ? { year: Number(rawYear), month: 1 } : null;
+    return rawYear !== undefined
+      ? { kind: 'resolved', date: { year: Number(rawYear), month: 1 } }
+      : INVALID_DATE;
   }
 
+  return INVALID_DATE;
+}
+
+/** The DD/MM reading of a date result: the FIRST leading number is the day,
+ *  the SECOND is the month. `null` only for `invalid` (nothing to resolve). */
+function resolveAsDayFirst(result: DateParseResult): ParsedDate | null {
+  if (result.kind === 'resolved') return result.date;
+  if (result.kind === 'ambiguous') return { year: result.year, month: result.d2 };
   return null;
+}
+
+/** The MM/DD reading: the FIRST leading number is the month. For a
+ *  `resolved` date there is only one reading (the day side was already
+ *  identified as 13-31), so both readings agree — as they must. */
+function resolveAsMonthFirst(result: DateParseResult): ParsedDate | null {
+  if (result.kind === 'resolved') return result.date;
+  if (result.kind === 'ambiguous') return { year: result.year, month: result.d1 };
+  return null;
+}
+
+/**
+ * ADR-029's "materiality is computed, not guessed", applied to an unreadable
+ * range (E3). Resolves the WHOLE range two ways — every ambiguous token read
+ * as DD/MM, then every ambiguous token read as MM/DD — computes the duration
+ * each way, and returns the SMALLER one. That number is true under either
+ * locale, so reporting it commits to neither. Returns 0 when neither reading
+ * produces a positive duration (nothing safe to report as a lower bound).
+ */
+function computeAmbiguousLowerBoundYears(start: DateParseResult, end: DateParseResult): number {
+  const readings: number[] = [];
+
+  const dayFirstStart = resolveAsDayFirst(start);
+  const dayFirstEnd = resolveAsDayFirst(end);
+  if (dayFirstStart !== null && dayFirstEnd !== null) {
+    const months = toAbsoluteMonth(dayFirstEnd) - toAbsoluteMonth(dayFirstStart);
+    if (months > 0) readings.push(months);
+  }
+
+  const monthFirstStart = resolveAsMonthFirst(start);
+  const monthFirstEnd = resolveAsMonthFirst(end);
+  if (monthFirstStart !== null && monthFirstEnd !== null) {
+    const months = toAbsoluteMonth(monthFirstEnd) - toAbsoluteMonth(monthFirstStart);
+    if (months > 0) readings.push(months);
+  }
+
+  if (readings.length === 0) return 0;
+  return roundHalfUp(Math.min(...readings) / 12, 1);
 }
 
 function overlapsAny(
@@ -233,7 +337,7 @@ function overlapsAny(
 export function extractYearsExperience(
   text: string,
   referenceDate: ExtractionOptions['referenceDate'],
-): readonly YearsExperienceAttribute[] {
+): readonly (YearsExperienceAttribute | UnreadableDateRangeAttribute)[] {
   return extractIgnoringInvisibleCharacters(text, (visible) =>
     extractYearsExperienceFromVisibleText(visible, referenceDate),
   );
@@ -242,10 +346,10 @@ export function extractYearsExperience(
 function extractYearsExperienceFromVisibleText(
   text: string,
   referenceDate: ExtractionOptions['referenceDate'],
-): readonly YearsExperienceAttribute[] {
+): readonly (YearsExperienceAttribute | UnreadableDateRangeAttribute)[] {
   if (text.length === 0) return [];
 
-  const results: YearsExperienceAttribute[] = [];
+  const results: (YearsExperienceAttribute | UnreadableDateRangeAttribute)[] = [];
 
   const excludedRanges = detectSections(text)
     .filter((s) => s.name === 'education' || s.name === 'certifications')
@@ -305,9 +409,39 @@ function extractYearsExperienceFromVisibleText(
       continue;
     }
 
-    const start = parseDateToken(startText);
-    const end = PRESENT_ONLY.test(endText) ? referenceDate : parseDateToken(endText);
-    if (start === null || end === null) continue;
+    const startResult = parseDateToken(startText);
+    const endResult: DateParseResult = PRESENT_ONLY.test(endText)
+      ? { kind: 'resolved', date: referenceDate }
+      : parseDateToken(endText);
+
+    // INVALID (malformed, e.g. "13/25/2019"): not a date at all. Silently
+    // dropped, exactly as before this change.
+    if (startResult.kind === 'invalid' || endResult.kind === 'invalid') continue;
+
+    // AMBIGUOUS (E2/E3): the END date governs just as much as the START
+    // (H-094 correction 2) — either side failing to resolve makes the whole
+    // range unreadable, because a duration needs BOTH endpoints. Surfaced as
+    // its own attribute rather than silently dropped (H-089) or silently
+    // resolved to one locale (H-095).
+    if (startResult.kind === 'ambiguous' || endResult.kind === 'ambiguous') {
+      const sourceSpan = { start: matchStart, end: matchEnd };
+      const value = text.slice(matchStart, matchEnd);
+      assertValidSpan(text, sourceSpan, value);
+      const minPossibleYears = computeAmbiguousLowerBoundYears(startResult, endResult);
+
+      results.push({
+        kind: 'unreadable_date_range',
+        value,
+        normalizedValue: String(minPossibleYears),
+        confidence: DATE_RANGE_CONFIDENCE,
+        sourceSpan,
+        minPossibleYears,
+      });
+      continue;
+    }
+
+    const start = startResult.date;
+    const end = endResult.date;
     if (isFutureDate(start, referenceDate) || isFutureDate(end, referenceDate)) continue;
 
     const months = toAbsoluteMonth(end) - toAbsoluteMonth(start);

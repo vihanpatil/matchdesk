@@ -173,20 +173,42 @@ export interface Explanation {
  *
  * `blocking` means the unaccounted-for evidence would CHANGE THE ELIGIBILITY
  * VERDICT, which is computable: re-run eligibility using the discarded value
- * and compare. A caller that persists or displays a score must refuse to do so
+ * (or, for `unreadable_employment_dates`, the computed lower bound) and
+ * compare. A caller that persists or displays a score must refuse to do so
  * when a blocking reservation is present.
  *
  * **Stated residual:** a non-blocking reservation can still move the SCORE
  * (and therefore rank order) without flipping eligibility. That is surfaced,
  * not refused, because refusing on any score movement would fire constantly —
  * but it means "non-blocking" is not the same as "harmless".
+ *
+ * A discriminated union (E3, docs/NEXT_PHASE.md Task E) — `kind` selects
+ * which shape applies. `unverified_tenure_claim` (H-040) is unchanged from
+ * before this widening: an explicit claim the engine read and then
+ * discarded in favour of dated ranges. `unreadable_employment_dates`
+ * (H-089/H-095) is the different shape ADR-029 anticipated: a range the
+ * engine could not read AT ALL, so there is no `claimed` number to name —
+ * only a computed lower bound on what is missing.
  */
-export interface Reservation {
-  readonly kind: 'unverified_tenure_claim';
+export type Reservation = UnverifiedTenureClaimReservation | UnreadableEmploymentDatesReservation;
+
+interface BaseReservation {
   readonly blocking: boolean;
-  /** Recruiter-facing sentence naming both numbers. */
+  /** Recruiter-facing sentence naming the numbers involved. */
   readonly detail: string;
+}
+
+export interface UnverifiedTenureClaimReservation extends BaseReservation {
+  readonly kind: 'unverified_tenure_claim';
   readonly claimed: number;
+  readonly computed: number;
+}
+
+export interface UnreadableEmploymentDatesReservation extends BaseReservation {
+  readonly kind: 'unreadable_employment_dates';
+  /** Sum of `minPossibleYears` across every unreadable range (E3). */
+  readonly minPossibleYears: number;
+  /** Total years the engine computed WITHOUT the unreadable range(s). */
   readonly computed: number;
 }
 

@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import { extractAttributes, extractEducation, extractSkills } from '../index.js';
 import { totalYearsExperience } from '../scoring/dimensions.js';
+import { scoreCandidate } from '../scoring/score.js';
+import type { Candidate, Job } from '../scoring/types.js';
 import { TAXONOMY } from '../taxonomy/data.js';
 import {
   cvSpecArbitrary,
@@ -412,6 +414,54 @@ function calendarSpanYears(ranges: readonly GeneratedRange[]): number {
   return (Math.max(...ends) - Math.min(...starts)) / 12;
 }
 
+/**
+ * Task F (docs/NEXT_PHASE.md, H-094): `renderRange` above only ever emits
+ * `MONTHS[...] YYYY`, so no relation in this suite could generate a NUMERIC
+ * date at all — the exact shape ADR-027 Decision 3 condemns, a relation that
+ * names its defect axis (H-089/H-095 are both about numeric notations) and
+ * then never generates it. These four notations render the SAME underlying
+ * (year, month) pair, so R21/R22 below can pin what `renderRange` could not.
+ */
+type DateNotation = 'monthName' | 'slash' | 'dash' | 'dot';
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+function renderDateNotation(
+  year: number,
+  month: number,
+  day: number,
+  notation: DateNotation,
+): string {
+  switch (notation) {
+    case 'monthName':
+      return `${MONTHS[month - 1] ?? 'Jan'} ${String(year)}`;
+    case 'slash':
+      return `${pad2(day)}/${pad2(month)}/${String(year)}`;
+    case 'dash':
+      return `${pad2(day)}-${pad2(month)}-${String(year)}`;
+    case 'dot':
+      return `${pad2(day)}.${pad2(month)}.${String(year)}`;
+  }
+}
+
+/** Same start/end months as {@link renderRange}, but with an explicit DAY
+ *  rendered in the given notation instead of always being a bare month name. */
+function renderRangeWithNotation(
+  range: GeneratedRange,
+  day: number,
+  notation: DateNotation,
+): string {
+  const startAbs = absoluteMonth(range.startYear, range.startMonth);
+  const endAbs = startAbs + range.months;
+  const endYear = Math.floor((endAbs - 1) / 12);
+  const endMonth = ((endAbs - 1) % 12) + 1;
+  const start = renderDateNotation(range.startYear, range.startMonth, day, notation);
+  const end = renderDateNotation(endYear, endMonth, day, notation);
+  return `Software Engineer, Acme Corporation\n${start} - ${end}`;
+}
+
 describe('metamorphic: years of experience cannot exceed elapsed time (H-028 D5)', () => {
   it('R13 · total experience never exceeds the calendar span from earliest start to latest end', () => {
     // The relation that would have caught D5b directly, with no expected
@@ -649,6 +699,87 @@ describe('metamorphic: generated relations for defects previously pinned only by
           const ceiling = Math.max(claimedYears, calendarSpanYears(ranges));
 
           expect(total).toBeLessThanOrEqual(ceiling + 0.05 * ranges.length);
+        },
+      ),
+      RUNS,
+    );
+  });
+});
+
+/**
+ * Task F (docs/NEXT_PHASE.md, H-094 correction 5): the relation that was
+ * missing. Neither R13 nor R20 could ever catch H-089 or H-095, because
+ * `renderRange` never generated a numeric date and both relations are
+ * one-directional upper bounds — an undercount (H-089's shape) satisfies
+ * `toBeLessThanOrEqual` just as well as a correct count does.
+ */
+describe('metamorphic: date NOTATION must not change what a CV yields (H-089/H-095/H-094)', () => {
+  const NUMERIC_NOTATIONS: readonly DateNotation[] = ['slash', 'dash', 'dot'];
+
+  it('R21 · tenure does not depend on the notation used to write the SAME dates, for an unambiguous day', () => {
+    // Renders the same underlying (year, month) pairs as a month name,
+    // DD/MM/YYYY, DD-MM-YYYY and DD.MM.YYYY, and asserts the extracted total
+    // is identical. Deliberately an UNAMBIGUOUS day (13-28, safe in every
+    // month) — an ambiguous day is genuinely unreadable and is R22 below,
+    // not an invariance violation.
+    const ALL_NOTATIONS: readonly DateNotation[] = ['monthName', ...NUMERIC_NOTATIONS];
+    fc.assert(
+      fc.property(
+        fc.array(rangeArbitrary, { minLength: 1, maxLength: 3 }),
+        fc.integer({ min: 13, max: 28 }),
+        (ranges, day) => {
+          const totals = ALL_NOTATIONS.map((notation) => {
+            const text = [
+              'Work History',
+              ...ranges.map((r) => renderRangeWithNotation(r, day, notation)),
+            ].join('\n');
+            return totalYearsExperience(extractAttributes(text, REF));
+          });
+
+          const reference = totals[0] ?? 0;
+          for (const total of totals) {
+            expect(total, `notations disagreed: ${JSON.stringify(totals)}`).toBeCloseTo(
+              reference,
+              5,
+            );
+          }
+        },
+      ),
+      RUNS,
+    );
+  });
+
+  it('R22 · a genuinely ambiguous notation yields a RESERVATION, never a silently different number', () => {
+    // Both the day and month positions are <=12 here — the day is drawn from
+    // 1-12, so every numeric rendering below is structurally AMBIGUOUS
+    // (E2), whatever the separator. Whatever the underlying dates, this must
+    // never silently produce a `years_experience` number the recruiter could
+    // mistake for a verified one — it must raise an `unreadable_employment_
+    // dates` Reservation instead (ADR-029), which `scoreCandidate` can
+    // refuse to persist on if it blocks eligibility.
+    fc.assert(
+      fc.property(
+        rangeArbitrary,
+        fc.integer({ min: 1, max: 12 }),
+        fc.constantFrom(...NUMERIC_NOTATIONS),
+        (range, day, notation) => {
+          const text = ['Work History', renderRangeWithNotation(range, day, notation)].join('\n');
+
+          const job: Job = {
+            id: 'j',
+            experience: { weight: 1, requirement: { minYears: 1, mustHave: true } },
+          };
+          const candidate: Candidate = {
+            id: 'c',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            attributes: extractAttributes(text, REF),
+          };
+
+          const result = scoreCandidate(job, candidate);
+          expect(
+            result.reservations.some((r) => r.kind === 'unreadable_employment_dates'),
+            `ambiguous ${notation} notation "${text}" must raise a reservation, not a silent number`,
+          ).toBe(true);
         },
       ),
       RUNS,

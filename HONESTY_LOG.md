@@ -3569,3 +3569,39 @@ output rather than from my arithmetic.
 **Third gate this session to catch something a green run did not**, after
 `pnpm typecheck` (implicit-`any` in the fixture tier) and the manifest
 integrity check (the renamed gap test).
+
+---
+
+### H-097 · Six manifest identities removed, all deliberate renames
+
+`assert-no-skipped-tests.mjs` refused the commit over six identities. All six
+are renames, none is a deletion, and the reasons differ by owner:
+
+**Three in `languageDetection.eval.test.ts` (ADR-031, Task A):**
+
+- Two H-086 Indian-English tests still **passed** after the classifier swap,
+  but their titles asserted a mechanism that no longer exists — "the
+  institution exemption is what protects them, and it is load-bearing". That
+  exemption was deleted. **A test whose title states a false mechanism is worse
+  than a failing test**, because it passes while teaching the next reader
+  something untrue. Retitled; assertions unchanged.
+- One `KNOWN LIMITATION` asserting that a pure comma-separated technology list
+  is misjudged as not-English. Under `eld` it reads English — narrowly
+  (`en 0.454` vs `sv 0.424`, `isReliable() === false`). The direction is
+  **safer** (a language-neutral tech list is no longer falsely refused), the
+  input is in no pass-criteria corpus, and the measured scores are recorded in
+  the test rather than left to go stale.
+
+**Three in `experience.test.ts` (Tasks E, H-089/H-095):** the `DOCUMENTED GAP`
+tests, flipped to assert the now-correct behaviour and renamed `FIXED`.
+
+Manifest regenerated: **952 identities**, `minTests` **915 → 952**, taken from
+the tool's own output. Last time I set this figure by arithmetic and was wrong
+by two (H-096); this time it was measured.
+
+**An engineer corrected my brief, and was right to.** I told the extraction
+engineer to flip "four" `DOCUMENTED GAP` tests in `experience.test.ts`. There
+were **three**. It flagged the discrepancy rather than inventing a fourth to
+match the instruction. That is the behaviour the tiger-team rules are supposed
+to produce, and it is worth recording that it happened in the direction of the
+lead being wrong.

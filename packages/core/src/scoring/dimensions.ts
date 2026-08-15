@@ -143,6 +143,41 @@ export function discardedTenureClaim(
   return { claimed, computed };
 }
 
+/**
+ * Every `unreadable_date_range` attribute {@link totalYearsExperience}
+ * NEVER sums (it filters on `kind === 'years_experience'`, so a different
+ * kind cannot silently change that total either way) — reported here so a
+ * caller can raise the `unreadable_employment_dates` `Reservation` (H-089,
+ * H-095, ADR-029) instead of the number simply being smaller with no
+ * explanation.
+ *
+ * **Residual, stated rather than hidden.** When more than one range is
+ * unreadable, this sums their individual `minPossibleYears` lower bounds.
+ * Each bound is individually true under either locale reading, but summing
+ * assumes the ranges do not overlap in calendar time. Unlike
+ * {@link totalYearsExperience}'s date-range merge, nothing here can dedupe
+ * concurrent unreadable ranges: an ambiguous range never resolves to an
+ * absolute start/end month (that is the whole reason it is unreadable), so
+ * there are no absolute months to intersect. A CV with two or more
+ * genuinely CONCURRENT and mutually ambiguous roles could see this sum
+ * exceed the true minimum lower bound. Not corrected here; not observed in
+ * the fixture corpus.
+ *
+ * Returns `null` when nothing is unreadable — the total is complete.
+ */
+export function unreadableEmploymentDates(
+  attributes: readonly ExtractedAttribute[],
+): { readonly minPossibleYears: number } | null {
+  const unreadable = attributes.filter(
+    (a): a is Extract<ExtractedAttribute, { kind: 'unreadable_date_range' }> =>
+      a.kind === 'unreadable_date_range',
+  );
+  if (unreadable.length === 0) return null;
+
+  const minPossibleYears = quantize(unreadable.reduce((acc, a) => acc + a.minPossibleYears, 0));
+  return { minPossibleYears };
+}
+
 export function experienceRelevanceSubscore(
   requirement: ExperienceRequirement,
   totalYears: number,

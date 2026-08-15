@@ -9,6 +9,7 @@ import {
   senioritySubscore,
   skillsSubscore,
   totalYearsExperience,
+  unreadableEmploymentDates,
 } from './dimensions.js';
 import { evaluateEligibility } from './eligibility.js';
 import { buildExplanation } from './explain.js';
@@ -173,35 +174,45 @@ function contributionsFor(active: readonly ActiveDimension[]): readonly Dimensio
 }
 
 /**
- * Reservations for this pair (ADR-029, closes H-040).
+ * Reservations for this pair (ADR-029, closes H-040, H-089, H-095).
  *
- * Today there is exactly one: an explicit tenure claim that
- * {@link totalYearsExperience} discarded in favour of parsed date ranges.
- * Discarding it is the correct rule — a verifiable range should beat a
- * self-reported total — but doing it silently produced a wrong number about a
- * real person, decided by nothing more than the date format a previous
- * employer happened to use.
+ * Two independent sources, both surfaced rather than left to silently change
+ * a number:
  *
- * **Materiality is computed, not guessed.** Re-run the experience gate using
- * the discarded claim; if the eligibility verdict differs, the number cannot
- * be presented as complete and the reservation blocks. If it does not differ,
- * the reservation is still surfaced so the recruiter can see both figures.
+ * 1. **`unverified_tenure_claim` (H-040).** An explicit tenure claim that
+ *    {@link totalYearsExperience} discarded in favour of parsed date ranges.
+ *    Discarding it is the correct rule — a verifiable range should beat a
+ *    self-reported total — but doing it silently produced a wrong number
+ *    about a real person, decided by nothing more than the date format a
+ *    previous employer happened to use.
+ * 2. **`unreadable_employment_dates` (H-089/H-095).** A date range the
+ *    engine could not read at all — genuinely ambiguous between DD/MM and
+ *    MM/DD. `discardedTenureClaim` is blind here BY CONSTRUCTION (H-094
+ *    correction 4): it needs an explicit claim to disagree with, and an
+ *    unreadable range never produced a first number to compare against.
+ *    {@link unreadableEmploymentDates} is the separate trigger this needs.
+ *
+ * **Materiality is computed for both, never guessed.** For (1), re-run the
+ * experience gate using the discarded claim. For (2), re-run it using the
+ * COMPUTED total plus the unreadable range's lower-bound duration (itself
+ * computed under both locale readings, see `extractYearsExperience`) — if
+ * that would cross the must-have threshold, the number on screen cannot be
+ * presented as complete and the reservation blocks. If it would not, the
+ * reservation is still surfaced so the recruiter can see the gap.
  */
 function reservationsFor(job: Job, candidate: Candidate): Reservation[] {
-  const discarded = discardedTenureClaim(candidate.attributes);
-  if (discarded === null) return [];
-
   const requirement = job.experience?.requirement;
-
-  // Eligibility can only turn on tenure when the job makes it a must-have.
-  // Without one, the claim cannot flip the verdict — but it can still move the
-  // score, so this is reported rather than dropped.
   const gates = requirement?.mustHave === true;
-  const flips =
-    gates && requirement.minYears > discarded.computed && requirement.minYears <= discarded.claimed;
+  const reservations: Reservation[] = [];
 
-  return [
-    {
+  const discarded = discardedTenureClaim(candidate.attributes);
+  if (discarded !== null) {
+    const flips =
+      gates &&
+      requirement.minYears > discarded.computed &&
+      requirement.minYears <= discarded.claimed;
+
+    reservations.push({
       kind: 'unverified_tenure_claim',
       blocking: flips,
       detail:
@@ -210,8 +221,31 @@ function reservationsFor(job: Job, candidate: Candidate): Reservation[] {
         `the tenure figure is a lower bound rather than a total.`,
       claimed: discarded.claimed,
       computed: discarded.computed,
-    },
-  ];
+    });
+  }
+
+  const unreadable = unreadableEmploymentDates(candidate.attributes);
+  if (unreadable !== null) {
+    const computed = totalYearsExperience(candidate.attributes);
+    const withLowerBound = quantize(computed + unreadable.minPossibleYears);
+    const flips =
+      gates && computed < requirement.minYears && withLowerBound >= requirement.minYears;
+
+    reservations.push({
+      kind: 'unreadable_employment_dates',
+      blocking: flips,
+      detail:
+        `Verified ${String(computed)} years from dated roles, but at least one employment ` +
+        `date range could not be read — its notation (e.g. "03/04/2019") is genuinely ` +
+        `ambiguous between day-first and month-first. Adding a conservative lower bound of ` +
+        `${String(unreadable.minPossibleYears)} years, true under either reading, would bring ` +
+        `the total to at least ${String(withLowerBound)}.`,
+      minPossibleYears: unreadable.minPossibleYears,
+      computed,
+    });
+  }
+
+  return reservations;
 }
 
 /**

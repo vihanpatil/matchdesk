@@ -18,5 +18,6 @@ export type {
   SkillAttribute,
   SkillExtractionMatchType,
   SourceSpan,
+  UnreadableDateRangeAttribute,
   YearsExperienceAttribute,
 } from './types.js';
