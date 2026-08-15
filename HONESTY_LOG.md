@@ -3605,3 +3605,49 @@ were **three**. It flagged the discrepancy rather than inventing a fourth to
 match the instruction. That is the behaviour the tiger-team rules are supposed
 to produce, and it is worth recording that it happened in the direction of the
 lead being wrong.
+
+---
+
+### H-098 · The only defect this round came from the seam between two engineers
+
+Three engineers worked in parallel on disjoint directories and each reported a
+green scoped run. The full serialized verify found one failure, and it was in
+none of their scopes:
+
+```
+refuse-mixed-language · is refused, never scored
+  expected 'mixed_language_content' to be 'non_english_language_not_supported'
+```
+
+**The refusal itself was intact** — `parseStatus` still `needs_attention`, C7
+holds. What moved was **which mechanism caught it**. That distinction is the
+whole finding: a reader skimming the failure would call it a language-detection
+regression, and it is not one.
+
+The fixture is roughly 50/50 English and French. The retired profiler judged the
+whole document non-English, so the **whole-document** gate fired. `eld` reads it
+as English-containing — **which it is, half of it is English prose** — so that
+gate correctly does not fire, and the **ADR-022 segment veto** catches the
+French instead.
+
+**The new reason is the more truthful one.** "Not in a language we support" was
+false about a bilingual document. And the fixture now exercises the segment veto
+on the **binary** path, which is what ADR-022 exists for and what D6 originally
+failed — so the change is a small increase in coverage, not a loss.
+
+**Why no engineer could have caught it.** The ingestion engineer's scope did not
+include `fixtures/corpus/`; the extraction engineer's scope did not include
+`apps/server/src/ingestion/`. The failure only exists when the two are run
+together. **The conflict-free-by-directory decomposition is what made the
+parallel work safe, and it is also precisely what hid this** — a partition that
+prevents write conflicts does not prevent behavioural coupling.
+
+That is an argument for the lead's serialized full verify, not against the
+decomposition. Recorded because the next session will be tempted to trust three
+green scoped runs and skip it.
+
+**Also worth recording:** two of the six renamed test identities (H-097) were
+tests that **still passed** while their titles asserted a mechanism this round
+deleted — "the institution exemption is what protects them, and it is
+load-bearing". A passing test that teaches a false mechanism is worse than a
+failing one, because nothing ever forces someone to read it again.

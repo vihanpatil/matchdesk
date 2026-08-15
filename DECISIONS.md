@@ -1629,3 +1629,154 @@ determinism arch test exists to keep inference runtimes out of core.
   hand-tuned patches and still mis-scored the H-079 case.
 - **`eld` is a single-maintainer package.** Pinned exact, and a new version
   must be re-measured against all four corpora before it is taken.
+
+---
+
+## ADR-032 — An unreadable date is evidence, not silence (extends ADR-029)
+
+**Date:** 2026-08-14 · **Status:** Accepted · **Extends ADR-029**
+
+H-089 and H-095 are one root cause with two opposite symptoms. `DATE_TOKEN`
+matched only _unambiguous_ three-part numeric dates and only `/` and `-`, so
+any other three-part date was never consumed whole and `RANGE_PATTERN` fell
+back to matching a **substring** of it:
+
+```
+"03/04/2019 - 05/08/2022"  -> role DELETED entirely
+"03/04/2019 - Present"     -> 5.2y,  evidence "04/2019 - Present"   (leading 03/ discarded)
+"04/03/2013 - Present"     -> 11.3y, evidence "03/2013 - Present"   (reads MARCH)
+"03-04-2013 - Present"     -> 11.4y, evidence "2013 - Present"      (truth 11.2)
+```
+
+**The engine already committed to a locale — by accident, through a fallback.**
+An earlier code comment claimed the ambiguous case was "deliberately left
+unresolved rather than silently guessing"; an independent verifier falsified
+that (H-094). Being wrong by accident is not better than being wrong on
+purpose, and it is harder to find.
+
+### Decision
+
+**1. Consume the whole token.** `DATE_TOKEN` now matches any
+`NN[/-.]NN[/-.]YYYY`, placed before the two-part and bare-year alternatives.
+This alone ends every substring truncation, which was the mechanism behind both
+findings.
+
+**2. Classify, never guess.** `parseDateToken` returns a discriminated
+`resolved | ambiguous | invalid`. Exactly one side in 13-31 resolves — a number
+above 12 cannot be a month in any locale, which is the one fact that holds
+everywhere. Both sides ≤ 12 is **ambiguous** and is refused.
+
+**3. An unreadable range is emitted as evidence, not dropped.** A new
+span-carrying `unreadable_date_range` attribute records that an employment
+range was present and could not be read; `reservationsFor` raises an
+`unreadable_employment_dates` reservation. `Reservation` becomes a discriminated
+union. `apps/server`'s `scoreStoredPair` already refuses to persist on any
+blocking reservation and is kind-agnostic, so it needed no change.
+
+**Materiality is computed, not guessed — and this is the part worth reading.**
+ADR-029 could compute materiality because H-040 had two numbers to compare: the
+claim and the total. H-089 has none — the engine never extracted a first number,
+which is why `discardedTenureClaim` is blind to it by construction (H-094).
+
+So the bound is computed differently: resolve the range under **both** locale
+readings and take the **smaller** duration. That is a true lower bound on the
+missing tenure under _either_ reading, so it commits to no locale while still
+being a real number. If adding it to the computed total would flip the
+eligibility verdict, the reservation blocks.
+
+### Why not simply pick DD/MM
+
+It is right for the target recruiter's Indian clients and wrong for US CVs, and
+the tool cannot tell which it is holding. The measured spread is also small
+enough to make guessing pointless and silence expensive: the two readings of
+`03/04/2019 - 05/08/2022` differ by **0.1 years**, and across all 20736
+ambiguous combinations the maximum disagreement is **1.8 years** — while
+deleting the role cost **9.3 years** in the traced case. **Abstaining silently
+was strictly worse than either guess for any role longer than 1.8 years.**
+
+### Costs, accepted
+
+- **A new attribute kind and a wider `Reservation` union.** Every consumer that
+  filters `years_experience` had to be checked; `totalYearsExperience` and
+  `discardedTenureClaim` are unaffected because they already filter by kind.
+- **Concurrent unreadable ranges cannot be interval-merged.** Two ambiguous
+  ranges each contribute their own lower bound, and neither resolves to
+  absolute months, so overlap between them cannot be deduped the way
+  `totalYearsExperience` dedupes readable ranges. Recorded in `dimensions.ts`.
+- **The two-part dotted form `03.2006` — H-040's original notation — remains
+  open.** `numericMonthYear` stays slash-only. Stated here rather than
+  discovered later.
+- **More documents will now raise reservations**, which is the point, but it
+  means the recruiter sees more caveats than before. That is the trade ADR-029
+  already made: a visible caveat beats a confident wrong number.
+
+---
+
+## ADR-033 — A declared licence with no text is unverified (extends ADR-016)
+
+**Date:** 2026-08-14 · **Status:** Accepted · **Extends ADR-016**
+
+`license-audit.mjs` validated a package's **declared** SPDX expression and had
+no mechanism to notice that the package **ships no licence text at all**.
+
+Found during the ADR-031 survey: `emscripten-wasm-loader@3.0.3` declares `MIT`
+and ships no LICENSE in its tarball, has none in its GitHub repository, and
+GitHub's own detector reports `license: null`. Our audit would have passed it
+silently. **ADR-016 exists to stop exactly this** — it refused `duck@0.1.12`'s
+bare `"BSD"` because the gate "correctly refused to guess" — but an
+unverifiable-because-absent licence is the same problem wearing better
+metadata.
+
+**Measured before designing:** **2/34** production packages ship no discoverable
+licence text (plus one dev-only). Detection covers `LICENSE`/`LICENCE`/
+`COPYING`/`NOTICE` in any case and extension, the `LICENSE-MIT` suffix shape,
+and ATX _and_ Setext licence headings in a README — the first, narrower version
+of the check wrongly flagged four legitimate packages until it learned those.
+
+### Decision
+
+The audit fails a package that ships no licence text, with a second waiver map
+in ADR-016's shape — exact-version-pinned, evidence required, printed every run.
+Waivers carry an explicit **`basis`**, because two very different things were
+otherwise about to share one label:
+
+- **`verified-elsewhere`** — the text was located and read outside the tarball.
+  `@napi-rs/canvas-darwin-arm64@1.0.5` is the platform half of a package whose
+  sibling ships full MIT text, confirmed independently via GitHub's licence API.
+  This is `duck@0.1.12`'s situation.
+- **`no-text-exists`** — the declaration is valid, unambiguous SPDX but there is
+  **no text anywhere**, and the evidence records where we looked and that it
+  came back empty. **This is a risk acceptance, not a verification**, it prints
+  under its own banner with a count, and flattening it into the first category
+  would be precisely the "waving through a licence nobody has read" ADR-016
+  refused.
+
+`dingbat-to-unicode@1.0.1` (production, via `mammoth`) and `stackback@0.0.2`
+(dev, via `vitest`) are waived on the second basis. Their objection is **weaker**
+than ADR-016's original one: both declare valid, unambiguous identifiers, so
+what is missing is corroboration rather than clarity — unlike bare `"BSD"`,
+whose ambiguity between 2-, 3- and 4-clause carried materially different
+obligations.
+
+**Rejected: a bare hard failure with no waiver path.** `license:audit` runs in
+the husky **pre-commit hook**, so a red audit blocks every commit in the
+repository — the gate would be breaking a different gate, the failure ADR-026
+already records for `.stryker-tmp` ("a gate must not be breakable by another
+gate"). A check that red-lights the build on day one over transitive packages
+nobody here controls gets reverted, and then the hole is invisible again.
+
+**Rejected: scoping the check to production only.** It would have hidden
+`stackback` and made the number look better without making the tree safer.
+
+### Costs, accepted
+
+- **Two live risk acceptances**, one of which ships to the recruiter. Visible on
+  every run rather than invisible, which is the whole improvement — but it is
+  an acceptance, not a fix. Replacing `mammoth`'s `dingbat-to-unicode` is a
+  dependency decision nobody has taken.
+- **The check reads the filesystem for every audited package**, ~340 of them,
+  on every run and therefore on every commit.
+- **Detection is heuristic.** A package could carry licence text in a form none
+  of the patterns recognise and fail wrongly; the waiver path is the remedy, and
+  `hasLicenseText` deliberately fails an empty path list rather than passing it,
+  so an unresolvable package cannot slip through the way the original hole did.

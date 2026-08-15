@@ -566,6 +566,12 @@
       "severity": "process",
       "status": "closed",
       "note": "Six manifest identities removed, all deliberate renames: three in languageDetection.eval.test.ts (two H-086 tests whose TITLES asserted the now-deleted institution exemption as load-bearing - a passing test teaching a false mechanism; one KNOWN LIMITATION flipped because eld reads a comma-separated tech list as English, narrowly and in the safer direction) and three DOCUMENTED GAP tests in experience.test.ts flipped to FIXED. Manifest 952, floor 915 -> 952 taken from the tool's output rather than arithmetic (cf H-096). Also records that the extraction engineer correctly refused to fabricate a fourth DOCUMENTED GAP test the lead's brief wrongly claimed existed."
+    },
+    {
+      "id": "H-098",
+      "severity": "process",
+      "status": "closed",
+      "note": "The only defect in a three-engineer parallel round came from the SEAM between two scopes, not from either scope. refuse-mixed-language changed refusal REASON (non_english_language_not_supported -> mixed_language_content) after the eld swap; the refusal itself was intact and the new reason is more truthful for a 50/50 bilingual document, which now exercises the ADR-022 segment veto on the binary path. Neither engineer could see it: ingestion's scope excluded fixtures/, extraction's excluded apps/server/. Conflict-free-by-directory prevents write conflicts but NOT behavioural coupling - an argument for the lead's serialized full verify."
     }
   ]
 }
