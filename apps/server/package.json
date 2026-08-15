@@ -11,6 +11,7 @@
     "@matchdesk/core": "workspace:*",
     "@matchdesk/shared": "workspace:*",
     "better-sqlite3": "13.0.3",
+    "eld": "2.1.0",
     "mammoth": "1.12.1",
     "pdfjs-dist": "6.2.108",
     "ulid": "3.0.2",

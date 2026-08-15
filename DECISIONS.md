@@ -1589,9 +1589,30 @@ own audit script is a finding in its own right and is not fixed by this ADR.**
 
 ### This ADR is a decision, not evidence (H-025)
 
-The claim that `pnpm license:audit` passes is a **prediction** until it has run
-with `eld` installed. That run belongs to the commit that installs it, and its
-output is the evidence.
+The claim that `pnpm license:audit` passes was a **prediction** until it ran
+with `eld` installed.
+
+**It has now run, and this is the evidence:**
+
+```
+$ pnpm --filter @matchdesk/server add eld@2.1.0 --save-exact
+$ pnpm license:audit
+License audit (ADR-003)
+  production deps audited: 34 (strict allowlist)
+  development deps audited: 305 (strict + MPL-2.0)
+  ⚠ waived: duck@0.1.12 declares "BSD", verified as BSD-2-Clause (ADR-016)
+✅ License audit passed — no disallowed licenses.
+```
+
+Production dependencies went **33 → 34** — exactly one, confirming the
+zero-transitive-dependency claim was true of the resolved tree and not only of
+the manifest. No new `METADATA_WAIVERS` entry was needed. `pnpm why eld`
+reports a single version reached only by `@matchdesk/server`, and the installed
+copy carries its `LICENSE` file.
+
+It is declared on **`apps/server`**, not the root, because that is the only
+package that may import it. `packages/core` must never see it — the
+determinism arch test exists to keep inference runtimes out of core.
 
 ### Costs, accepted
 
