@@ -62,44 +62,64 @@ H-100, a wrong-score in both directions. **A4 and A5 now read Covered.**
 
 ### H-041 — a sub-floor foreign insert is scored, not refused
 
-**Do not start this without reading H-105 first.** H-041's scope note said the
-residual was _Germanic_. That is **false**, and it was false for three sessions:
+**NARROWED, not closed (H-111). It still blocks E5, and the remaining step is
+a decision, not an implementation.**
+
+A sub-floor `eld` line pass now supplements the function-word lexicon:
 
 ```
-German     SCORED 50/ineligible      Portuguese  REFUSED (correct)
-Polish     SCORED 50/ineligible      Spanish     REFUSED (correct)
-Turkish    SCORED 50/ineligible
-Romanian   SCORED 50/ineligible
-Indonesian SCORED 50/ineligible
+                        foreign short lines caught   English lines refused
+  lexicon only                    2/26                      0/258
+  lexicon ∪ eld line pass        11/26                      0/258
 ```
 
-5 of 7 foreign degree lines scored, each telling the recruiter a graduate has no
-degree. A second arm scored 7 of 9, Portuguese and Czech included — and
-Portuguese flipping between arms is itself the proof that **this is segmentation
-geometry, not classifier accuracy.**
+Every language H-105 measured as wrong-scoring end-to-end — German, Polish,
+Turkish, Romanian, Indonesian, Czech, Portuguese, Dutch, Swedish, Italian — is
+now refused. **The residual is a foreign line of ≤5 bearing words**, and the
+`DOCUMENTED GAP` tests assert it stays open on purpose.
 
-**A remedy aimed at "Germanic" would measure none of the languages that
-actually fail, and would be declared successful.**
+**The axis is a word count, not a language family.** The four remaining gap
+cases are Germanic, Germanic, Germanic and Turkic. Every foreign line of ≥6
+bearing words is caught, whatever the language. The old "residual is Germanic"
+framing was falsified (H-105) and is now falsified in the tests themselves.
+
+### The decision that closes it, which is the user's
+
+Lowering `MIN_BEARING_WORDS_FOR_LINE_JUDGEMENT` closes the class. Its cost is
+measured against 258 English lines:
+
+```
+  floor   English refused   what it refuses
+   W>=6        0/258         — (current)
+   W>=5        2/258         "Java, Spring Boot, PostgreSQL, Docker, AWS"
+                             "AutoCAD, STAAD.Pro, Project Management"
+   W>=4        2/139         "Giovanni Esposito - Sous Chef"
+                             "Nguyen Thi Minh Anh"
+```
+
+**The 4-word row is not just a rate.** Both lines are a candidate's _name_, so
+the error path is keyed on the origin of a person's name — H-028 D3's shape,
+which this project records as a discrimination risk and not merely an accuracy
+one. **Do not take that decision on the user's behalf**, and do not present it
+as a tuning knob.
 
 **What is already ruled out, with measurements on file:**
 
-- **Swapping the classifier.** ADR-031 did that. `eld` is in place and is
-  strictly better, but at window granularity it is blind to the sub-floor class
-  and at line granularity it costs 2/23 real English CVs (H-092, 64
-  configurations).
-- **Buying the gate with false refusals.** The user rejected this at 17% (H-080)
-  and again at 8.7%. Do not revive it as a threshold.
-- **Growing the function-word lexicon.** H-106 has just finished removing seven
-  entries from it because they refused ordinary English. It is not a
-  lexicon-size problem.
+- **A confidence margin** and **an absolute-score cut** — both measured, both
+  rejected. The classes overlap: a real Dutch line beats English by 0.109 while
+  `"Kwabena Boateng - HGV Driver"` beats it by 0.115; a real German line scores
+  0.601 while the same English line scores 0.664. **No threshold on `eld`'s
+  output separates them**, which is why the gate is on its input.
+- **Swapping the classifier** — ADR-031 did that; it does nothing for this.
+- **Growing the function-word lexicon** — H-106 shrank it for refusing ordinary
+  English. Not a lexicon-size problem.
+- **Deleting the lexicon** now that `eld` runs at line level — it fires _below_
+  the floor where `eld` may not speak, and costs 0/258. Keep both.
 
-**What remains, and nobody has costed it:** the segmentation itself. A trailing
-short line never forms a judgeable window under `lineWindows`' forward-growth
-rule. That is the defect. **Cost that change before writing any code**, and
-measure it against all 23 English CVs, `INDIAN_ENGLISH_CVS` included, plus the
-13 non-English ones.
-
----
+**If you attempt the floor, widen the corpus first.** H-111 records the floor
+being raised twice mid-implementation, each time because the pool under-sampled
+a population: hand-written lines exposed the names, and only the **fixture
+corpus** exposed the technology lists.
 
 ## 3. Everything else that is open
 

@@ -609,16 +609,75 @@ describe('sub-floor foreign inserts (H-085)', () => {
     ).toHaveProperty('hasNonEnglishSegment', true);
   });
 
-  it('DOCUMENTED GAP: a Germanic sub-floor insert is still SCORED', () => {
-    // Asserts the WRONG behaviour on purpose so it cannot be lost (H-085).
-    // Germanic compound-noun lines contain no function words at all, and mean
-    // word length cannot rescue them at line level — English lines reach 11.3
-    // there ("Additional: Conversational Portuguese"), so the classes do not
-    // separate on 3-5 words. Closing this needs the language-ID library.
-    const document = withInsert('Kenntnisse: Lagerverwaltung, Bedarfsplanung');
-    expect(findNonEnglishSegments(document).hasNonEnglishSegment).toBe(false);
-    expect(detectLanguageHeuristic(document).isEnglish).toBe(true);
+  // ── H-041: the sub-floor pass is no longer lexicon-limited ──────────────
+  // Until this, the sub-floor pass was the 8-language function-word lexicon
+  // alone, so it closed Romance and NOTHING else. H-105 measured the
+  // consequence end-to-end: German, Polish, Turkish, Romanian, Indonesian,
+  // Czech and Portuguese degree lines were all SCORED, each telling a
+  // recruiter that a graduate has no degree. "The residual is Germanic" was
+  // wrong, and wrong for three sessions.
+  it.each([
+    ['sv', 'Civilingenjor i datateknik, Kungliga Tekniska Hoegskolan'],
+    ['pl', 'Politechnika Warszawska, Wydzial Informatyki i Systemow'],
+    ['ro', 'Facultatea de Automatica si Calculatoare, Bucuresti'],
+    ['id', 'Sarjana Teknik Informatika, Institut Teknologi Bandung'],
+    ['cs', 'Fakulta informacnich technologii, Vysoke uceni technicke'],
+    ['pt', 'Licenciatura em Engenharia Informatica, Universidade do Porto'],
+    ['it', 'Laurea in Ingegneria Informatica, Politecnico di Milano'],
+  ])('CLOSED (H-041): a one-line %s degree insert is caught', (_lang, line) => {
+    expect(findNonEnglishSegments(withInsert(line)).hasNonEnglishSegment).toBe(true);
   });
+
+  // The floor's whole purpose. These are English CV lines of 2-4 bearing
+  // words that `eld` classifies as foreign when it is allowed to speak —
+  // measured, at a 4-word floor it refuses "Giovanni Esposito - Sous Chef"
+  // (Italian) and "Nguyen Thi Minh Anh" (Vietnamese). An error path keyed on
+  // the origin of a candidate's NAME is the H-028 D3 shape, which this
+  // project records as a discrimination risk and not merely an accuracy one.
+  it.each([
+    'Giovanni Esposito - Sous Chef',
+    'Nguyen Thi Minh Anh',
+    'Dmitri Karalis - Head Chef',
+    'Kwabena Boateng - HGV Driver',
+    'Ana Sofia Restrepo Marin',
+    'Chen Wei Ling - Lead Auditor',
+    'Additional: Conversational Portuguese',
+  ])('a short English line is NOT refused because of the name on it: %s', (line) => {
+    expect(findNonEnglishSegments(withInsert(line)).hasNonEnglishSegment).toBe(false);
+  });
+
+  // The residual, and the point is WHICH axis it lies on.
+  it.each([
+    ['de', 3, 'Kenntnisse: Lagerverwaltung, Bedarfsplanung'],
+    ['de', 4, 'Diplom Wirtschaftsinformatik, Universitaet Mannheim'],
+    ['nl', 5, 'Werkervaring in softwareontwikkeling en gegevensbeheer'],
+    ['tr', 5, 'Bilgisayar Muhendisligi Lisans Derecesi, Bogazici'],
+  ])(
+    'DOCUMENTED GAP (H-041): a %s line of %i bearing words is still SCORED',
+    (_lang, _words, line) => {
+      // Asserts the WRONG behaviour on purpose so it cannot be lost (H-085).
+      //
+      // THE REASON RECORDED HERE USED TO BE WRONG, and wrong for three
+      // sessions. It said Germanic compound nouns carry no function words and
+      // that mean word length cannot separate them — framing the residual as a
+      // property of a LANGUAGE FAMILY. It is not. These four cases are
+      // Germanic, Germanic, Germanic and TURKIC, and they are missed for one
+      // reason only: each is below MIN_BEARING_WORDS_FOR_LINE_JUDGEMENT.
+      // Measured across 26 short foreign lines in 15 languages, every line of
+      // >=6 bearing words is caught and every shorter one is missed,
+      // regardless of language.
+      //
+      // Closing it means lowering that floor, which is measured to refuse
+      // real English CVs — at 5 the technology lists
+      // "Java, Spring Boot, PostgreSQL, Docker, AWS" and
+      // "AutoCAD, STAAD.Pro, Project Management", at 4 the candidate NAMES
+      // "Giovanni Esposito - Sous Chef" and "Nguyen Thi Minh Anh". Refusing a
+      // CV because of the origin of someone's name is H-028 D3's shape. That
+      // is the user's call, not a tuning decision.
+      const document = withInsert(line);
+      expect(findNonEnglishSegments(document).hasNonEnglishSegment).toBe(false);
+    },
+  );
 });
 
 describe('H-106: ordinary English lines must not be refused by the sub-floor lexicon', () => {

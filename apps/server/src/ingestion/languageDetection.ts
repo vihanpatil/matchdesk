@@ -32,11 +32,17 @@
  * or the whole document for the primary `extractText.ts` gate. It is
  * measured, not assumed, that this configuration costs zero English CVs
  * while still refusing every non-English one — see
- * `languageDetection.eval.test.ts`. It does **not** close the H-041
- * Germanic sub-floor gap (a short foreign line too small to form a line
- * window): that is a segmentation defect, not a classifier one, and
- * `languageDetection.eval.test.ts:591`'s `DOCUMENTED GAP` test asserts it
- * stays open on purpose.
+ * `languageDetection.eval.test.ts`.
+ *
+ * **H-041 is NARROWED by the sub-floor line pass below, not closed.** The
+ * swap itself does nothing for it; {@link lineReadsNonEnglish} does. That
+ * pass took the sub-floor class from Romance-only (the 8-language
+ * function-word lexicon) to eleven of twenty-six measured foreign lines
+ * across fifteen languages, at zero cost to English recall. What remains is
+ * a foreign line of five or fewer bearing words, and the `DOCUMENTED GAP`
+ * tests assert it stays open on purpose. **The residual is a word count, not
+ * a language family** — the "Germanic" framing was falsified by measurement
+ * (H-105).
  *
  * **Honest limitations, stated per Section 0.1 / ADR-006:**
  * - Short documents (see {@link MIN_WORDS_FOR_JUDGEMENT}) do not carry
@@ -478,6 +484,76 @@ function carriesNonEnglishFunctionWords(text: string): boolean {
   return distinct.size >= MIN_FUNCTION_WORD_HITS;
 }
 
+/**
+ * Minimum language-BEARING words before `eld` is allowed to judge a single
+ * line (H-041). Below this the classifier is not so much wrong as guessing,
+ * and what it guesses on is a CV's proper nouns and technology lists.
+ *
+ * **Measured, against 258 English lines and 26 short foreign lines in 15
+ * languages.** The English pool is every line of all 23 English CVs, every
+ * line of the fixture corpus, hand-written lines across the ten professions
+ * the corpus names, and 18 technology/qualification lists:
+ *
+ * ```
+ *   floor   English refused   foreign caught
+ *   W>=5         2/258             17/26
+ *   W>=6         0/258             11/26
+ *   W>=7         0/258              4/26
+ * ```
+ *
+ * **The floor was raised twice by measurement, both times because the pool
+ * was missing a population.** At 4 it refuses `"Giovanni Esposito - Sous
+ * Chef"` and `"Nguyen Thi Minh Anh"` — a candidate's NAME, which is the
+ * H-028 D3 shape this project records as a discrimination risk and not merely
+ * an accuracy one. At 5 it refuses `"Java, Spring Boot, PostgreSQL, Docker,
+ * AWS"` and `"AutoCAD, STAAD.Pro, Project Management"` — language-neutral
+ * technology lists, caught only when the fixture corpus was added to the
+ * pool. Both are H-022's shape, and both were found by widening the corpus
+ * rather than by argument.
+ *
+ * **Lowering it is a decision for the user, not a tuning knob**, because what
+ * it buys recall with is refusing CVs on the basis of the candidate's name.
+ */
+const MIN_BEARING_WORDS_FOR_LINE_JUDGEMENT = 6;
+
+/**
+ * Whether a single LINE reads as non-English to `eld` (H-041).
+ *
+ * The sub-floor pass below this used to be the function-word lexicon alone,
+ * which spans eight languages and therefore closed Romance and nothing else —
+ * H-105 measured German, Polish, Turkish, Romanian, Indonesian, Czech and
+ * Portuguese degree lines all being SCORED, each one telling a recruiter that
+ * a graduate has no degree. That is why "the residual is Germanic" was wrong.
+ *
+ * This adds `eld` at line granularity, which is language-general, gated on two
+ * things and no thresholds beyond them: enough bearing text to judge
+ * ({@link MIN_BEARING_WORDS_FOR_LINE_JUDGEMENT}), and `eld`'s OWN reliability
+ * flag.
+ *
+ * **A confidence margin was measured and rejected**, as was an absolute-score
+ * cut: the classes genuinely overlap, so neither separates them. A real Dutch
+ * line scores 0.109 above English while `"Kwabena Boateng - HGV Driver"`
+ * scores 0.115; a real German line scores 0.601 absolute while the same
+ * English line scores 0.664. There is no threshold on `eld`'s output that
+ * does this job, which is why the gate is on the INPUT instead.
+ *
+ * **The lexicon is kept, not replaced.** It fires below this floor, where
+ * `eld` is not allowed to speak, and it costs 0/258 (H-106). Deleting it
+ * would lose the sub-floor Romance catches with nothing to replace them —
+ * H-092 reached the same conclusion and said so.
+ */
+function lineReadsNonEnglish(text: string): boolean {
+  const bearing = stripNeutralTokens(text);
+  const words = bearing.match(CASED_WORD) ?? [];
+  if (words.length < MIN_BEARING_WORDS_FOR_LINE_JUDGEMENT) return false;
+
+  const detection = eld.detect(bearing);
+  // `eld` returns an empty string when it will not commit to a language; that
+  // is an abstention, not a foreign verdict, and must not become a refusal.
+  if (detection.language === '' || detection.language === 'en') return false;
+  return detection.isReliable();
+}
+
 export interface NonEnglishSegment {
   /** The offending text, trimmed. */
   readonly text: string;
@@ -678,7 +754,11 @@ export function findNonEnglishSegments(text: string): MixedLanguageResult {
   // Veto-only, like everything else here: it can add refusals and can never
   // manufacture an English verdict.
   for (const line of linesWithOffsets(text)) {
-    if (!carriesNonEnglishFunctionWords(line.text)) continue;
+    // Two independent signals, unioned. The lexicon survives below the
+    // 5-word floor where `eld` is not allowed to speak, and `eld` covers the
+    // languages a 60-word lexicon never could. Neither is a threshold on the
+    // other's output; deleting either loses measured recall (H-092, H-041).
+    if (!carriesNonEnglishFunctionWords(line.text) && !lineReadsNonEnglish(line.text)) continue;
     const alreadyReported = nonEnglishSegments.some(
       (s) => s.sourceSpan.start <= line.start && s.sourceSpan.end >= line.end,
     );
@@ -687,8 +767,10 @@ export function findNonEnglishSegments(text: string): MixedLanguageResult {
     nonEnglishSegments.push({
       text: line.text,
       sourceSpan: { start: line.start, end: line.end },
-      // The lexicon spans eight languages and deliberately does not identify
-      // which one, so this reports no nearest language rather than guessing.
+      // Neither signal reports WHICH language: the lexicon spans eight and
+      // does not distinguish them, and `eld`'s pick at line granularity is
+      // reliable enough to say "not English" without being worth quoting to a
+      // recruiter as a positive identification. ADR-006 needs English-vs-not.
       nearestLanguage: null,
     });
   }

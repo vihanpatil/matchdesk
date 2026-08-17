@@ -3968,3 +3968,75 @@ E4 should start here and nowhere else.
 against surviving mutants rather than against defects, which is a different and
 larger activity, and doing it while E5 still has an open blocker would be
 optimising the wrong thing.
+
+---
+
+### H-111 · H-041 narrowed from "Romance only" to "≤5 words", at zero cost
+
+**H-041 is not closed. It still blocks E5.** What changed is its size and,
+more importantly, the axis it lies on.
+
+The sub-floor pass was the 8-language function-word lexicon alone, so it closed
+Romance and nothing else — which is why H-105 measured German, Polish, Turkish,
+Romanian, Indonesian, Czech and Portuguese degree lines all being **scored**,
+each telling a recruiter that a graduate has no degree. It now also runs `eld`
+at line granularity, gated on two things and no threshold beyond them: enough
+bearing text to judge, and `eld`'s own reliability flag.
+
+```
+                          foreign short lines caught    English lines refused
+  lexicon only (before)              2/26                      0/258
+  lexicon ∪ eld line pass           11/26                      0/258
+```
+
+End-to-end, every language H-105 measured as wrong-scoring is now refused.
+
+**Two designs were measured and rejected**, both because the classes genuinely
+overlap rather than because a number was inconvenient:
+
+- **A confidence margin.** A real Dutch line beats English by 0.109; the
+  English line `"Kwabena Boateng - HGV Driver"` beats it by 0.115.
+- **An absolute score cut.** A real German line scores 0.601; the same English
+  line scores 0.664.
+
+There is no threshold on `eld`'s **output** that separates them, which is why
+the gate is on its **input** instead.
+
+**The residual, characterised precisely: a foreign line of ≤5 bearing words.**
+The four remaining gap cases are Germanic, Germanic, Germanic and **Turkic** —
+the axis is a word count, not a language family, and the `DOCUMENTED GAP` tests
+now say so instead of repeating the "Germanic" story that was wrong for three
+sessions.
+
+**Why I did not simply lower the floor**, which would close the class outright:
+
+```
+  floor   English refused   what it refuses
+   W>=6        0/258         —
+   W>=5        2/258         "Java, Spring Boot, PostgreSQL, Docker, AWS"
+                             "AutoCAD, STAAD.Pro, Project Management"
+   W>=4        2/139         "Giovanni Esposito - Sous Chef"
+                             "Nguyen Thi Minh Anh"
+   W>=3        5/139         (adds more of the same)
+```
+
+The 4-word cost is not merely a false-refusal rate. **Both lines it refuses are
+a candidate's name**, and an error path keyed on the origin of someone's name is
+H-028 D3's shape, which this project already records as "a discrimination risk
+and not merely an accuracy one". That is a stronger reason to hold the floor
+than the rate is, and it makes lowering it the user's decision rather than a
+tuning knob.
+
+**I raised the floor twice during this work, and both times the corpus caught
+me, not the reasoning.** At 4 the sweep read 0/96 and looked finished; adding
+hand-written profession lines exposed the two names. At 5 it read 0/139 and
+looked finished again; the **full verify** then failed on the fixture corpus,
+exposing two technology lists. Final floor 6, measured 0/258.
+
+**That is H-022's shape twice inside a single fix, committed by me, in the same
+session I wrote it up as trap 1.** The generalisable lesson is narrower and more
+useful than "name your corpora": an English corpus assembled by hand
+systematically under-samples **proper nouns and neutral token lists**, and those
+are exactly what a line-level language classifier fails on. The fixture corpus
+caught what my hand-written pool could not, which is the argument for having
+both.

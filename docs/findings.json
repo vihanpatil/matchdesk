@@ -240,7 +240,7 @@
       "id": "H-041",
       "severity": "wrong-score",
       "status": "open",
-      "note": "STILL WRONG-SCORE. SCOPE NOTE CORRECTED 2026-08-14 - the previous 'Romance CLOSED, residual is GERMANIC' framing is FALSIFIED (H-105). Measured end-to-end through the PDF path, 5 of 7 foreign degree lines are scored 50/ineligible - German, Polish, Turkish, Romanian, Indonesian - and a second arm scored 7 of 9 including Czech and Portuguese. The residual is EVERY language outside the 60-word 8-language function-word lexicon, including two Romance ones. The lexicon closed the French/Spanish lines that happen to carry >=2 listed words, not 'Romance'. ADR-031 deliberately did not close this: it is segmentation geometry, not classifier accuracy (H-092). CRITICAL FOR THE NEXT REMEDY: anything aimed at 'Germanic' will not measure Polish, Turkish, Romanian or Indonesian."
+      "note": "NARROWED, NOT CLOSED - still wrong-score, still blocks E5. A sub-floor line pass using eld (lineReadsNonEnglish) now supplements the 8-language function-word lexicon, taking the class from Romance-only to 11 of 26 measured foreign lines across 15 languages, at ZERO cost to English recall (0/258 English lines refused). Measured end-to-end, the H-105 population that was scoring wrong - Polish, Turkish, Romanian, Indonesian, Czech, Portuguese, Dutch, Swedish, Italian degree lines - is now caught. RESIDUAL, precisely characterised: a foreign line of <=5 BEARING WORDS. The axis is a word count, NOT a language family: the four remaining gap cases are Germanic, Germanic, Germanic and Turkic, and every foreign line of >=6 bearing words is caught regardless of language. CLOSING IT REQUIRES A USER DECISION, because the floor is what costs English recall: at 5 it refuses the technology lists 'Java, Spring Boot, PostgreSQL, Docker, AWS' and 'AutoCAD, STAAD.Pro, Project Management'; at 4 it refuses the candidate NAMES 'Giovanni Esposito - Sous Chef' and 'Nguyen Thi Minh Anh' - an error path keyed on the origin of a person's name, which is H-028 D3's shape and a discrimination risk rather than merely an accuracy one. A confidence margin and an absolute-score cut were both measured and REJECTED: the classes overlap, so no threshold on eld's output separates them."
     },
     {
       "id": "H-042",
@@ -644,6 +644,12 @@
       "severity": "process",
       "status": "open",
       "note": "E4 re-measured 80.02% (12m01s), above the 79 ratchet, and no module below 60 - both ADR-023 criteria hold. BUT experience.ts DECLINED 71.04 -> 69.36 and is now the weakest module in the engine, while being both the file this session changed most (ADR-032, H-101, H-102, H-104, H-095, H-107 all landed in it) and the file that computes tenure - the number every wrong-score finding in this project has been about. Not a behavioural regression: 103 tests pass and every fix has a test that fails without it. It means the NEW code carries survived mutants at a higher rate than the code it joined. Left open deliberately: raising it means writing tests against surviving mutants rather than defects, which is a larger and different activity, and doing it while E5 has an open blocker optimises the wrong thing. sections.ts improved 74.07 -> 84.15 in the same round."
+    },
+    {
+      "id": "H-111",
+      "severity": "process",
+      "status": "closed",
+      "note": "The H-041 evidence floor was raised TWICE during its own implementation, both times because the measurement pool was missing a population, and both times caught by widening the corpus rather than by argument. At a 4-word floor the sweep looked clean at 0/96 English lines - then adding hand-written lines exposed 2 refusals, both candidate NAMES of non-Anglo origin. At 5 words it looked clean at 0/139 - then the full verify failed on the fixture corpus, exposing 2 more, both language-neutral TECHNOLOGY LISTS. Final floor 6, measured 0/258. H-022's shape twice inside one fix, by the lead, in the same session the lead recorded it as trap 1. The lesson that generalises: an English corpus assembled by hand systematically under-samples proper nouns and neutral token lists, which are precisely what a line-level language classifier fails on."
     }
   ]
 }

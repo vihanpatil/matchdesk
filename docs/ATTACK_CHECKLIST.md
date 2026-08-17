@@ -51,14 +51,16 @@ is re-run. Anything found outside these classes gets added as a new row.
 **E1 is MET when every row reads Covered and no row has an open wrong-score
 finding.** After the 2026-08-14 adversarial round, **one row does not**:
 
-- **A1 (H-041)** — the only remaining open wrong-score in the project.
-  ADR-031 replaced the classifier and deliberately did **not** close this: the
-  residual is segmentation geometry, not classifier accuracy (H-092), so a
-  trailing sub-floor line still never forms a judgeable window. **Its scope
-  note was itself wrong until H-105** — the residual is not "Germanic", it is
-  every language outside the function-word lexicon, Portuguese and Romanian
-  included. Any remedy aimed at Germanic would measure none of the languages
-  that actually fail.
+- **A1 (H-041)** — the only remaining open wrong-score in the project, now
+  **narrowed but not closed** (H-111). A sub-floor `eld` line pass took the
+  class from Romance-only to 11 of 26 measured foreign lines across 15
+  languages, at 0/258 English lines refused, and every language H-105 measured
+  as wrong-scoring is now caught. **The residual is a foreign line of ≤5
+  bearing words, and the axis is a word count rather than a language family** —
+  the four remaining cases are Germanic, Germanic, Germanic and Turkic.
+  Closing it means lowering the evidence floor, which is measured to refuse
+  technology lists at 5 words and candidate NAMES at 4. That last cost is
+  H-028 D3's shape and makes it a user decision, not a tuning one.
 
 **A4 and A5 are now Covered, and both were earned rather than argued.** A5 had
 never been executed in the project's history; its first run produced H-100, a
