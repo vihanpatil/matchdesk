@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MatchDesk</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/app.mjs"></script>
+  </head>
+  <body>
+    <div id="ambient" aria-hidden="true">
+      <div class="orb orb-a"></div>
+      <div class="orb orb-b"></div>
+      <div class="orb orb-c"></div>
+    </div>
+
+    <header class="topbar">
+      <a class="brand" href="#/jobs">MatchDesk</a>
+      <nav>
+        <a href="#/jobs" data-nav="jobs">Jobs</a>
+        <a href="#/candidates" data-nav="candidates">Candidates</a>
+      </nav>
+      <span class="local-badge" title="Loopback only — nothing leaves this machine">
+        Local&nbsp;·&nbsp;Private
+      </span>
+    </header>
+
+    <main id="view" class="view"></main>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+  </body>
+</html>

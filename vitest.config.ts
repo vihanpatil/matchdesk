@@ -21,6 +21,7 @@ export default defineConfig({
        must never be reachable from anything that ships. */
     include: [
       '{apps,packages}/*/src/**/*.test.{ts,mts,cts}',
+      'apps/web/test/**/*.test.mjs',
       'scripts/**/*.test.mjs',
       'fixtures/**/*.test.mjs',
     ],

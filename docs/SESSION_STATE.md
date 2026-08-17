@@ -41,33 +41,28 @@ will talk to**: `pnpm serve` binds `127.0.0.1` only, uploads are raw bytes,
 requirement proposal is the extractor itself, and an unconfirmed job cannot be
 scored. Tested end-to-end over a real socket.
 
-**Does not exist:** `apps/web`. No UI. Embeddings (cascade step 4) and OCR are
-deferred behind typed seams.
+**Exists since ADR-036:** `apps/web` — the UI. Vanilla ES modules, zero
+dependencies, served by `pnpm serve` at the same origin as the API. Ranked
+results, requirement confirmation, needs-attention tray with reasons, evidence
+highlighting, light/dark, ambient motion. Verified end-to-end in a real
+browser.
 
-## Next phase: the UI
+**Does not exist:** the match matrix (secondary view, PRODUCT_DECISIONS), a
+packaged launcher beyond `pnpm serve`, embeddings (cascade step 4), OCR.
 
-ADR-018 blocked UI work until extraction was hardened; the gate says it is,
-and ADR-035 built the API surface, so UI work is now **pure frontend**: build
-`apps/web` against `pnpm serve` (dev servers proxy `/api`; no CORS on
-purpose). The shape is already agreed with the user:
+## Next phase
 
-- **Ranked list first, matrix second.** Pick a job → candidates ranked,
-  eligible and ineligible grouped separately (the partition is structural —
-  an ineligible candidate can never rank above an eligible one), evidence
-  highlighted on click.
-- **Needs-attention tray is a first-class surface**, not an error state. The
-  engine's whole design converts wrong scores into visible refusals
-  (`Reservation`s, ADR-029/032/034); the UI must show _why_ a document was
-  refused, with the offending span.
-- **200×200 is a capacity ceiling, never a rendered layout.** 15 jobs × 3 CVs
-  renders 45 cells sized to content; virtualization only when data demands
-  it. Compute is not the bottleneck (0.34 s full fill, H-046; the batch path
-  reuses extraction, ~15.8× faster than pairwise).
-- Add `ATTACK_CHECKLIST` rows for the UI when it exists — do not pre-write
-  attacks against a UI nobody has designed.
+The defining workflow ships. What remains, in rough order of value:
 
-Keep it lazy and elite: no framework ceremony the product does not need, low
-latency by construction (local SQLite, deterministic scoring, no network).
+- **Use it against a real pool** — the fastest way to find what the corpus
+  cannot: real CVs, at volume, on the recruiter's own machine.
+- **The match matrix** — the agreed secondary view. 200×200 stays a capacity
+  ceiling, never a rendered layout.
+- **Recruiter conveniences** PRODUCT_DECISIONS names: attribute suppression
+  with rescore, job-local custom skills, background recompute with visible
+  stale states.
+- **Packaging** — a launcher that opens the browser, per PRODUCT_DECISIONS.
+- **UI rows for `ATTACK_CHECKLIST`** — the UI exists now, so attack it.
 
 ## Watch items — open, none blocking
 

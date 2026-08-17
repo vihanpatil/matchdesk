@@ -1,0 +1,19 @@
+{
+  /* The UI is JSDoc-typed browser JS with no build step (ADR-036) — checkJs
+     is its only type verification, exactly as tsconfig.scripts.json does for
+     the build tooling. DOM lib instead of node types. */
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "allowJs": true,
+    "checkJs": true,
+    "types": [],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler"
+  },
+  "include": ["apps/web/public/**/*.mjs"]
+}

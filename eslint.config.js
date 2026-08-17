@@ -353,4 +353,28 @@ export default tseslint.config(
       ],
     },
   },
+
+  /* ---- The UI (ADR-036): browser JS, DOM globals instead of node's. ---- */
+  {
+    files: ['apps/web/public/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        document: 'readonly',
+        window: 'readonly',
+        location: 'readonly',
+        fetch: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        requestAnimationFrame: 'readonly',
+        performance: 'readonly',
+        File: 'readonly',
+        FormData: 'readonly',
+        Node: 'readonly',
+        HTMLElement: 'readonly',
+        HTMLInputElement: 'readonly',
+        RequestInit: 'readonly',
+        console: 'readonly',
+      },
+    },
+  },
 );

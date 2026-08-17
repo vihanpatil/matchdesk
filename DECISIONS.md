@@ -1931,3 +1931,72 @@ the opaque id and the action — never PII, never source text.
   match row, per ADR-024 — a UI wanting an old result re-scores, which is
   measured cheap (0.34 s for a full 200×200 fill).
 - **20 MB upload cap** — generous for documents, bounded for memory.
+
+---
+
+## ADR-036 — The UI: zero-dependency, zero-build, served by the API itself
+
+**Date:** 2026-08-17 · **Status:** Accepted
+
+`apps/web` is vanilla ES modules and CSS, served as static files by the
+existing server. **No framework, no bundler, no new packages of any kind.**
+
+### Why no framework
+
+Four views for one local user do not amortize a build toolchain. A React +
+Vite setup would have added dozens of packages to a tree whose licence gate
+(ADR-003/016/033) makes every entry expensive, plus a build step, plus a dev
+server — to render lists and cards the DOM API renders directly. The UI is
+JSDoc-typed and typechecked (`tsconfig.web.json`, `checkJs`, DOM lib) exactly
+as the build tooling already is; pure logic (ranking, evidence highlighting)
+lives in `lib/*.mjs` and is unit-tested in node.
+
+### Design system
+
+Apple-grade minimalism with an ambient layer: system font stack, hairline
+borders, frosted-glass cards, and three oversized gradient orbs that drift on
+keyframes and parallax against scroll and pointer via CSS custom properties
+fed by one rAF loop. Light and dark themes from one token set;
+`prefers-reduced-motion` disables all of it.
+
+**Measured, not assumed, on the ambient layer:** the first version used
+`filter: blur(70px)` over the orb container, and a viewport-sized blur layer
+froze rendering under scroll in testing. The blur was replaced by gradient
+falloff — visually equivalent, compositor-cheap. `scroll-behavior: smooth`
+was removed for the same class of reason.
+
+### Rules the UI inherits from the engine
+
+- **A displayed number is never wrong, even transiently.** A count-up
+  animation was built, measured freezing mid-count in a throttled tab —
+  showing "8" for a candidate who scored 78 — and removed. Scores and
+  composition bars render their true values immediately; only decorative
+  arcs animate, so a stalled frame scheduler can leave decoration undrawn
+  but never a false number.
+- **No HTML string concatenation exists.** Everything renders through
+  `createElement`/`textContent`, and the static handler's CSP
+  (`default-src 'self'`) makes the alternative a runtime error. Uploaded
+  document content cannot become markup.
+- **Names are filenames.** PRODUCT_DECISIONS forbids displaying guessed
+  candidate names; every list shows `originalFilename`.
+- **The needs-attention tray shows why**: ingest warnings on candidate
+  cards, and per-skip reasons (including blocking-reservation sentences)
+  after scoring.
+
+### Verified in a real browser
+
+The full recruiter workflow was driven end-to-end against the live server:
+upload → proposal chips (Python/Go/microservices found in the real job PDF,
+degree pre-filled) → must-have toggle → confirm → score → ranked results
+(78 eligible above 38; French CV in the tray with its reason) → detail view
+with evidence marks on the exact phrases in the document. Light and dark.
+
+### Costs, accepted
+
+- **The match matrix (secondary view) is not built.** The ranked list is the
+  defining workflow; the matrix comes when a real pool needs it.
+- **`serve.ts` and the DOM code are not unit-tested** — wiring and rendering
+  are covered by the API e2e tests, the pure-logic unit tests, and the real
+  browser pass above. Coverage headline dropped ~3 points accordingly.
+- **No packaging/launcher beyond `pnpm serve`** — documented setup, not a
+  double-clickable app. PRODUCT_DECISIONS' launcher requirement remains open.

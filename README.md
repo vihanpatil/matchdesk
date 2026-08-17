@@ -17,7 +17,7 @@ pnpm install
 pnpm gate      # the release gate, computed from docs/findings.json — an exit code, not prose
 pnpm verify    # typecheck + lint + format + licence audit + full test suite (~1 min)
 pnpm mutate    # mutation testing (~12 min); ratchet enforced by stryker.config.json
-pnpm serve     # the local API on http://127.0.0.1:3900 (loopback only, ADR-035)
+pnpm serve     # the app + API on http://127.0.0.1:3900 (loopback only, ADR-035/036)
 ```
 
 **Never trust a status number written in a document — including this one.**
@@ -34,11 +34,12 @@ the command.
   SQLite persistence, the document→score pipeline.
 - `fixtures/` — a golden corpus rendered to real PDF/DOCX bytes,
   deterministically, at build time.
-- `apps/server/src/http` — the loopback-only API the UI talks to
+- `apps/server/src/http` — the loopback-only API and static host
   (`pnpm serve`): upload, requirement proposal + confirmation, scoring,
   matches, deletion (ADR-035).
-- **`apps/web` does not exist yet.** There is no UI. That is the next phase —
-  see [docs/SESSION_STATE.md](docs/SESSION_STATE.md).
+- `apps/web` — the UI (ADR-036): vanilla ES modules, zero dependencies, no
+  build step. Ranked results, evidence highlighting, needs-attention tray,
+  light/dark, ambient motion. Open `pnpm serve`'s URL in a browser.
 
 ## Documentation map
 

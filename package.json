@@ -10,7 +10,7 @@
     "node": ">=24.15.0"
   },
   "scripts": {
-    "typecheck": "tsc --build --clean && tsc --build --force && pnpm typecheck:tests && pnpm typecheck:scripts",
+    "typecheck": "tsc --build --clean && tsc --build --force && pnpm typecheck:tests && pnpm typecheck:scripts && pnpm typecheck:web",
     "typecheck:tests": "tsc -p tsconfig.eslint.json --noEmit",
     "typecheck:scripts": "tsc -p tsconfig.scripts.json --noEmit",
     "lint": "eslint . --max-warnings=0",
@@ -29,7 +29,8 @@
     "gate": "node scripts/gate.mjs",
     "mutate": "stryker run",
     "fixtures:build": "node scripts/build-fixtures.mjs",
-    "serve": "tsc --build apps/server && node apps/server/dist/http/serve.js"
+    "serve": "tsc --build apps/server && node apps/server/dist/http/serve.js",
+    "typecheck:web": "tsc -p tsconfig.web.json --noEmit"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
