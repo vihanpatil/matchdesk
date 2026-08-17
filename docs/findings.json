@@ -240,7 +240,7 @@
       "id": "H-041",
       "severity": "wrong-score",
       "status": "open",
-      "note": "STILL WRONG-SCORE, residual now precisely bounded (ADR-030 + H-087). Romance sub-floor inserts CLOSED by a function-word signal (0 false positives in 70 English lines). RESIDUAL: a GERMANIC-language insert shorter than ~100 letters - compound lines carry no function words, and mean word length does not separate at line level (English reaches 11.3, a German degree line 10.2). Closing it needs the language-ID library the user approved."
+      "note": "STILL WRONG-SCORE. SCOPE NOTE CORRECTED 2026-08-14 - the previous 'Romance CLOSED, residual is GERMANIC' framing is FALSIFIED (H-105). Measured end-to-end through the PDF path, 5 of 7 foreign degree lines are scored 50/ineligible - German, Polish, Turkish, Romanian, Indonesian - and a second arm scored 7 of 9 including Czech and Portuguese. The residual is EVERY language outside the 60-word 8-language function-word lexicon, including two Romance ones. The lexicon closed the French/Spanish lines that happen to carry >=2 listed words, not 'Romance'. ADR-031 deliberately did not close this: it is segmentation geometry, not classifier accuracy (H-092). CRITICAL FOR THE NEXT REMEDY: anything aimed at 'Germanic' will not measure Polish, Turkish, Romanian or Indonesian."
     },
     {
       "id": "H-042",
@@ -351,9 +351,9 @@
     },
     {
       "id": "H-062",
-      "severity": "coverage-gap",
+      "severity": "wrong-score",
       "status": "open",
-      "note": "PDF line model rests entirely on pdfjs hasEOL, no vertical-gap fallback. Unmeasured. A merged header could delete a section (D1 shape) \u2014 re-examine if a PDF fixture ever loses a section."
+      "note": "RE-TRIAGED coverage-gap -> wrong-score on 2026-08-14. This entry's own note said 're-examine if a PDF fixture ever loses a section'; the ADR-015 round produced exactly that (H-100). It also falsifies this entry's stated MECHANISM: no pdfjs hasEOL error is required. hasEOL was correct in every arm - the runs genuinely are on one visual line - and the defect is detectSections' whole-line rule meeting ordinary CV typography. Confirmed format-independent, including the DOCX right-tab form."
     },
     {
       "id": "H-063",
@@ -516,8 +516,8 @@
     {
       "id": "H-089",
       "severity": "wrong-score",
-      "status": "open",
-      "note": "An ambiguous numeric date range silently deletes a role and reports a smaller total tenure with warnings: []. CONFIRMED wrong-score by an independent ADR-015 verifier who was not told the lead's view. The verifier CORRECTED the lead's description on three counts (H-094): (1) the open-ended case does NOT abstain - it matches a SUBSTRING and silently commits to DD/MM, truncating the evidence span; (2) the END date governs, not 'both sides ambiguous', so the population is 336/784 day-pairs not 144/784; (3) H-040's Reservation remedy IS built but is blind here by construction - discardedTenureClaim needs an explicit claim to disagree with, and H-089 never extracts a first number. Traced end-to-end: 10.7y/100/ELIGIBLE becomes 1.4y/55/INELIGIBLE, match row persisted, warnings structurally unreachable. ALSO an E2 blocker: no metamorphic relation can generate a numeric date at all."
+      "status": "closed",
+      "note": "CLOSED for its named mechanism: a THREE-PART ambiguous numeric date no longer deletes a role or guesses a locale. ADR-032 consumes the whole token and emits an unreadable_date_range attribute plus an unreadable_employment_dates reservation, with materiality bounded by the smaller of the two locale readings. Pinned - 4 tests fail without the fix. SCOPE OF THE CLOSURE, stated: three-part forms only. The ADR-015 round confirmed every three-part separator behaves, and found five FURTHER silent tenure defects that ADR-032 does not touch (H-100 to H-104) plus the still-live two-part half of H-095."
     },
     {
       "id": "H-090",
@@ -553,7 +553,7 @@
       "id": "H-095",
       "severity": "wrong-score",
       "status": "open",
-      "note": "Dash and dot date separators silently INFLATE tenure. The \\d{1,2}/\\d{4} alternative is slash-only, so 03-04-2013 and 03.04.2013 fall to bare \\d{4} and default to January: 11.4y reported against a truth of 11.2, evidence truncated to '2013 - Present'. 192/784 two-sided dash pairs and 12/28 '- Present' dash cases are wrong. Opposite direction from H-089 - a candidate can be credited with tenure they do not have. Split out of H-089 on the verifier's recommendation. Pinned by a DOCUMENTED GAP test."
+      "note": "NOT closed by ADR-032. Its three-part half (03-04-2013, 03.04.2013) is fixed, but this entry's own named mechanism - 'the \\d{1,2}/\\d{4} alternative is slash-only' - is the TWO-PART form and is still live. Verified by the lead: '03.2019 - Present' yields 7.6 against a truth of 7.4, evidence span truncated to '2019 - Present', reservations [] and warnings []. '2015-03 - Present' and '2015/03 - Present' delete the role entirely. This is H-040's original 03.2006 notation, and experience.ts documents it as deliberately out of ADR-032's scope - an honest disclosure in the module, but the finding is not closed by it."
     },
     {
       "id": "H-096",
@@ -572,6 +572,60 @@
       "severity": "process",
       "status": "closed",
       "note": "The only defect in a three-engineer parallel round came from the SEAM between two scopes, not from either scope. refuse-mixed-language changed refusal REASON (non_english_language_not_supported -> mixed_language_content) after the eld swap; the refusal itself was intact and the new reason is more truthful for a 50/50 bilingual document, which now exercises the ADR-022 segment veto on the binary path. Neither engineer could see it: ingestion's scope excluded fixtures/, extraction's excluded apps/server/. Conflict-free-by-directory prevents write conflicts but NOT behavioural coupling - an argument for the lead's serialized full verify."
+    },
+    {
+      "id": "H-099",
+      "severity": "wrong-score",
+      "status": "closed",
+      "note": "BATCH path bypassed the ADR-029 blocking-reservation refusal. Same job, same candidate, same reference date: scoreStoredPair THREW and wrote nothing, while scoreJobAgainstCandidates scored 64 and PERSISTED the matches row - and the batch path is the entry point a 'score this job against my pool' action uses, so ADR-029's guarantee was reachable only by the path nobody calls. Made H-040's 'closed' note false as written. FIXED: the batch path now skips rather than persisting, deliberately differing from the single path's throw because a batch must not let one unreconcilable candidate deny service to the pool - `skipped` already means 'we could not read this document'. Pinned; the test fails without the guard (verified by removing it)."
+    },
+    {
+      "id": "H-100",
+      "severity": "wrong-score",
+      "status": "open",
+      "note": "A5, run for the FIRST TIME in the project's history, and it broke in both directions. detectSections requires a header to be the whole trimmed line, so ordinary CV typography defeats it: 'Education   Leeds, UK' (right-aligned location on the header baseline), a decorative rule, or letter-spaced 'E D U C A T I O N' all make the section vanish. Measured: education dates then credited as employment, 98/INELIGIBLE -> 100/ELIGIBLE; and in the education-first ordering, 11.6 years of dated employment -> 'found 0', 48 points lost. warnings [] and reservations [] in both. Format-independent - the DOCX right-tab form breaks identically. NOT a pdfjs defect: hasEOL was correct in every arm. Lead reproduced the whole-line rule directly."
+    },
+    {
+      "id": "H-101",
+      "severity": "wrong-score",
+      "status": "open",
+      "note": "One future-dated endpoint deletes the ENTIRE role, silently. 'Jan 2015 - Dec 2026' with reference 2026-08 - an ordinary current fixed-term contract - yields 0 years and 'found 0', where 'Jan 2015 - Present' yields 11.6. Verified by the lead. Also reachable with no future-dated text at all: ADR-024 requires re-scoring against the STORED (older) reference date, so any range extending past it is dropped the same way. Rejecting implausible dates is defensible; deleting the range rather than clamping or surfacing it is not, per ADR-029's own principle."
+    },
+    {
+      "id": "H-102",
+      "severity": "wrong-score",
+      "status": "open",
+      "note": "The D5c quantity-context guard deletes REAL roles. NON_EMPLOYMENT_CONTEXT fires on a bare YYYY-YYYY range when a quantity word sits within 40 chars either side - and the line after a date line in a CV is almost always a metric bullet. Verified by the lead: '2015 - 2026' followed by 'Scaled the platform to two million users.' yields 0 years; the same CV with 'Scaled the platform considerably.' yields 11. reservations [] and warnings []. D5c was measured for false POSITIVES only; this false-negative direction was never measured. Distance-bounded, which narrows it but does not remove it - the tight form is the canonical CV bullet."
+    },
+    {
+      "id": "H-103",
+      "severity": "wrong-score",
+      "status": "open",
+      "note": "EXPLICIT_YEARS_PATTERN fabricates tenure from ordinary prose - it requires no experience context at all. Verified by the lead: 'Maintained a 15 year old legacy COBOL system.' yields 15 years with the evidence span '15 year', and explain.ts shows that literal string to the recruiter as proof of fifteen years' experience. ELIGIBLE against a 9-year must-have. SECOND FACE: with a real range also present the fabricated claim becomes a fabricated BLOCKING reservation quoting a number the document never made, so scoreStoredPair refuses an otherwise scoreable candidate - that half is false-refusal driven by fabricated evidence."
+    },
+    {
+      "id": "H-104",
+      "severity": "wrong-score",
+      "status": "open",
+      "note": "Per-range rounding inflates tenure by up to 20%. Each merged range is rounded to 1 dp BEFORE totalYearsExperience sums them, so a 3-month range goes 0.25 -> 0.3, a systematic +20% that compounds with range count. Measured: 17 consecutive 3-month contracts (truth 4.25 years) report 5.1 against a 5-year must-have -> score 100, ELIGIBLE, unmet [], reservations []. The error is proportional, not bounded by the documented 0.1 quantization. Fix is arithmetic - sum credited months, round once. Realistic population: locum, agency, contractor and seasonal CVs."
+    },
+    {
+      "id": "H-105",
+      "severity": "process",
+      "status": "closed",
+      "note": "H-041's scope note was falsified by measurement. It read 'Romance sub-floor inserts CLOSED, residual is GERMANIC'; the ADR-015 round scored 5 of 7 foreign degree lines end-to-end (German, Polish, Turkish, Romanian, Indonesian) and 7 of 9 in a second arm including Czech and Portuguese. The residual is every language outside the 8-language function-word lexicon, including two ROMANCE ones. H-041's note corrected in the same commit. Matters because a remedy aimed at 'Germanic' would not have measured the languages that actually fail."
+    },
+    {
+      "id": "H-106",
+      "severity": "false-refusal",
+      "status": "open",
+      "note": "NON_ENGLISH_FUNCTION_WORDS contains tokens that are ordinary English or English proper nouns - van, door, die, den, el, los, la, le, de, est, par, con - and two hits on one line refuse the whole document. carriesNonEnglishFunctionWords runs on the RAW line, so stripNeutralTokens never applies and ALL-CAPS forms count. 4 of 7 realistic English lines refused: 'Loaded the van each morning and completed door to door parcel deliveries', 'Chef de Partie at Le Gavroche', 'press die tooling for door panel assembly', 'between the El Paso and Los Angeles offices'. Breaks catering, trades and logistics/haulage - three of the ten professions the code comment names as its own corpus, whose '0 false positives in 70 lines' claim is true of those lines and does not generalise. Does NOT block E5, but the refusal message asserts the document mixes non-English text, which is false."
+    },
+    {
+      "id": "H-107",
+      "severity": "false-refusal",
+      "status": "open",
+      "note": "Concurrent ambiguous date ranges double-count their lower bound. unreadableEmploymentDates sums each range's minPossibleYears with no interval merge (neither resolves to absolute months), so two identical concurrent ambiguous roles produce minPossibleYears 9.8 for what is really ~4.9, and a BLOCKING reservation whose recruiter-visible detail asserts 'at least 9.8'. Documented as a residual in dimensions.ts by ADR-032 and confirmed reachable by the ADR-015 round. System behaviour is refusal, so false-refusal per ADR-027 - but with a wrong number in the text shown to the recruiter."
     }
   ]
 }

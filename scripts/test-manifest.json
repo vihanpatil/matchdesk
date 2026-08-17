@@ -97,6 +97,7 @@
     "apps/server/src/ingestion/pdfExtractor.test.ts :: extractPdfText produces well over 100 significant characters per page for a real text page",
     "apps/server/src/ingestion/pdfExtractor.test.ts :: extractPdfText reports well under 100 significant characters per page for a sparse (scan-like) PDF",
     "apps/server/src/pipeline/pipeline.test.ts :: pipeline: a document becomes a score ADR-018 Decision 1: adding a matched requirement never lowers the score, TEXT IN -> SCORE OUT",
+    "apps/server/src/pipeline/pipeline.test.ts :: pipeline: a document becomes a score BATCH path refuses to persist a blocking reservation, exactly like the single path (H-099)",
     "apps/server/src/pipeline/pipeline.test.ts :: pipeline: a document becomes a score H-052: a stored score is REPRODUCIBLE from stored state alone (ADR-024)",
     "apps/server/src/pipeline/pipeline.test.ts :: pipeline: a document becomes a score H-052: an open-ended range cannot leave stale evidence behind, because none is stored",
     "apps/server/src/pipeline/pipeline.test.ts :: pipeline: a document becomes a score REFUSES to score a mixed-language CV end-to-end (ADR-022)",

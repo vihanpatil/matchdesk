@@ -355,6 +355,25 @@ export function scoreJobAgainstCandidates(
     };
     const result = scoreCandidate(job, scoringCandidate);
 
+    // ADR-029 / H-040, and H-099: the single-pair path refuses to persist a
+    // blocking reservation, and this path did not. Same job, same candidate,
+    // same reference date: `scoreStoredPair` threw and wrote nothing, while
+    // this function wrote score 64 to `matches`. Since this is the entry point
+    // a "score this job against my pool" action uses, the guarantee ADR-029
+    // records was reachable only by the path nobody calls.
+    //
+    // This SKIPS rather than throwing, which is the one place it deliberately
+    // differs from the single-pair path. The invariant that matters is
+    // identical — no row is persisted — but a batch must not let one
+    // unreconcilable candidate deny service to the rest of the pool, and this
+    // function already has the right channel for it: `skipped` means "we could
+    // not read this document", which is exactly what an unreconciled
+    // reservation says. They land in the needs-attention tray with the others.
+    if (result.reservations.some((r) => r.blocking)) {
+      skipped.push(candidate.id);
+      continue;
+    }
+
     upsertMatch(db, {
       jobId: job.id,
       candidateId: candidate.id,

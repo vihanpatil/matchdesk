@@ -158,20 +158,37 @@ describe('the REAL registry, as shipped', () => {
     // deliberately, which is the point — the gate result cannot change
     // silently.
     //
-    // It has now earned that FOUR times: H-002 triaged out, H-040 closed by
-    // ADR-029, H-089 registered, and H-095 split out of H-089 by the ADR-015
-    // verifier.
-    // ['H-002','H-040','H-041'] -> ['H-040','H-041'] -> ['H-041']
-    //   -> ['H-041','H-089'] -> ['H-041','H-089','H-095'].
+    // It has now earned that FIVE times: H-002 triaged out, H-040 closed by
+    // ADR-029, H-089 registered, H-095 split out of H-089 by an ADR-015
+    // verifier, and now an ADR-015 round that took the count from 3 to 8.
+    //   ['H-002','H-040','H-041'] -> ['H-040','H-041'] -> ['H-041']
+    //   -> ['H-041','H-089'] -> ['H-041','H-089','H-095']
+    //   -> the eight below.
     //
-    // The first two moves made the gate EASIER; the last two made it HARDER,
-    // and that direction matters more. The plan two sessions ago assumed
-    // H-041 was the last blocker, so closing it would flip E5. It will not:
-    // the count has gone UP twice since, both times because someone measured
-    // rather than reasoned.
+    // The trend is the finding. Two moves made the gate easier; three made it
+    // HARDER, every one of those because somebody measured rather than
+    // reasoned. Two sessions ago the plan assumed H-041 was the last blocker
+    // and that closing it would flip E5; there are now eight, and five of them
+    // were found by ONE adversarial round against rows the checklist already
+    // named. H-062 is on this list because that round falsified its recorded
+    // mechanism, not merely its severity — it had been sitting as a
+    // coverage-gap describing a pdfjs defect that does not exist.
+    //
+    // Do not read a rising count as the project getting worse. Every one of
+    // these was already true of the code; what changed is that somebody
+    // looked.
     const gate = computeGate(registry.findings);
     expect(gate.e5).toBe(false);
-    expect(gate.blockingE5.map((f) => f.id).sort()).toEqual(['H-041', 'H-089', 'H-095']);
+    expect(gate.blockingE5.map((f) => f.id).sort()).toEqual([
+      'H-041',
+      'H-062',
+      'H-095',
+      'H-100',
+      'H-101',
+      'H-102',
+      'H-103',
+      'H-104',
+    ]);
   });
 
   it('every remaining E5 blocker is a measured defect, not an untriaged one', () => {

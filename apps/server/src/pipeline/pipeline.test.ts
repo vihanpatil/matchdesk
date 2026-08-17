@@ -257,6 +257,57 @@ describe('pipeline: a document becomes a score', () => {
     expect(scored[0]?.result).toEqual(single.result);
   });
 
+  it('BATCH path refuses to persist a blocking reservation, exactly like the single path (H-099)', async () => {
+    // Found by an ADR-015 adversarial round. `scoreStoredPair` refused and
+    // wrote nothing; this path scored the same candidate 64 and PERSISTED the
+    // row — and this is the entry point a "score this job against my pool"
+    // action uses, so ADR-029's guarantee was reachable only by the path
+    // nobody calls. It also made H-040's `closed` note false as written.
+    //
+    // H-040's exact shape: dated roles totalling ~2.6 years, an explicit
+    // "Over 20 years" claim the engine discards, and a must-have gate sitting
+    // between the two so the discarded claim is MATERIAL.
+    const ingested = await ingestCandidateDocument(
+      db,
+      filesDir,
+      readFixture('candidate-english.docx'),
+      'candidate-english.docx',
+      REF,
+    );
+
+    // A real stored id (the `matches` foreign key is real) carrying the text
+    // that produces the reservation. Without the guard, `upsertMatch` succeeds
+    // and the row lands — which is what this asserts is no longer possible.
+    const candidate = {
+      ...ingested.candidate,
+      rawText: [
+        'Alex Morgan',
+        'Over 20 years of experience in backend engineering.',
+        '',
+        'Employment History',
+        'Senior Engineer, Acme Corp, Jan 2023 - Aug 2025',
+        'Built services in Python.',
+      ].join('\n'),
+    };
+
+    const job: ScoringJob = {
+      ...(await ingestJobAndSpec()),
+      experience: { weight: 1, requirement: { minYears: 9, mustHave: true } },
+    };
+
+    const { scored, skipped } = scoreJobAgainstCandidates(db, job, [candidate], REF, COMPUTED_AT);
+
+    expect(scored).toHaveLength(0);
+    expect(skipped).toEqual([candidate.id]);
+
+    // The load-bearing assertion: no row. A skip says "we could not read this
+    // document"; a persisted 64 would be a claim about a person.
+    const row = db
+      .prepare('SELECT * FROM matches WHERE job_id = ? AND candidate_id = ?')
+      .get(job.id, candidate.id);
+    expect(row).toBeUndefined();
+  });
+
   it('REFUSES to score against a job whose OWN document was unreadable (H-049, C7)', async () => {
     // Found by adversarial probe: C7 was enforced on the candidate side only.
     // A French job description stored with parseStatus="needs_attention" and

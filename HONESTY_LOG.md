@@ -3651,3 +3651,204 @@ tests that **still passed** while their titles asserted a mechanism this round
 deleted — "the institution exemption is what protects them, and it is
 load-bearing". A passing test that teaches a false mechanism is worse than a
 failing one, because nothing ever forces someone to read it again.
+
+---
+
+### H-099 · The batch path wrote the row the single path refuses to write
+
+An ADR-015 round attacked three checklist rows. This was the worst thing it
+found, and nothing in this repository had registered it.
+
+`scoreStoredPair` refuses to persist when a blocking reservation is present —
+ADR-029's guarantee, and the closure recorded against H-040. Measured on the
+same database, same job, same candidate, same reference date, with H-040's own
+document shape:
+
+```
+scoreStoredPair            -> THREW, match row after: null
+scoreJobAgainstCandidates  -> scored=1, score 64, eligible false,
+                              reservations[0].blocking = true
+                              match row after: {"score":64,...}  PERSISTED
+```
+
+**The guarantee existed only on the path nobody calls.** `scoreJobAgainstCandidates`
+is the entry point a "score this job against my whole pool" action uses; the
+single-pair path is the one used to score one pair. The function's own comment
+presented it purely as a 15.8× performance shape, and the test asserting the two
+paths agree uses a candidate with **no** reservation, so the divergence was
+untested by construction.
+
+**This makes H-040's `closed` note false as written.** It says "`scoreStoredPair`
+refuses to persist a match" — true, and not sufficient.
+
+**Fixed.** The batch path now skips. That is a deliberate difference from the
+single path's throw: the invariant that matters is identical — **no row is
+persisted** — but a batch must not let one unreconcilable candidate deny service
+to the rest of the pool, and this function already has the right channel, since
+`skipped` means "we could not read this document" and lands the candidate in the
+needs-attention tray. Pinned; the test fails without the guard, verified by
+removing it.
+
+**The defence I rejected.** "Nothing calls it yet" is the exact argument
+`assertJobStatesRequirements`'s own docstring refuses — _"A defect whose only
+defence is 'nothing calls it yet' is one that lands the day something does."_
+It is worse here, because the number reaches `matches`, which is stored state a
+later reader consumes without the caveat.
+
+---
+
+### H-100 · A5 ran for the first time and broke in both directions
+
+`docs/ATTACK_CHECKLIST.md` row A5 had never been executed in the project's
+history. It was the only row in that state. It does not survive contact.
+
+`detectSections` requires a header to be **the whole trimmed line**. Ordinary CV
+typography defeats that. Measured end-to-end through the real PDF path, same CV
+in both arms, only the header's visual line differing:
+
+```
+"Education"                -> sections [...,"experience","education"]
+                              11.6 years,  score  98,  INELIGIBLE (needs 12)
+"Education   Leeds, UK"    -> sections [...,"experience"]     education GONE
+                              15.6 years,  score 100,  ELIGIBLE
+```
+
+The degree's dates are credited as employment. **And the deletion direction is
+worse** — on an education-first CV (the recent-graduate and academic ordering),
+an `Experience` header carrying a right-aligned date removes the section
+entirely: **11.6 years of dated employment becomes "found 0", 48 points**, with
+`warnings: []` and `reservations: []`.
+
+Reproduced directly by me at the `detectSections` level, so the mechanism is not
+in dispute: `Education   Leeds, UK`, a decorative rule, and letter-spaced
+`E D U C A T I O N` all fail, while `EDUCATION:` and `Education & Training`
+pass.
+
+**This falsifies H-062's recorded mechanism, not merely its severity.** H-062
+blames the PDF line model — _"rests entirely on pdfjs `hasEOL`"_ — and says to
+re-examine if a PDF fixture ever loses a section. `hasEOL` was **correct in every
+arm**: the two runs genuinely are on one visual line, and reconstruction is
+right. No `hasEOL` error is required, and the defect reproduces on the DOCX
+right-tab form too. **H-062 re-triaged coverage-gap → wrong-score.**
+
+**The corpus structurally cannot hold a regression test for this.**
+`buildFixturePdf` takes `readonly string[]` and draws one run per line, so no
+fixture can express a multi-run visual line. Covering A5 needs the builder
+extended, not just a fixture added.
+
+---
+
+### H-101–H-104 · Four more silent tenure defects, all reproduced
+
+Found in the same round, all in `experience.ts`, all confirmed by me directly
+against `packages/core/dist`. Every one is silent: `warnings: []`,
+`reservations: []`.
+
+| finding   | input                                          | reported | truth |
+| --------- | ---------------------------------------------- | -------- | ----- |
+| **H-101** | `Jan 2015 - Dec 2026` (ref 2026-08)            | **0**    | 11.6  |
+| **H-102** | `2015 - 2026` + "…to two million users."       | **0**    | 11    |
+| **H-103** | "Maintained a 15 year old legacy COBOL system" | **15**   | 0     |
+| **H-104** | 17 × 3-month contracts                         | **5.1**  | 4.25  |
+
+- **H-101** — one future-dated endpoint deletes the whole role. An ordinary
+  current fixed-term contract does it. Also reachable with no future-dated text
+  at all, because ADR-024 requires re-scoring against the **stored** reference
+  date, so any range extending past it is dropped the same way.
+- **H-102** — the D5c quantity guard fires on a metric bullet within 40
+  characters, and the line after a date line in a CV is almost always a metric
+  bullet. D5c was measured for false **positives** only; this direction never
+  was.
+- **H-103** — `EXPLICIT_YEARS_PATTERN` needs no experience context whatsoever, so
+  a _system's_ age becomes a _person's_ tenure, and `explain.ts` shows the
+  recruiter the literal string `"15 year"` as the evidence. **Second face:** with
+  a real range also present, the fabricated claim becomes a fabricated
+  **blocking** reservation, so the engine refuses an otherwise scoreable
+  candidate while quoting a number the document never made.
+- **H-104** — each merged range is rounded to 1 dp _before_ the sum, so a
+  3-month range goes `0.25 → 0.3`, a systematic **+20%** that compounds with
+  range count. 17 three-month contracts report 5.1 against a 5-year must-have:
+  **score 100, eligible**, truth 4.25. The error is proportional, not bounded by
+  the documented 0.1 quantization, and the population is locum, agency,
+  contractor and seasonal CVs.
+
+---
+
+### H-105 · H-041's scope note said "Germanic". It is not Germanic.
+
+H-041 read _"Romance sub-floor inserts CLOSED … RESIDUAL: a GERMANIC-language
+insert"_, and `languageDetection.ts` states the gap "covers Romance inserts only,
+by construction". Measured end-to-end through the PDF path, one degree line
+swapped, everything else identical:
+
+```
+English    SCORED 100 eligible        Portuguese  REFUSED (correct)
+German     SCORED  50 INELIGIBLE      Spanish     REFUSED (correct)
+Polish     SCORED  50 INELIGIBLE
+Turkish    SCORED  50 INELIGIBLE
+Romanian   SCORED  50 INELIGIBLE
+Indonesian SCORED  50 INELIGIBLE
+```
+
+**5 of 7 foreign arms scored**, each telling the recruiter a graduate has no
+degree. A second arm with the line in a different position scored **7 of 9**,
+including Czech and Portuguese — and Portuguese flipping between positions is
+itself confirmation that this is segmentation geometry, exactly as H-092
+concluded.
+
+The residual is **every language outside the 60-word, 8-language function-word
+lexicon — including two Romance ones.** The lexicon closed the French and
+Spanish lines that happen to carry ≥2 listed words; it did not close "Romance".
+
+**Why this matters more than the wording:** a remediation aimed at "Germanic"
+would not have measured Polish, Turkish, Romanian or Indonesian, and would have
+been declared successful. H-041's note is corrected in the same commit.
+
+---
+
+### H-106 · The lexicon that closed Romance refuses ordinary English
+
+`NON_ENGLISH_FUNCTION_WORDS` contains `van`, `door`, `die`, `den`, `el`, `los`,
+`la`, `le`, `de`, `est`, `par`, `con`. Two hits on one line refuse the whole
+document, and `carriesNonEnglishFunctionWords` runs on the **raw** line, so
+`stripNeutralTokens` never applies.
+
+```
+REFUSED  "Loaded the van each morning and completed door to door parcel deliveries."
+REFUSED  "Worked as Chef de Partie at Le Gavroche before moving in house."
+REFUSED  "Set up press die tooling for door panel assembly on two lines."
+REFUSED  "Relocated between the El Paso and Los Angeles offices twice."
+```
+
+**4 of 7 realistic English lines.** The code comment names its own corpus as
+covering "nursing, teaching, accountancy, **catering**, **trades**, **logistics**,
+science, law, admin and **haulage**" and claims _0 false positives in 70 lines_.
+Four of those ten domains break on a single ordinary sentence. The claim is true
+of those 70 lines and does not generalise — **H-022's shape again**, and the
+count is now beyond arguing about.
+
+Classified **false-refusal**: it does not block E5. But the message shown to the
+recruiter asserts the document mixes non-English text, which is false, and the
+person lands in a needs-attention tray they will never leave.
+
+---
+
+### H-107 · ADR-032's own stated residual is reachable, and it misstates a number
+
+ADR-032 documented, in `dimensions.ts`, that concurrent unreadable ranges cannot
+be interval-merged: neither resolves to absolute months, so `minPossibleYears`
+is summed rather than merged. The adversarial round reached it.
+
+Two identical **concurrent** ambiguous roles produce a summed
+`minPossibleYears` of **9.8** for coverage that is really ~4.9, and that number
+crosses a 9-year gate — so it raises a **blocking** reservation whose
+recruiter-visible text asserts "at least 9.8 years".
+
+The system's behaviour is refusal, so under ADR-027 this classifies as
+**false-refusal** and does not block E5. But the sentence the recruiter reads
+contains a number that is wrong by 2×, and "we refused, and here is a figure we
+made up" is a worse artifact than either a correct refusal or a correct number.
+
+Recorded because the residual was disclosed honestly in the ADR and its
+_consequence_ was not: I wrote that it "cannot dedupe overlap", which is true,
+without noticing that the un-deduped figure is then shown to a human.
