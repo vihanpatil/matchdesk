@@ -69,9 +69,17 @@ verification failures remain append-only in `../HONESTY_LOG.md`.
 
 ## V1 workflow and interface
 
-- The defining workflow is a **200 jobs × 200 candidates** match matrix.
-- The matrix is a virtualized, filterable grid. Each cell shows the integer
-  score plus eligible, ineligible, pending, stale, or needs-attention status.
+_Amended 2026-08-17: ranked list first, matrix second (decided with the
+recruiter; supersedes the original matrix-first framing)._
+
+- The defining workflow is: **pick a job → see candidates ranked**, eligible
+  and ineligible grouped separately, evidence on click. The **needs-attention
+  tray is a first-class surface** that shows _why_ a document was refused.
+- A match matrix is the secondary view. **200 jobs × 200 candidates is a
+  capacity ceiling, never a rendered layout** — 15 jobs × 3 CVs renders 45
+  cells sized to content; virtualization engages only when the data needs it.
+  Each cell shows the integer score plus eligible, ineligible, pending, stale,
+  or needs-attention status.
 - Opening a cell presents an evidence-first detail view: score composition,
   strengths, gaps, eligibility reasons, and highlighted job/CV excerpts.
 - Changes to a candidate, job, confirmed requirement, suppression, or scoring

@@ -221,7 +221,7 @@ describe('scoring property tests', () => {
       fc.property(idArb, createdAtArb, (id, createdAt) => {
         const emptyCandidate: Candidate = { id, createdAt, attributes: [] };
 
-        // NARROWED, with the reason stated (SESSION_STATE §7 forbids doing
+        // NARROWED, with the reason stated (SESSION_STATE's fixture rule forbids doing
         // this silently). This property previously asserted that a job with
         // NO dimensions also does not throw. It now must throw: it returned
         // score 0 with eligible:true for every candidate, and zero is a claim

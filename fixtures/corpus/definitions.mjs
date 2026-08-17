@@ -21,7 +21,7 @@
  * Each carries the defect that motivated it, so a future reader can tell what
  * the fixture is FOR — a fixture whose purpose is forgotten gets "fixed" to
  * match new behaviour the first time it fails, which is the failure mode
- * `docs/SESSION_STATE.md` §7 warns about.
+ * `docs/SESSION_STATE.md`'s fixture rule warns about.
  *
  * These definitions are consumed twice: as plain text straight into
  * `packages/core` (the text tier), and rendered to real PDF/DOCX bytes through

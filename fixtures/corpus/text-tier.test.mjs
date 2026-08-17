@@ -23,7 +23,8 @@ import { CORPUS, CORPUS_REFERENCE_DATE, INDIAN_CV_CORPUS } from './definitions.m
  *    can see, because relations compare two runs that both moved.
  *
  * **If a snapshot fails, that is a question, not a chore.** Update it only
- * after stating why the new value is correct (`docs/SESSION_STATE.md` §7). The
+ * after stating why the new value is correct (`docs/SESSION_STATE.md`,
+ * "How to work on this codebase"). The
  * `why` field on every fixture exists so that question can be answered years
  * from now.
  *
