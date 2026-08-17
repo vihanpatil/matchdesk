@@ -30,96 +30,46 @@ scan is clean and on file. Do not push without asking.
 
 ---
 
-## 1. What changed, and the one number that matters
+## 1. E5 is MET
 
-**E5 blockers went 3 → 8 → 1 in a single session.** Both moves are the same
-fact: the defects were always in the code, and the only variable was whether
-anyone looked. Do not read the fall as progress any more than the rise was
-decline.
+```
+E1  every ATTACK_CHECKLIST row Covered   E4  run `pnpm mutate`
+E2  MET   every wrong-score pinned       E5  MET   zero open wrong-score
+E3  run `pnpm test`
+```
 
-An ADR-015 adversarial round attacked three checklist rows and found **nine**
-defects, six of them wrong-score. All are now closed, each with a test that
-fails without its fix:
+**Run `pnpm gate` rather than trusting that block.** E3 and E4 are settled by
+running a command; quoting a stale figure is trap 3 and this project has done it
+twice.
 
-| finding   | what it did                                                              |
-| --------- | ------------------------------------------------------------------------ |
-| **H-100** | `Education   Leeds, UK` **deleted the section** — 11.6 years → "found 0" |
-| **H-099** | the batch path **persisted** the score the single path refuses to write  |
-| **H-101** | one future-dated endpoint deleted the whole role                         |
-| **H-102** | a metric bullet on the next line deleted a real role                     |
-| **H-103** | `"15 year old system"` became **15 years of tenure**                     |
-| **H-104** | per-range rounding inflated tenure ~20%                                  |
-| **H-095** | `03.2019` reported 7.6 against a truth of 7.4                            |
-| **H-106** | `"the van … door to door"` **refused an English CV**                     |
-| **H-107** | two concurrent ambiguous ranges asserted "at least 9.8" for ~4.9         |
+**H-041 closed after five sessions, and how matters more than that it did.** It
+was named a language-detection defect, and three sessions went into detecting
+the foreign line better — a prose gate, a compounding signal, a function-word
+lexicon, a mean-word-length threshold, an institution exemption, a whole
+classifier swap to `eld`, and a 40-point threshold grid. Each narrowed it. None
+closed it.
 
-**A5 had never been run in the project's history.** Its first run produced
-H-100, a wrong-score in both directions. **A4 and A5 now read Covered.**
+**H-112 settled why, by measurement: a person's name is foreign text.**
+`"Nguyen Thi Minh Anh"` scores Vietnamese 0.834 with English 0.000 — a stronger
+foreign signal than any genuine foreign line. Every evidence floor low enough to
+catch a short foreign degree line also refuses candidates in proportion to how
+non-Anglo their name is, and four of the names it refuses come from this
+project's own `INDIAN_CV_CORPUS`.
+
+**The defect was one sentence the engine had no right to say.** `"Requires at
+least a bachelor degree"`, printed when it had extracted no education at all —
+a claim about a person, made from silence, while holding text it could not read.
+**ADR-034** makes it decline to assert a must-have unmet in that situation.
+Zero cost across 50 documents; nine languages caught in native orthography.
+
+**The pattern, because it has now closed five findings under five different
+names.** H-040, H-089, H-101, H-102 and H-041 were all the same defect: the
+engine emitting a confident number while silently discarding something it could
+not account for. Each was filed under the mechanism someone first noticed, and
+each was closed by making the engine **more willing to say it did not know**.
+If a sixth appears, look there first.
 
 ---
-
-## 2. The only blocker left
-
-### H-041 — a sub-floor foreign insert is scored, not refused
-
-**NARROWED, not closed (H-111). It still blocks E5, and the remaining step is
-a decision, not an implementation.**
-
-A sub-floor `eld` line pass now supplements the function-word lexicon:
-
-```
-                        foreign short lines caught   English lines refused
-  lexicon only                    2/26                      0/258
-  lexicon ∪ eld line pass        11/26                      0/258
-```
-
-Every language H-105 measured as wrong-scoring end-to-end — German, Polish,
-Turkish, Romanian, Indonesian, Czech, Portuguese, Dutch, Swedish, Italian — is
-now refused. **The residual is a foreign line of ≤5 bearing words**, and the
-`DOCUMENTED GAP` tests assert it stays open on purpose.
-
-**The axis is a word count, not a language family.** The four remaining gap
-cases are Germanic, Germanic, Germanic and Turkic. Every foreign line of ≥6
-bearing words is caught, whatever the language. The old "residual is Germanic"
-framing was falsified (H-105) and is now falsified in the tests themselves.
-
-### The decision that closes it, which is the user's
-
-Lowering `MIN_BEARING_WORDS_FOR_LINE_JUDGEMENT` closes the class. Its cost is
-measured against 258 English lines:
-
-```
-  floor   English refused   what it refuses
-   W>=6        0/258         — (current)
-   W>=5        2/258         "Java, Spring Boot, PostgreSQL, Docker, AWS"
-                             "AutoCAD, STAAD.Pro, Project Management"
-   W>=4        2/139         "Giovanni Esposito - Sous Chef"
-                             "Nguyen Thi Minh Anh"
-```
-
-**The 4-word row is not just a rate.** Both lines are a candidate's _name_, so
-the error path is keyed on the origin of a person's name — H-028 D3's shape,
-which this project records as a discrimination risk and not merely an accuracy
-one. **Do not take that decision on the user's behalf**, and do not present it
-as a tuning knob.
-
-**What is already ruled out, with measurements on file:**
-
-- **A confidence margin** and **an absolute-score cut** — both measured, both
-  rejected. The classes overlap: a real Dutch line beats English by 0.109 while
-  `"Kwabena Boateng - HGV Driver"` beats it by 0.115; a real German line scores
-  0.601 while the same English line scores 0.664. **No threshold on `eld`'s
-  output separates them**, which is why the gate is on its input.
-- **Swapping the classifier** — ADR-031 did that; it does nothing for this.
-- **Growing the function-word lexicon** — H-106 shrank it for refusing ordinary
-  English. Not a lexicon-size problem.
-- **Deleting the lexicon** now that `eld` runs at line level — it fires _below_
-  the floor where `eld` may not speak, and costs 0/258. Keep both.
-
-**If you attempt the floor, widen the corpus first.** H-111 records the floor
-being raised twice mid-implementation, each time because the pool under-sampled
-a population: hand-written lines exposed the names, and only the **fixture
-corpus** exposed the technology lists.
 
 ## 3. Everything else that is open
 

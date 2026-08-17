@@ -10,8 +10,8 @@ docs/SESSION_STATE.md`. A hardcoded hash here went stale twice; don't add one
 back. Working tree clean, `pnpm verify` exit 0 — see H-058 before quoting any
 branch-coverage figure, and H-074 before quoting a coverage total.
 
-**Current work: E5 has ONE blocker — `H-041`. See the UPDATE block below,
-which supersedes everything after it.**
+**Current work: E5 and E2 are MET. See the UPDATE block below, which
+supersedes everything after it.**
 
 **➡ NEXT PHASE BRIEF: `docs/NEXT_PHASE.md`** — tasks, deliverables, pass
 criteria and the tiger-team decomposition for the next session. Read
@@ -21,35 +21,33 @@ SESSION_STATE for state, NEXT_PHASE for what to do.
 
 ## ⚠ UPDATE 2026-08-14 (latest session) — READ THIS BEFORE THE REST OF THIS FILE
 
-Everything below this block predates the ADR-031 classifier swap, the
-numeric-date remedy and the adversarial round. Where it disagrees with this
-block, **this block is right.**
+Everything below predates the ADR-031 classifier swap, the numeric-date remedy,
+the adversarial round and ADR-034. Where it disagrees, **this block is right.**
 
-1. **E5 has ONE blocker: `H-041`.** It went 3 → 8 → 1 in one session. The rise
-   was an ADR-015 round finding nine defects; the fall was fixing them. Both
-   are the same fact — the defects were always there, and the variable was
-   whether anyone looked.
-2. **H-041's scope note was WRONG for three sessions** and is corrected in
-   H-105. The residual is **not Germanic**: Polish, Turkish, Romanian,
-   Indonesian and Portuguese all score too. It is **every language outside the
-   function-word lexicon**, and it is a **segmentation geometry** problem.
-   A remedy aimed at "Germanic" would measure none of the failing languages.
-3. **`eld@2.1.0` is installed and live** (ADR-031), replacing the Cavnar &
-   Trenkle classifier at window granularity. It deleted that whole apparatus
-   plus `MAX_ENGLISH_MEAN_WORD_LENGTH`, `ENGLISH_INSTITUTION_WORDS` and
-   `MIN_FOREIGN_MARGIN` — 223 lines — at zero measured regression. It
-   deliberately does **not** close H-041.
-4. **ADR-032** — an unreadable date is emitted as evidence, never guessed at or
-   deleted. **ADR-033** — a declared licence with no text is unverified; two
-   live risk acceptances print on every audit run.
-5. **ATTACK_CHECKLIST A4 and A5 now read Covered.** A5 had never been run in
-   the project's history. A1 is the only row left.
-6. **Do not trust E3/E4 figures in any document**, including this one. Both are
-   settled by running a command.
+1. **E5 is MET. E2 is MET.** Zero open wrong-score findings. Every
+   `ATTACK_CHECKLIST` row reads Covered. **Run `pnpm gate`** — E3 and E4 are
+   settled by running a command and no figure here should be trusted.
+2. **H-041 is CLOSED (ADR-034)** after five sessions — and NOT by language
+   detection, which H-112 proved impossible at line granularity because **a
+   person's name is foreign text**. The engine now declines to assert a
+   must-have unmet while holding unread text in that requirement's section.
+   Everything below about "the Germanic residual" and about adopting a
+   language-ID library as the remedy is **superseded and was wrong**.
+3. **`eld@2.1.0` is live** (ADR-031), replacing the Cavnar & Trenkle profiler
+   and deleting three heuristics with it. It did not close H-041 and was never
+   going to.
+4. **ADR-032** — an unreadable date is evidence, not silence. **ADR-033** — a
+   declared licence with no text is unverified. **ADR-034** — an unmet
+   must-have may not be asserted from silence.
+5. **The through-line, five findings under five names.** H-040, H-089, H-101,
+   H-102 and H-041 were all the engine emitting a confident number while
+   silently discarding something it could not account for. All closed by making
+   it more willing to say it did not know. Look there first for the sixth.
+6. **Open, none blocking:** H-108 (a dateless header-shaped line), H-113
+   (bare-ASCII transliteration), H-110 (`experience.ts` is the weakest module at
+   69.36% and declining), plus two live licence risk acceptances (ADR-033).
 
-**Read `docs/NEXT_PHASE.md` for what to do next.** It carries the ruled-out
-options for H-041 with their measurements, so the next session does not
-re-derive them.
+**Read `docs/NEXT_PHASE.md` for what to do next.**
 
 **Do not read the gate from here either — run `pnpm gate`.**
 

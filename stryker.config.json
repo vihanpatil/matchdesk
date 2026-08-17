@@ -15,7 +15,7 @@
     "!packages/core/src/index.ts",
     "!packages/core/src/taxonomy/data.ts"
   ],
-  "_thresholdComment": "RATCHET, not an aspiration. `break` sits just below the measured score so it can never get WORSE without failing the build. Measured 65.03% on 2026-08-12 (break 64); 80.42% on 2026-08-13; 80.39% on 2026-08-14 after ADR-031/ADR-032; 80.02% on 2026-08-14 after the adversarial fix round (12m01s). `break` stays at 79 \u2014 the convention here is about a point of headroom below the measurement, not a ceiling pressed against it. Raise it as survivors fall; NEVER lower it without a HONESTY_LOG entry saying why. ADR-023 E4 requires >=75 overall with no extraction or scoring module below 60; both hold, the weakest being experience.ts at 69.36% (down from 71.04% \u2014 see H-110, it is the file this project changes most and pins least well).",
+  "_thresholdComment": "RATCHET, not an aspiration. `break` sits just below the measured score so it can never get WORSE without failing the build. Measured 65.03% 2026-08-12 (break 64); 80.42% 2026-08-13; then 80.39%, 80.02% and 79.85% across 2026-08-14 as ADR-031, ADR-032 and ADR-034 landed. ADR-023 E4 holds: >=75 overall, no extraction/scoring module below 60 (weakest experience.ts 69.36%). READ THE TREND, NOT THE PASS: four consecutive measurements have declined and headroom above `break` is now 0.85, below this project's usual ~1 point. Every one of those changes added defect-targeted tests, which pin the defect and not the surrounding arithmetic - see H-110. The next core change may well break the build, and the right response is to raise the score, NOT to lower `break`. NEVER lower it without a HONESTY_LOG entry saying why.",
   "thresholds": {
     "high": 90,
     "low": 70,
