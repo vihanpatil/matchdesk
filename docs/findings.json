@@ -650,6 +650,12 @@
       "severity": "process",
       "status": "closed",
       "note": "The H-041 evidence floor was raised TWICE during its own implementation, both times because the measurement pool was missing a population, and both times caught by widening the corpus rather than by argument. At a 4-word floor the sweep looked clean at 0/96 English lines - then adding hand-written lines exposed 2 refusals, both candidate NAMES of non-Anglo origin. At 5 words it looked clean at 0/139 - then the full verify failed on the fixture corpus, exposing 2 more, both language-neutral TECHNOLOGY LISTS. Final floor 6, measured 0/258. H-022's shape twice inside one fix, by the lead, in the same session the lead recorded it as trap 1. The lesson that generalises: an English corpus assembled by hand systematically under-samples proper nouns and neutral token lists, which are precisely what a line-level language classifier fails on."
+    },
+    {
+      "id": "H-112",
+      "severity": "process",
+      "status": "closed",
+      "note": "Exhaustive negative result for H-041, recorded so it is not re-derived. Measured against 258 English lines and 26 short foreign lines in 15 languages: confidence margin OVERLAPS (real Dutch +0.109 vs English name +0.115), absolute en-score OVERLAPS (real German 0.601 vs English name 0.664), a 40-point grid of margin x score x floor yields ZERO designs at 0 false refusals, larger eld ngram tiers are strictly WORSE, and capitalisation filtering is dead because German nouns are capitalised (H-079). The evidence floor is the only lever and it is disqualified twice over: what it refuses as it drops is candidate NAMES, overwhelmingly non-Anglo and four of them from INDIAN_CV_CORPUS (H-028 D3's discrimination shape), AND it plateaus at 23/26 because hu/vi/el are eld coverage limits rather than floor effects - strictly worse on both axes, so not a trade worth offering. ROOT CAUSE: a person's name IS foreign text ('Nguyen Thi Minh Anh' scores vi 0.834 with en 0.000, a stronger signal than any genuine foreign line), so no line-level classifier can separate the two. The only remaining route is the scoring question of whether a must-have may be asserted unmet purely from ABSENCE of evidence, which needs its own ADR and adversarial round."
     }
   ]
 }

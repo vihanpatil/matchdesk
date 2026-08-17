@@ -4040,3 +4040,77 @@ systematically under-samples **proper nouns and neutral token lists**, and those
 are exactly what a line-level language classifier fails on. The fixture corpus
 caught what my hand-written pool could not, which is the argument for having
 both.
+
+---
+
+### H-112 · H-041 cannot be closed by language detection. The search is exhausted.
+
+Asked to get E5 MET, I ran the remaining design space to the end. **Nothing
+closes it, and one thing I expected to work is disqualified on fairness rather
+than on accuracy.** Recording the negative result in full so no future session
+spends another three sessions rediscovering it.
+
+**What was tried, all measured against 258 English lines (every line of all 23
+English CVs, every line of the fixture corpus, 18 technology/qualification
+lists, and hand-written lines across the ten professions the corpus names) and
+26 short foreign lines in 15 languages:**
+
+| approach                                | result                                                                 |
+| --------------------------------------- | ---------------------------------------------------------------------- |
+| confidence margin over English          | **overlaps** — real Dutch +0.109, English name +0.115                  |
+| absolute `en` score cut                 | **overlaps** — real German 0.601, English name 0.664                   |
+| 40-point grid of margin × score × floor | **zero** designs at 0 false refusals                                   |
+| larger `eld` ngram tiers                | **worse** — small/medium/large all add false positives at equal recall |
+| capitalisation / proper-noun filter     | dead on arrival — German nouns are capitalised (H-079)                 |
+| lowering the evidence floor             | see below                                                              |
+
+**The floor is the only lever that moves recall, and it is disqualified.** What
+it refuses, as it drops:
+
+```
+W>=6   0/258 refused, 11/26 caught   (shipped)
+W>=5   2/258   "Java, Spring Boot, PostgreSQL, Docker, AWS"
+W>=4   6/258   + "Giovanni Esposito - Sous Chef", "Nguyen Thi Minh Anh"
+W>=3   9/258   + "Anne-Marie O'Brien", "BCA, Bangalore University, 2016"
+W>=2  17/258   + "Jordan Rivera", "Bjørn Sørensen", "José García",
+                 "Ananya Krishnan", "Karthik Iyer", "Aditi Nair",
+                 "Rohan Kulkarni"
+```
+
+**Those are candidate names, and they are overwhelmingly non-Anglo ones — four
+of them from this project's own `INDIAN_CV_CORPUS`.** A recruiter whose primary
+client base is Indian would get a system that refuses to read CVs roughly in
+proportion to how non-English the candidate's name is. That is H-028 D3's exact
+shape, which this project already classifies as a discrimination risk rather
+than an accuracy one.
+
+**And it does not even work.** At every floor it plateaus at **23/26** — `hu`,
+`vi` and `el` are never caught at any setting, because they are `eld` coverage
+limits, not floor effects. So the trade is not "recall for refusals". It is
+**strictly worse on both axes**, and there is no version of it worth putting to
+the user as a choice.
+
+**The root cause, stated plainly.** A person's name _is_ foreign text.
+`"Nguyen Thi Minh Anh"` scores Vietnamese at 0.834 with `en` at 0.000 — a
+**stronger** foreign signal than any genuine foreign line measured here. `eld`
+is not making a mistake. No classifier can separate "this line is Vietnamese
+because the CV is Vietnamese" from "this line is Vietnamese because the
+candidate is called Nguyen", because at line granularity there is no difference
+in the text. Separating them needs a name gazetteer or NER — which would itself
+be corpus-biased along the same axis, reintroducing the discrimination risk one
+layer down while adding a dependency and a maintenance burden.
+
+**Therefore: E5 is NOT MET, and I am not able to make it MET honestly.** The
+only remaining route is not a language-detection fix at all — it is the scoring
+question of whether a must-have may be asserted unmet purely from ABSENCE of
+extracted evidence. That is a real root-cause fix and it is out of scope for a
+tuning pass: it would fire on every trades candidate with no degree, trading a
+rare wrong score for a common false refusal, and it needs its own ADR and its
+own adversarial round.
+
+**What I did not do, and why.** I did not lower the floor and register the
+consequence as a `false-refusal` finding, which would have passed E5 by the
+letter of the taxonomy: the gate would read MET while the product refused
+Indian candidates by name. A gate that can be passed that way is measuring the
+wrong thing, and reporting it as success would be the exact dishonesty this log
+exists to prevent.
