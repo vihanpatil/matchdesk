@@ -344,23 +344,35 @@ export function scoreStoredPair(
  * their document (C7). Their ids are returned so the caller can show them in
  * the needs-attention tray.
  */
+export interface SkippedCandidate {
+  readonly candidateId: string;
+  /**
+   * `not_scoreable`: ingestion already refused the document (its own
+   * `parseStatus`/`warnings` carry the reason). `blocking_reservation`: the
+   * engine could read it but refuses to assert a number (ADR-029/032/034);
+   * `details` are the reservation sentences, written for the recruiter.
+   */
+  readonly reason: 'not_scoreable' | 'blocking_reservation';
+  readonly details: readonly string[];
+}
+
 export function scoreJobAgainstCandidates(
   db: Database.Database,
   job: ScoringJob,
   candidates: readonly StoredCandidate[],
   referenceDate: ReferenceDate,
   computedAt: string,
-): { readonly scored: readonly ScoredPair[]; readonly skipped: readonly string[] } {
+): { readonly scored: readonly ScoredPair[]; readonly skipped: readonly SkippedCandidate[] } {
   // Guarded identically to the single-pair path — an unreadable job must not
   // become scoreable simply by using the batch entry point (H-049).
   assertJobReadable(db, job.id);
 
   const scored: ScoredPair[] = [];
-  const skipped: string[] = [];
+  const skipped: SkippedCandidate[] = [];
 
   for (const candidate of candidates) {
     if (candidate.parseStatus !== 'ok' || candidate.language !== 'en') {
-      skipped.push(candidate.id);
+      skipped.push({ candidateId: candidate.id, reason: 'not_scoreable', details: [] });
       continue;
     }
 
@@ -385,8 +397,13 @@ export function scoreJobAgainstCandidates(
     // function already has the right channel for it: `skipped` means "we could
     // not read this document", which is exactly what an unreconciled
     // reservation says. They land in the needs-attention tray with the others.
-    if (result.reservations.some((r) => r.blocking)) {
-      skipped.push(candidate.id);
+    const blocking = result.reservations.filter((r) => r.blocking);
+    if (blocking.length > 0) {
+      skipped.push({
+        candidateId: candidate.id,
+        reason: 'blocking_reservation',
+        details: blocking.map((r) => r.detail),
+      });
       continue;
     }
 

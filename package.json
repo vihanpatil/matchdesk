@@ -28,7 +28,8 @@
     "test:manifest": "node scripts/update-test-manifest.mjs",
     "gate": "node scripts/gate.mjs",
     "mutate": "stryker run",
-    "fixtures:build": "node scripts/build-fixtures.mjs"
+    "fixtures:build": "node scripts/build-fixtures.mjs",
+    "serve": "tsc --build apps/server && node apps/server/dist/http/serve.js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

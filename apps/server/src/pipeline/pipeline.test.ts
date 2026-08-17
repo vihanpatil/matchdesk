@@ -232,7 +232,9 @@ describe('pipeline: a document becomes a score', () => {
     expect(scored.map((s) => s.candidateId)).toEqual([english.candidate.id]);
     // A zero is a claim about a candidate; a skip says we could not read their
     // document. They are not the same and must not be conflated (C7).
-    expect(skipped).toEqual([french.candidate.id]);
+    expect(skipped).toEqual([
+      { candidateId: french.candidate.id, reason: 'not_scoreable', details: [] },
+    ]);
     expect(getMatch(db, JOB.id, french.candidate.id)).toBeNull();
   });
 
@@ -298,7 +300,11 @@ describe('pipeline: a document becomes a score', () => {
     const { scored, skipped } = scoreJobAgainstCandidates(db, job, [candidate], REF, COMPUTED_AT);
 
     expect(scored).toHaveLength(0);
-    expect(skipped).toEqual([candidate.id]);
+    expect(skipped).toHaveLength(1);
+    expect(skipped[0]?.candidateId).toBe(candidate.id);
+    // The UI shows WHY: the reservation's own sentence travels with the skip.
+    expect(skipped[0]?.reason).toBe('blocking_reservation');
+    expect(skipped[0]?.details.join(' ')).toContain('states 20');
 
     // The load-bearing assertion: no row. A skip says "we could not read this
     // document"; a persisted 64 would be a claim about a person.

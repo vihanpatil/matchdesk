@@ -1856,3 +1856,78 @@ it is not "simplified" into later.
   ADR-029 already accepted for H-040 and is unchanged here.
 - **More documents will reach the needs-attention tray.** That is the trade: a
   visible "we could not read this" instead of a confident wrong verdict.
+
+---
+
+## ADR-035 — The pre-UI surface: HTTP API, scoring-config bridge, deletion
+
+**Date:** 2026-08-17 · **Status:** Accepted
+
+Three things stood between "a rigorously tested library" and "a UI can be
+built", and nothing else did:
+
+1. **Nothing served.** `apps/server` was a callable module; there was no HTTP
+   layer, no entry point.
+2. **No path from a stored job to the engine.** Every `ScoringJob` spec in the
+   project's history was hand-built inside a test. A recruiter had no way to
+   create a scoreable job at all.
+3. **No deletion**, which PRODUCT_DECISIONS makes a v1 requirement of the
+   privacy boundary.
+
+### Decisions
+
+**The API is `node:http` with zero new dependencies.** Uploads are raw bytes
+with metadata in query parameters, so no multipart parser enters the supply
+chain — ADR-003/ADR-033 make every new package expensive on purpose, and a
+JSON-plus-bytes API needs none. No framework: twelve routes do not justify one.
+
+**Loopback is enforced at the socket, plus a Host-header check.** `serve.ts`
+binds `127.0.0.1` with no option to widen it — C3 is a property of the code,
+not a config flag. The Host check exists because a loopback bind alone does
+not stop DNS rebinding: a hostile page can point its own hostname at
+127.0.0.1 and the browser will connect. No CORS headers, deliberately — the
+production UI is served same-origin, and the dev UI proxies `/api`.
+
+**The scoring config is a zod-validated blob, split from the display layer.**
+`job_scoring_configs` stores exactly core's `Job` minus `id`, validated on
+every write AND read; the existing `job_requirements` table remains the
+display/evidence layer. Compile-time drift pins (`DeepRequired` both ways,
+plus literal-union pins for the enums) make divergence between the stored
+shape and the engine's input a type error. The pins caught their first
+mismatch during their own construction.
+
+**Requirement proposal IS the extractor.** PRODUCT_DECISIONS demands
+deterministic, source-backed proposal with recruiter confirmation. There is no
+separate proposal engine: the same gate-hardened `extractAttributes` that
+reads CVs reads the job description, so every suggestion carries an evidence
+span and anything the extractor cannot support is simply not proposed.
+Proposals are never `mustHave` and carry no chosen weights — those are the
+recruiter's calls. An unconfirmed job is **not scoreable**; there is no
+"score with defaults" path. The proposed degree level is the LOWEST found,
+because "Bachelor's required, Master's preferred" states a bachelor minimum
+and proposing higher would silently tighten a gate.
+
+**Batch skips now carry their reason.** `scoreJobAgainstCandidates` returns
+`{candidateId, reason, details}` — `not_scoreable` (ingestion refused; the
+candidate row carries why) or `blocking_reservation` (the engine refuses to
+assert a number; the reservation sentences travel with the skip). The
+needs-attention tray cannot be a first-class surface if the API only says
+"skipped".
+
+**Deletion cascades in SQL and audits opaquely.** Derived rows go via the
+`ON DELETE CASCADE` the schema already declares. The content-addressed file is
+unlinked only when no other row references its hash. The audit entry records
+the opaque id and the action — never PII, never source text.
+
+### Costs, accepted
+
+- **Two clocks enter at the edge.** `serve.ts` passes wall-clock
+  `referenceDate`/`computedAt` per request; the pipeline already persists both
+  with every score (ADR-024), and tests inject fixed values.
+- **A `as ScoringJob` cast** bridges zod's `T | undefined` optionals to core's
+  plain optionals under `exactOptionalPropertyTypes`. Runtime-safe (JSON
+  cannot carry `undefined`); the drift pins carry the real safety.
+- **The API returns full score results transiently** and persists only the
+  match row, per ADR-024 — a UI wanting an old result re-scores, which is
+  measured cheap (0.34 s for a full 200×200 fill).
+- **20 MB upload cap** — generous for documents, bounded for memory.

@@ -34,18 +34,22 @@ truth; `README.md` is the entry point and carries the doc map.
 
 **Exists, gate-clean:** extraction and deterministic scoring
 (`packages/core`), ingestion + language detection + SQLite + the
-document→score pipeline (`apps/server`), a two-tier golden fixture corpus, and
-the full verification machinery (gate registry, mutation ratchet, manifest
-integrity, licence-text audit).
+document→score pipeline (`apps/server`), a two-tier golden fixture corpus, the
+full verification machinery (gate registry, mutation ratchet, manifest
+integrity, licence-text audit), and — since ADR-035 — the **HTTP API the UI
+will talk to**: `pnpm serve` binds `127.0.0.1` only, uploads are raw bytes,
+requirement proposal is the extractor itself, and an unconfirmed job cannot be
+scored. Tested end-to-end over a real socket.
 
-**Does not exist:** `apps/web`. No UI, no HTTP server, no launcher. Nothing a
-recruiter can click. Embeddings (cascade step 4) and OCR are deferred behind
-typed seams.
+**Does not exist:** `apps/web`. No UI. Embeddings (cascade step 4) and OCR are
+deferred behind typed seams.
 
 ## Next phase: the UI
 
-ADR-018 blocked UI work until extraction was hardened; the gate now says it
-is. The shape is already agreed with the user:
+ADR-018 blocked UI work until extraction was hardened; the gate says it is,
+and ADR-035 built the API surface, so UI work is now **pure frontend**: build
+`apps/web` against `pnpm serve` (dev servers proxy `/api`; no CORS on
+purpose). The shape is already agreed with the user:
 
 - **Ranked list first, matrix second.** Pick a job → candidates ranked,
   eligible and ineligible grouped separately (the partition is structural —
