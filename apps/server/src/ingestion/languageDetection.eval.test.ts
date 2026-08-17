@@ -620,3 +620,76 @@ describe('sub-floor foreign inserts (H-085)', () => {
     expect(detectLanguageHeuristic(document).isEnglish).toBe(true);
   });
 });
+
+describe('H-106: ordinary English lines must not be refused by the sub-floor lexicon', () => {
+  // `NON_ENGLISH_FUNCTION_WORDS` contains tokens that are ordinary English
+  // words (`van`, `door`, `die`, `den`, `est`, `con`, `par`) or common in
+  // English proper nouns (`el`, `los`, `la`, `le`, `de` — "El Paso", "Los
+  // Angeles", "Le Gavroche", "Chef de Partie"). Two hits on one line refuse
+  // the whole document. These are the seven reproduction lines from the
+  // adversarial round (H-106), plus ten more constructed independently,
+  // spanning every domain the module's own comment names as covered
+  // (nursing, teaching, accountancy, catering, trades, logistics, science,
+  // law, admin, haulage) — reusing only the tech lead's seven would repeat
+  // the exact mistake the original 70-line corpus made, at a smaller scale.
+  const mustNotBeRefused: Record<string, string> = {
+    // --- the seven lines from the H-106 report itself ---
+    haulage_van_door: 'Loaded the van each morning and completed door to door parcel deliveries.',
+    catering_chef_de_partie: 'Worked as Chef de Partie at Le Gavroche before moving in house.',
+    trades_press_die_door: 'Set up press die tooling for door panel assembly on two lines.',
+    logistics_el_paso_los_angeles: 'Relocated between the El Paso and Los Angeles offices twice.',
+    haulage_tonne_van_door: 'Drove a 3.5 tonne van and carried out door checks before each shift.',
+    admin_est_turnover: 'Established in 1994, est. turnover of four million pounds per annum.',
+    admin_head_of_sales: 'Reported to the Head of Sales and Marketing at the Leeds site.',
+
+    // --- ten more, constructed independently, one per named domain ---
+    nursing_van_door:
+      'Used the community nursing van to complete door to door medication checks each morning.',
+    catering_mise_en_place_door:
+      'Ran the pass and coordinated mise en place while covering door duties during the lunch rush.',
+    trades_door_den:
+      'Replaced worn door hinges and reset the den window during the loft conversion job.',
+    admin_van_den: 'Used the office van to move archived boxes into the den for long-term storage.',
+    teaching_con_par:
+      'Reviewed the pro and con of each teaching method to ensure outcomes stayed on par with targets.',
+    accountancy_con_par:
+      'Weighed the pro and con of each supplier contract to keep costs on par with budget.',
+    law_con_par:
+      'Weighed the pro and con of each settlement offer to ensure the fee stayed on par with standard rates.',
+    science_par_con:
+      'Logged control readings that stayed on par with the reference standard, noting any pro or con of the probe design.',
+    haulage_de_pere_los_angeles:
+      'Drove the route via De Pere before continuing on to the Los Angeles depot.',
+    logistics_la_crosse_el_paso:
+      'Coordinated deliveries between the La Crosse depot and the El Paso yard each quarter.',
+  };
+
+  it('none of the seventeen lines is refused as mixed-language content', () => {
+    const falselyRefused = Object.entries(mustNotBeRefused)
+      .filter(([, line]) => findNonEnglishSegments(line).hasNonEnglishSegment)
+      .map(([label]) => label);
+    expect(falselyRefused).toEqual([]);
+  });
+
+  // Regression guards: the Romance sub-floor catches this lexicon exists for
+  // (H-087) must still fire after any token removal or case-sensitivity
+  // change made to close the false refusals above. Local copy of the H-085
+  // `withInsert` body — that helper is scoped to its own describe block.
+  const englishBody = [
+    'Marisol Okonkwo',
+    'Senior Data Engineer, Northwind Freight, Jan 2023 - Dec 2025',
+    'Built streaming pipelines in Python for shipment tracking and reconciliation.',
+    'Ran the Docker based deployment platform used by four delivery teams.',
+    'Owned the data quality programme covering nine downstream reporting systems.',
+  ];
+  const withRomanceInsert = (line: string) => [...englishBody, line].join('\n');
+
+  it('still catches the closed Romance sub-floor cases (H-087) after the fix', () => {
+    const spanish = withRomanceInsert(
+      'Licenciatura en Ciencias de la Computacion, Universidad de Salamanca',
+    );
+    const french = withRomanceInsert('Encadrement d une equipe de six personnes');
+    expect(findNonEnglishSegments(spanish).hasNonEnglishSegment).toBe(true);
+    expect(findNonEnglishSegments(french).hasNonEnglishSegment).toBe(true);
+  });
+});

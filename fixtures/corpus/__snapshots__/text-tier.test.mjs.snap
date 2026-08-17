@@ -8,7 +8,7 @@ exports[`corpus · text tier · full snapshots > baseline-clean-cv · extraction
     "kind": "years_experience",
     "normalized": "6.6",
     "span": "75..93",
-    "years": 6.6,
+    "years": 6.583333,
   },
   {
     "canonicalId": "typescript",
@@ -109,7 +109,7 @@ exports[`corpus · text tier · full snapshots > d1-unrecognised-section-header 
     "kind": "years_experience",
     "normalized": "6.6",
     "span": "71..89",
-    "years": 6.6,
+    "years": 6.583333,
   },
   {
     "canonicalId": "python",
@@ -125,7 +125,7 @@ exports[`corpus · text tier · full snapshots > d1-unrecognised-section-header 
     "kind": "years_experience",
     "normalized": "3.8",
     "span": "187..206",
-    "years": 3.8,
+    "years": 3.75,
   },
   {
     "canonicalId": "postgresql",
@@ -146,7 +146,7 @@ exports[`corpus · text tier · full snapshots > d2-longest-match-does-not-swall
     "kind": "years_experience",
     "normalized": "7.6",
     "span": "70..88",
-    "years": 7.6,
+    "years": 7.583333,
   },
   {
     "canonicalId": "rails",
@@ -199,7 +199,7 @@ exports[`corpus · text tier · full snapshots > d3-name-never-manufactures-a-sk
     "kind": "years_experience",
     "normalized": "5.6",
     "span": "167..185",
-    "years": 5.6,
+    "years": 5.583333,
   },
 ]
 `;
@@ -233,7 +233,7 @@ exports[`corpus · text tier · full snapshots > d4b-certification-level-is-not-
     "kind": "years_experience",
     "normalized": "5.4",
     "span": "70..88",
-    "years": 5.4,
+    "years": 5.416667,
   },
   {
     "canonicalId": "aws",
@@ -279,7 +279,7 @@ exports[`corpus · text tier · full snapshots > d5-education-dates-are-not-empl
     "kind": "years_experience",
     "normalized": "2.6",
     "span": "149..167",
-    "years": 2.6,
+    "years": 2.583333,
   },
 ]
 `;
@@ -313,7 +313,7 @@ exports[`corpus · text tier · full snapshots > d5c-quantity-is-not-a-date-rang
     "kind": "years_experience",
     "normalized": "3.6",
     "span": "62..80",
-    "years": 3.6,
+    "years": 3.583333,
   },
 ]
 `;
@@ -326,7 +326,7 @@ exports[`corpus · text tier · full snapshots > gap-certification-level-variant
     "kind": "years_experience",
     "normalized": "5.4",
     "span": "70..88",
-    "years": 5.4,
+    "years": 5.416667,
   },
   {
     "canonicalId": "aws",
@@ -354,7 +354,7 @@ exports[`corpus · text tier · full snapshots > h034-invisible-characters-fabri
     "kind": "years_experience",
     "normalized": "7.6",
     "span": "66..84",
-    "years": 7.6,
+    "years": 7.583333,
   },
   {
     "canonicalId": "javascript",
@@ -536,7 +536,7 @@ exports[`corpus · text tier · full snapshots > indian-bca-hcl · extraction is
     "kind": "years_experience",
     "normalized": "10.3",
     "span": "80..100",
-    "years": 10.3,
+    "years": 10.333333,
   },
   {
     "degreeLevel": "bachelor",
@@ -581,7 +581,7 @@ exports[`corpus · text tier · full snapshots > indian-be-ece-unambiguous-dates
     "kind": "years_experience",
     "normalized": "7.2",
     "span": "81..101",
-    "years": 7.2,
+    "years": 7.166667,
   },
   {
     "canonicalId": "java",
@@ -613,7 +613,7 @@ exports[`corpus · text tier · full snapshots > indian-be-ece-unambiguous-dates
     "kind": "years_experience",
     "normalized": "2.8",
     "span": "223..246",
-    "years": 2.8,
+    "years": 2.833333,
   },
   {
     "canonicalId": "postgresql",
@@ -751,7 +751,7 @@ exports[`corpus · text tier · full snapshots > indian-btech-eee-slash-dates ·
     "kind": "years_experience",
     "normalized": "4.6",
     "span": "81..104",
-    "years": 4.6,
+    "years": 4.583333,
   },
   {
     "degreeLevel": "bachelor",
@@ -772,7 +772,7 @@ exports[`corpus · text tier · full snapshots > indian-btech-then-mba-gurugram 
     "kind": "years_experience",
     "normalized": "5.2",
     "span": "81..101",
-    "years": 5.2,
+    "years": 5.166667,
   },
   {
     "evidence": "14/07/2016 - 19/05/2019",
@@ -780,7 +780,7 @@ exports[`corpus · text tier · full snapshots > indian-btech-then-mba-gurugram 
     "kind": "years_experience",
     "normalized": "2.8",
     "span": "206..229",
-    "years": 2.8,
+    "years": 2.833333,
   },
   {
     "degreeLevel": "master",
@@ -825,7 +825,7 @@ exports[`corpus · text tier · full snapshots > indian-mca-tcs · extraction is
     "kind": "years_experience",
     "normalized": "9.4",
     "span": "95..112",
-    "years": 9.4,
+    "years": 9.416667,
   },
   {
     "degreeLevel": "master",
@@ -878,7 +878,7 @@ exports[`corpus · text tier · full snapshots > indian-me-structural-dash-dates
     "kind": "years_experience",
     "normalized": "7.8",
     "span": "92..115",
-    "years": 7.8,
+    "years": 7.75,
   },
   {
     "degreeLevel": "master",
@@ -907,7 +907,7 @@ exports[`corpus · text tier · full snapshots > indian-mixed-readable-and-unrea
     "kind": "years_experience",
     "normalized": "7.2",
     "span": "78..98",
-    "years": 7.2,
+    "years": 7.166667,
   },
   {
     "evidence": "04/07/2016 - 03/05/2019",
@@ -959,7 +959,7 @@ exports[`corpus · text tier · full snapshots > indian-mtech-ece-nit · extract
     "kind": "years_experience",
     "normalized": "11.2",
     "span": "86..104",
-    "years": 11.2,
+    "years": 11.166667,
   },
   {
     "degreeLevel": "master",
@@ -988,7 +988,7 @@ exports[`corpus · text tier · full snapshots > indian-pgdm-marketing-xlri · e
     "kind": "years_experience",
     "normalized": "7.1",
     "span": "80..98",
-    "years": 7.1,
+    "years": 7.083333,
   },
   {
     "canonicalId": "stakeholder-management",
@@ -1041,7 +1041,7 @@ exports[`corpus · text tier · full snapshots > us-localised-twin-of-indian-be-
     "kind": "years_experience",
     "normalized": "7.2",
     "span": "94..112",
-    "years": 7.2,
+    "years": 7.166667,
   },
   {
     "canonicalId": "java",
@@ -1073,7 +1073,7 @@ exports[`corpus · text tier · full snapshots > us-localised-twin-of-indian-be-
     "kind": "years_experience",
     "normalized": "2.8",
     "span": "233..252",
-    "years": 2.8,
+    "years": 2.833333,
   },
   {
     "canonicalId": "postgresql",

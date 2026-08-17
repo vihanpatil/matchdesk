@@ -4,7 +4,22 @@ import type {
   ExtractedAttribute,
   SkillAttribute,
 } from '../extraction/types.js';
-import { quantize } from '../numeric/round.js';
+import { quantize, roundHalfUp } from '../numeric/round.js';
+
+/**
+ * Decimal places for a tenure figure. This is a PRESENTATION precision, not
+ * the engine's float-drift guard — `quantize` is 6dp and exists so hardware
+ * float drift cannot reach a score, which is a different job.
+ *
+ * H-104 removed the per-range rounding that inflated tenure by up to 20%
+ * across many short contracts. Carrying the exact fraction per range is
+ * right, but it left the TOTAL at `quantize`'s 6dp, so the recruiter was
+ * shown "Requires at least 9 years of experience; found 11.583333." The
+ * per-range rounding had been incidentally supplying the 1dp presentation all
+ * along. Round ONCE, here, at the sum — which is what H-104's fix actually
+ * called for.
+ */
+const TENURE_DECIMALS = 1;
 import type { SemanticMatcher, SkillMatchResult } from './cascade.js';
 import { matchSkillRequirement } from './cascade.js';
 import {
@@ -88,11 +103,11 @@ export function totalYearsExperience(attributes: readonly ExtractedAttribute[]):
   );
   const rangeYears = yearsAttrs.filter((a) => a.isExplicitStatement !== true);
   const rangeTotal = rangeYears.reduce((acc, a) => acc + a.years, 0);
-  if (rangeTotal > 0) return quantize(rangeTotal);
+  if (rangeTotal > 0) return roundHalfUp(rangeTotal, TENURE_DECIMALS);
 
   const explicitYears = yearsAttrs.filter((a) => a.isExplicitStatement === true);
   const explicitMax = explicitYears.reduce((acc, a) => Math.max(acc, a.years), 0);
-  return quantize(explicitMax);
+  return roundHalfUp(explicitMax, TENURE_DECIMALS);
 }
 
 /**
@@ -137,7 +152,7 @@ export function discardedTenureClaim(
     .reduce((acc, a) => Math.max(acc, a.years), 0);
   if (claimed <= 0) return null;
 
-  const computed = quantize(rangeTotal);
+  const computed = roundHalfUp(rangeTotal, TENURE_DECIMALS);
   if (claimed <= computed) return null;
 
   return { claimed, computed };
@@ -151,17 +166,27 @@ export function discardedTenureClaim(
  * H-095, ADR-029) instead of the number simply being smaller with no
  * explanation.
  *
- * **Residual, stated rather than hidden.** When more than one range is
- * unreadable, this sums their individual `minPossibleYears` lower bounds.
- * Each bound is individually true under either locale reading, but summing
- * assumes the ranges do not overlap in calendar time. Unlike
- * {@link totalYearsExperience}'s date-range merge, nothing here can dedupe
- * concurrent unreadable ranges: an ambiguous range never resolves to an
- * absolute start/end month (that is the whole reason it is unreadable), so
- * there are no absolute months to intersect. A CV with two or more
- * genuinely CONCURRENT and mutually ambiguous roles could see this sum
- * exceed the true minimum lower bound. Not corrected here; not observed in
- * the fixture corpus.
+ * **FIXED (H-107, was a residual of ADR-032).** This still just sums the
+ * per-attribute `minPossibleYears` values — that part is unchanged and
+ * correct. What changed is WHERE the dedupe happens: two or more
+ * `unreadable_date_range` attributes from the SAME document are now
+ * interval-merged in the extractor, under a single consistent locale
+ * reading chosen to minimise the grand total, before `minPossibleYears` is
+ * ever assigned per attribute (`extractYearsExperience`,
+ * ../extraction/experience.js — see `creditedMonthsUnderReading` there for
+ * the full argument). So by the time attributes reach this function, two
+ * fully-overlapping concurrent ambiguous ranges already carry `(bound, 0)`
+ * rather than `(bound, bound)`, and this sum reproduces the merged total
+ * exactly rather than double-counting it. A summed `minPossibleYears` of
+ * "9.8" for ~4.9 true coverage — the measured H-107 case — is no longer
+ * reachable this way.
+ *
+ * **What is NOT fixed, disclosed rather than hidden.** The merge assumes
+ * the document uses one notation consistently across ITS ambiguous ranges.
+ * If a single document genuinely mixed day-first and month-first ranges
+ * with no other tell, this bound is not provably sound for that document.
+ * Not observed in the fixture corpus; recorded because it is the one case
+ * the design does not cover, not because it was found.
  *
  * Returns `null` when nothing is unreadable — the total is complete.
  */
@@ -174,7 +199,10 @@ export function unreadableEmploymentDates(
   );
   if (unreadable.length === 0) return null;
 
-  const minPossibleYears = quantize(unreadable.reduce((acc, a) => acc + a.minPossibleYears, 0));
+  const minPossibleYears = roundHalfUp(
+    unreadable.reduce((acc, a) => acc + a.minPossibleYears, 0),
+    TENURE_DECIMALS,
+  );
   return { minPossibleYears };
 }
 

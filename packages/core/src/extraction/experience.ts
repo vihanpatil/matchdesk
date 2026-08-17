@@ -93,18 +93,66 @@ const MONTH_PATTERN =
  * turns this into a `Reservation` (ADR-029) rather than a silently smaller
  * or larger number.
  *
- * **Deliberately still out of scope: the two-part dotted form `03.2006`**
- * (H-040's original gap). `numericMonthYear` below stays slash-only, so a
- * bare `MM.YYYY` still falls through to the bare-year branch. Not touched
- * by this change.
+ * **H-095 (closes the "two-part dotted form" gap left open above, and its
+ * dash/year-first siblings).** `numericMonthYear`'s two-part branch used to
+ * be slash-only (`\d{1,2}\/\d{4}`), so `03.2019 - Present` and
+ * `03-2019 - Present` fell through to the bare `\d{4}` alternative,
+ * defaulting to January and OVER-counting by however many months into the
+ * year the true start date was — and `2015/03 - Present` /
+ * `2015-03 - Present` (year-first order) fell through to bare-year on BOTH
+ * ends, matching nothing and DELETING the role.
+ *
+ * `TWO_PART_DATE_TOKEN` now accepts `.`/`-` alongside `/`, and both
+ * `MM[sep]YYYY` and `YYYY[sep]MM` orders. **No ambiguity machinery is
+ * needed here** (unlike the three-part case): a 4-digit group is
+ * unambiguously the year wherever it sits, so which side is the month is
+ * never in doubt. The one thing to guard is not swallowing an ordinary bare
+ * `YYYY - YYYY` range or a decimal/version-like number — both alternatives
+ * require the OTHER side to be a 1-2 digit number immediately adjacent (no
+ * space) with a valid 1-12 month value, which a version string like `12.4`
+ * or a spaced range like `2015 - 2019` does not present.
  */
 const THREE_PART_DATE_TOKEN = String.raw`\d{1,2}[/.-]\d{1,2}[/.-]\d{4}`;
 const THREE_PART_DATE_SHAPE = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/;
+const TWO_PART_DATE_TOKEN = String.raw`\d{1,2}[/.-]\d{4}|\d{4}[/.-]\d{1,2}`;
 
-const DATE_TOKEN = String.raw`(?:${MONTH_PATTERN}\.?\s+\d{4}|${THREE_PART_DATE_TOKEN}|\d{1,2}\/\d{4}|\d{4})`;
+const DATE_TOKEN = String.raw`(?:${MONTH_PATTERN}\.?\s+\d{4}|${THREE_PART_DATE_TOKEN}|${TWO_PART_DATE_TOKEN}|\d{4})`;
 const PRESENT_TOKEN = '(?:Present|Current|Now|Ongoing)';
 
-const EXPLICIT_YEARS_PATTERN = /(\d{1,2}(?:\.\d)?)\+?\s*(?:years?|yrs?)\b(\s+of\s+experience)?/gi;
+/**
+ * H-103: a bare `N years?`/`yrs?` match needs no experience context
+ * whatsoever, so "Maintained a 15 year old legacy COBOL system" reads as a
+ * 15-year tenure claim — a SYSTEM's age becomes a PERSON's tenure, and
+ * `explain.ts` shows the recruiter the literal span "15 year" as proof.
+ * "N year partnership/contract/warranty/lease" is the same shape with a
+ * different noun.
+ *
+ * The discriminator is GRAMMATICAL, not lexical. English uses the SINGULAR
+ * attributively — "a 15 year old system", "a 20 year partnership", "a 5 year
+ * contract" — and the PLURAL for a span of time a person accumulated: "15
+ * years as a registered nurse", "20 years in the trade". So a plural
+ * `years`/`yrs` is a tenure claim, and a singular `year`/`yr` is one only
+ * when "experience" follows it outright (which keeps "1 year of experience",
+ * the low-end case, working).
+ *
+ * **Requiring the literal word "experience" was tried first and rejected by
+ * measurement.** It killed the fabrications, and it also dropped
+ * "Over 20 years in backend engineering", "15 years as a registered nurse"
+ * and "A qualified electrician with 18 years in the trade" — ordinary CV
+ * phrasing. That is not a fix, it is the same wrong number moved from
+ * fabricated-high to silently-zero: an explicit claim is what
+ * `totalYearsExperience` falls back to when no range parses, so losing it
+ * shows the recruiter "found 0" for someone with twenty years. H-101 and
+ * H-102 are the same silent-zero shape, being closed in this very commit.
+ *
+ * `years old` is excluded outright — a person's stated AGE is not tenure,
+ * and ADR-007 keeps age proxies out of scoring entirely.
+ *
+ * Group 2 (the confidence bonus) distinguishes "of experience" from bare
+ * "experience"; it no longer gates whether the phrase counts at all.
+ */
+const EXPLICIT_YEARS_PATTERN =
+  /(\d{1,2}(?:\.\d)?)\+?\s*(?:years|yrs|(?:year|yr)(?=\s+(?:of\s+)?experience\b))\b(?!\s+old\b)(\s+of\s+experience|\s+experience)?/gi;
 const RANGE_PATTERN = new RegExp(
   `(${DATE_TOKEN})\\s*(?:-|–|—|to)\\s*(${DATE_TOKEN}|${PRESENT_TOKEN})`,
   'gi',
@@ -147,6 +195,19 @@ function isFutureDate(
  * A bare `YYYY - YYYY` range needs supporting context to count as
  * employment (H-028 D5c). Rejects it when a quantity word appears
  * immediately before the match or as the token immediately after it.
+ *
+ * **H-102: the window must not cross a newline.** D5c was measured only for
+ * false POSITIVES ("budget of 2000 - 2024 USD", "Grew active users from
+ * 2015 - 2019" — both quantity word and range on the SAME line). It was
+ * never measured for false NEGATIVES: the line immediately after a CV date
+ * range is almost always a metric bullet ("Scaled the platform to two
+ * million users."), and D5c's quantity-word list is ordinary CV vocabulary
+ * ("users", "accounts", "requests", ...). A raw character window happily
+ * crosses the line break and reads that bullet as if it qualified the
+ * range itself, deleting a real employment range. Every one of D5c's actual
+ * positives has the quantity word on the SAME LINE as the range, so
+ * clamping the window to the line loses no coverage there while no longer
+ * reaching an adjacent bullet.
  */
 function isBareRangeWithoutEmploymentContext(
   text: string,
@@ -158,10 +219,14 @@ function isBareRangeWithoutEmploymentContext(
   if (!YEAR_ONLY.test(startText.trim())) return false;
   if (!YEAR_ONLY.test(endText.trim()) && !PRESENT_ONLY.test(endText.trim())) return false;
 
-  const before = text.slice(Math.max(0, matchStart - CONTEXT_WINDOW_CHARS), matchStart);
+  const lineStart = text.lastIndexOf('\n', Math.max(0, matchStart - 1)) + 1;
+  const nextNewline = text.indexOf('\n', matchEnd);
+  const lineEnd = nextNewline === -1 ? text.length : nextNewline;
+
+  const before = text.slice(Math.max(lineStart, matchStart - CONTEXT_WINDOW_CHARS), matchStart);
   if (NON_EMPLOYMENT_CONTEXT.test(before)) return true;
 
-  const after = text.slice(matchEnd, matchEnd + CONTEXT_WINDOW_CHARS);
+  const after = text.slice(matchEnd, Math.min(lineEnd, matchEnd + CONTEXT_WINDOW_CHARS));
   return NON_EMPLOYMENT_CONTEXT.test(after);
 }
 
@@ -178,6 +243,22 @@ type DateParseResult =
   | { readonly kind: 'invalid' };
 
 const INVALID_DATE: DateParseResult = { kind: 'invalid' };
+
+/**
+ * How a tenure figure is LABELLED. `years` itself stays the exact fraction —
+ * H-104 exists because rounding per range before summing inflated totals by
+ * up to 20% — but `normalizedValue` is presentation, and a recruiter reading
+ * evidence should see "6.6", not "6.583333".
+ *
+ * Keeping the two apart is the whole point: arithmetic precision and display
+ * precision are different jobs, and collapsing them is what caused H-104 in
+ * the first place.
+ */
+const TENURE_LABEL_DECIMALS = 1;
+
+function labelYears(years: number): string {
+  return String(roundHalfUp(years, TENURE_LABEL_DECIMALS));
+}
 
 function parseDateToken(token: string): DateParseResult {
   const trimmed = token.trim();
@@ -234,14 +315,21 @@ function parseDateToken(token: string): DateParseResult {
       : INVALID_DATE;
   }
 
-  // Slash-only, deliberately: the two-part dotted form ("03.2006", H-040's
-  // original gap) stays unreached here and falls through to the bare-year
-  // branch below, exactly as before. Out of scope for this change — see
-  // the module doc comment above DATE_TOKEN.
-  const numericMonthYear = /^(\d{1,2})\/(\d{4})$/.exec(trimmed);
-  if (numericMonthYear !== null) {
-    const month = Number(numericMonthYear[1]);
-    const year = Number(numericMonthYear[2]);
+  // H-095: MM[sep]YYYY, any of / . -. The year is always the 4-digit side,
+  // so there is nothing to disambiguate — unlike the three-part case.
+  const monthThenYear = /^(\d{1,2})[/.-](\d{4})$/.exec(trimmed);
+  if (monthThenYear !== null) {
+    const month = Number(monthThenYear[1]);
+    const year = Number(monthThenYear[2]);
+    return month >= 1 && month <= 12 ? { kind: 'resolved', date: { year, month } } : INVALID_DATE;
+  }
+
+  // H-095: the year-first order, YYYY[sep]MM ("2015/03", "2015-03"). Same
+  // separators, same unambiguous year-by-digit-count rule.
+  const yearThenMonth = /^(\d{4})[/.-](\d{1,2})$/.exec(trimmed);
+  if (yearThenMonth !== null) {
+    const year = Number(yearThenMonth[1]);
+    const month = Number(yearThenMonth[2]);
     return month >= 1 && month <= 12 ? { kind: 'resolved', date: { year, month } } : INVALID_DATE;
   }
 
@@ -300,6 +388,82 @@ function computeAmbiguousLowerBoundYears(start: DateParseResult, end: DateParseR
 
   if (readings.length === 0) return 0;
   return roundHalfUp(Math.min(...readings) / 12, 1);
+}
+
+/**
+ * H-107: `ADR-032`'s own documented residual. Two or more ambiguous ranges
+ * used to each report `computeAmbiguousLowerBoundYears` independently, and
+ * the caller (`unreadableEmploymentDates`, ../scoring/dimensions.js) summed
+ * them with no interval merge — so two IDENTICAL, fully-overlapping
+ * concurrent ambiguous roles reported roughly DOUBLE the true minimum
+ * coverage, and that inflated number could cross a must-have gate and raise
+ * a BLOCKING reservation asserting a figure the document never supported.
+ *
+ * **The fix, and why it is sound.** Interval-merging needs absolute
+ * start/end months, which only exist per LOCALE READING (an ambiguous range
+ * has none on its own — that is the whole reason it is ambiguous). So this
+ * merges under ONE reading applied to every ambiguous range in the document
+ * — first entirely DAY-FIRST, then entirely MONTH-FIRST — producing two
+ * candidate totals, and the caller keeps whichever credited-months map
+ * produced the SMALLER grand total.
+ *
+ * That is a true lower bound PROVIDED the document uses one notation
+ * consistently across its ambiguous ranges (the same assumption a single
+ * ambiguous range's own two-reading minimum already leans on, generalised
+ * from one range to the set): if the document's real locale is day-first,
+ * the day-first merge computes the true total exactly, and
+ * `min(dayFirst, monthFirst) <= dayFirst = truth` regardless of what the
+ * month-first total happens to be — and symmetrically if the real locale is
+ * month-first. A document that mixes notations between different ambiguous
+ * ranges is the one case this does not provably bound; not observed in the
+ * corpus, and disclosed rather than hidden.
+ *
+ * For exactly one ambiguous range this reduces to the ORIGINAL
+ * `computeAmbiguousLowerBoundYears` behaviour exactly (no other range to
+ * merge against), which is why the caller keeps that function for the
+ * single-range case rather than routing everything through this one.
+ */
+function creditedMonthsUnderReading<
+  T extends { readonly start: DateParseResult; readonly end: DateParseResult },
+>(
+  candidates: readonly T[],
+  resolve: (result: DateParseResult) => ParsedDate | null,
+): Map<T, number> {
+  interface Interval {
+    readonly candidate: T;
+    readonly startAbs: number;
+    readonly endAbs: number;
+  }
+
+  const intervals: Interval[] = [];
+  for (const candidate of candidates) {
+    const start = resolve(candidate.start);
+    const end = resolve(candidate.end);
+    // Cannot happen for a range that reached this point (both sides were
+    // already confirmed not `invalid`), but resolved defensively rather
+    // than asserted, per rule 0.2.4 (never swallow, but also never crash
+    // on a case that should be structurally impossible).
+    if (start === null || end === null) continue;
+    intervals.push({ candidate, startAbs: toAbsoluteMonth(start), endAbs: toAbsoluteMonth(end) });
+  }
+
+  const chronological = intervals
+    .slice()
+    .sort((a, b) => a.startAbs - b.startAbs || a.endAbs - b.endAbs);
+  const credited = new Map<T, number>();
+  let coveredUntil = -Infinity;
+  for (const interval of chronological) {
+    const creditedStart = Math.max(interval.startAbs, coveredUntil);
+    credited.set(interval.candidate, Math.max(0, interval.endAbs - creditedStart));
+    coveredUntil = Math.max(coveredUntil, interval.endAbs);
+  }
+  return credited;
+}
+
+function sumValues(map: ReadonlyMap<unknown, number>): number {
+  let total = 0;
+  for (const value of map.values()) total += value;
+  return total;
 }
 
 function overlapsAny(
@@ -363,7 +527,11 @@ function extractYearsExperienceFromVisibleText(
     const parsed = Number(numberText);
     if (!Number.isFinite(parsed) || parsed <= 0 || parsed > MAX_PLAUSIBLE_YEARS) continue;
 
-    const hasOfExperience = explicitMatch[2] !== undefined;
+    // Group 2 is now mandatory (H-103: "experience" must follow at all) and
+    // captures either " of experience" or bare " experience" — the bonus
+    // still distinguishes the two, it no longer gates whether this is an
+    // experience claim in the first place.
+    const hasOfExperience = explicitMatch[2]?.trim().toLowerCase().startsWith('of') === true;
     const confidence = quantize(
       Math.min(1, EXPLICIT_BASE_CONFIDENCE + (hasOfExperience ? EXPLICIT_OF_EXPERIENCE_BONUS : 0)),
     );
@@ -377,7 +545,7 @@ function extractYearsExperienceFromVisibleText(
     results.push({
       kind: 'years_experience',
       value,
-      normalizedValue: String(years),
+      normalizedValue: labelYears(years),
       confidence,
       sourceSpan,
       years,
@@ -394,7 +562,21 @@ function extractYearsExperienceFromVisibleText(
     readonly endAbs: number;
   }
 
+  // H-107: an AMBIGUOUS range's attribute is not emitted immediately — it is
+  // deferred (like `RangeCandidate` above) so that, when MORE THAN ONE
+  // ambiguous range exists in the document, they can be interval-merged
+  // before a `minPossibleYears` is assigned. See the processing step below
+  // the main loop for why.
+  interface AmbiguousRangeCandidate {
+    readonly matchStart: number;
+    readonly matchEnd: number;
+    readonly value: string;
+    readonly start: DateParseResult;
+    readonly end: DateParseResult;
+  }
+
   const candidates: RangeCandidate[] = [];
+  const ambiguousCandidates: AmbiguousRangeCandidate[] = [];
   const rangePattern = new RegExp(RANGE_PATTERN);
   let rangeMatch: RegExpExecArray | null;
   while ((rangeMatch = rangePattern.exec(text)) !== null) {
@@ -424,30 +606,41 @@ function extractYearsExperienceFromVisibleText(
     // its own attribute rather than silently dropped (H-089) or silently
     // resolved to one locale (H-095).
     if (startResult.kind === 'ambiguous' || endResult.kind === 'ambiguous') {
-      const sourceSpan = { start: matchStart, end: matchEnd };
       const value = text.slice(matchStart, matchEnd);
-      assertValidSpan(text, sourceSpan, value);
-      const minPossibleYears = computeAmbiguousLowerBoundYears(startResult, endResult);
-
-      results.push({
-        kind: 'unreadable_date_range',
-        value,
-        normalizedValue: String(minPossibleYears),
-        confidence: DATE_RANGE_CONFIDENCE,
-        sourceSpan,
-        minPossibleYears,
-      });
+      assertValidSpan(text, { start: matchStart, end: matchEnd }, value);
+      ambiguousCandidates.push({ matchStart, matchEnd, value, start: startResult, end: endResult });
       continue;
     }
 
     const start = startResult.date;
-    const end = endResult.date;
-    if (isFutureDate(start, referenceDate) || isFutureDate(end, referenceDate)) continue;
+    // H-101: a START in the future makes the whole range implausible — a CV
+    // does not narrate employment that has not begun (`Jan 2030 - Jan 2032`
+    // must still be rejected; the far-future guard). But a range that
+    // STARTED in the past and merely ENDS after `referenceDate` is an
+    // ordinary current fixed-term contract ("Jan 2015 - Dec 2026" against a
+    // stored reference date of Aug 2026) — deleting the entire role over 4
+    // months of not-yet-elapsed time silently erased 11.6 years of real,
+    // verifiable employment. Clamped to `referenceDate` instead, exactly
+    // like "Present" already is: the engine CAN compute a definite number
+    // here (it is not the E3 "unaccounted-for evidence" case — the exact
+    // target end date is known, only its relationship to `referenceDate`
+    // needed deciding), so ADR-029 Decision 1 favours using it over
+    // dropping the range or merely flagging it unread.
+    if (isFutureDate(start, referenceDate)) continue;
+    const end = isFutureDate(endResult.date, referenceDate) ? referenceDate : endResult.date;
 
     const months = toAbsoluteMonth(end) - toAbsoluteMonth(start);
     if (months <= 0) continue;
 
-    const years = roundHalfUp(months / 12, 1);
+    // H-104: do NOT round here beyond ordinary float precision. Rounding
+    // EACH range to 1dp before summing (`totalYearsExperience`,
+    // ../scoring/dimensions.js) was a systematic bias: a 3-month range
+    // (0.25y) rounded up to 0.3, and the error compounded with range count
+    // — 17 such contracts reported 5.1 instead of the true 4.25, a
+    // proportional +20% unbounded by any single "0.1 quantization" story.
+    // Credited months are carried as an exact fraction and rounded exactly
+    // ONCE, downstream, when the total is summed.
+    const years = quantize(months / 12);
     if (years <= 0 || years > MAX_PLAUSIBLE_YEARS) continue;
 
     candidates.push({
@@ -457,6 +650,52 @@ function extractYearsExperienceFromVisibleText(
       startAbs: toAbsoluteMonth(start),
       endAbs: toAbsoluteMonth(end),
     });
+  }
+
+  // --- Ambiguous-range pass (H-107): a lone ambiguous range keeps EXACTLY
+  // the original per-range computation (`computeAmbiguousLowerBoundYears`,
+  // ADR-032) — min of its own two locale readings, rounded once to 1dp.
+  // TWO OR MORE ambiguous ranges are interval-merged first, under a
+  // consistent locale reading, so a CONCURRENT pair is not double-counted.
+  // See `creditedMonthsUnderReading` below for the soundness argument.
+  if (ambiguousCandidates.length === 1) {
+    const only = ambiguousCandidates[0];
+    if (only !== undefined) {
+      const minPossibleYears = computeAmbiguousLowerBoundYears(only.start, only.end);
+      results.push({
+        kind: 'unreadable_date_range',
+        value: only.value,
+        normalizedValue: labelYears(minPossibleYears),
+        confidence: DATE_RANGE_CONFIDENCE,
+        sourceSpan: { start: only.matchStart, end: only.matchEnd },
+        minPossibleYears,
+      });
+    }
+  } else if (ambiguousCandidates.length > 1) {
+    // Every reading is well-defined here: both endpoints were already
+    // confirmed not `invalid` above, so `resolveAsDayFirst`/
+    // `resolveAsMonthFirst` cannot return null for either side.
+    const dayFirstMonths = creditedMonthsUnderReading(ambiguousCandidates, resolveAsDayFirst);
+    const monthFirstMonths = creditedMonthsUnderReading(ambiguousCandidates, resolveAsMonthFirst);
+    const totalDayFirst = sumValues(dayFirstMonths);
+    const totalMonthFirst = sumValues(monthFirstMonths);
+    const winningMonths = totalDayFirst <= totalMonthFirst ? dayFirstMonths : monthFirstMonths;
+
+    for (const candidate of ambiguousCandidates) {
+      const months = winningMonths.get(candidate) ?? 0;
+      // H-104's lesson applied here too: quantize once, do not round each
+      // range to 1dp before the caller (`unreadableEmploymentDates`,
+      // ../scoring/dimensions.js) sums them.
+      const minPossibleYears = quantize(months / 12);
+      results.push({
+        kind: 'unreadable_date_range',
+        value: candidate.value,
+        normalizedValue: labelYears(minPossibleYears),
+        confidence: DATE_RANGE_CONFIDENCE,
+        sourceSpan: { start: candidate.matchStart, end: candidate.matchEnd },
+        minPossibleYears,
+      });
+    }
   }
 
   // --- Pass 2: merge overlapping intervals (H-028 D5b) so a candidate with
@@ -477,7 +716,10 @@ function extractYearsExperienceFromVisibleText(
 
   for (const candidate of candidates) {
     const months = creditedMonths.get(candidate) ?? 0;
-    const years = roundHalfUp(months / 12, 1);
+    // H-104: round once, not per range — see the comment at the Pass 1
+    // plausibility check above for why. `totalYearsExperience`
+    // (../scoring/dimensions.js) is where the single rounding happens now.
+    const years = quantize(months / 12);
     // Fully absorbed by an earlier-processed, wider-covering range.
     if (years <= 0) continue;
 
@@ -487,7 +729,7 @@ function extractYearsExperienceFromVisibleText(
     results.push({
       kind: 'years_experience',
       value: candidate.value,
-      normalizedValue: String(years),
+      normalizedValue: labelYears(years),
       confidence: DATE_RANGE_CONFIDENCE,
       sourceSpan,
       years,

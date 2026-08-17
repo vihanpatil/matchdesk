@@ -33,44 +33,51 @@ is re-run. Anything found outside these classes gets added as a new row.
 
 ## The classes
 
-| #   | Attack class                             | Why it is here                                              | Status                                                      |
-| --- | ---------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
-| A1  | Mixed / code-switched language           | H-041, H-043, H-068 — the open wrong-score defect           | **FINDING OPEN** (H-041)                                    |
-| A2  | Invisible / homoglyph / RTL characters   | H-034, H-048 — fabricated skills, not just breakage         | Covered (DOCX only, H-067)                                  |
-| A3  | Degree and qualification ambiguity       | H-022, H-033, H-053 — "as", British forms, `X of Y`         | Covered                                                     |
-| A4  | Date range and tenure arithmetic         | H-040 closed (ADR-029); H-089/H-095 — numeric-date notation | **REMEDY LANDED** (ADR-032), unverified                     |
-| A5  | Section segmentation and header merging  | H-028 D1, H-062 — a merged header deletes a section         | **NOT RUN** (PDF path)                                      |
-| A6  | Eligibility / must-have gate boundaries  | H-049, H-050, H-066 — empty jobs, negative weights          | Covered                                                     |
-| A7  | Evidence span correctness                | H-028 D4, H-064, H-066 — in-bounds span, wrong place        | Covered                                                     |
-| A8  | Score reproducibility over time / inputs | H-052, ADR-024, H-002 — same inputs, same number            | Covered (H-002 triaged; pinned by determinism.arch.test.ts) |
-| A9  | Unreadable or partial documents (C7)     | H-049 — an unreadable JOB scored candidates 100/100         | Covered                                                     |
-| A10 | Certification identity and level         | H-063, H-066 — Associate vs Professional collapse           | Covered (argued)                                            |
-| A11 | Format parity, PDF vs DOCX               | H-059, H-062, H-065 — same content, same score              | Covered (Phase 4)                                           |
-| A12 | Numeric edge cases in scoring            | H-056 — `roundHalfUp` bound; renormalization                | Covered                                                     |
+| #   | Attack class                             | Why it is here                                             | Status                                                      |
+| --- | ---------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- |
+| A1  | Mixed / code-switched language           | H-041, H-043, H-068 — the open wrong-score defect          | **FINDING OPEN** (H-041)                                    |
+| A2  | Invisible / homoglyph / RTL characters   | H-034, H-048 — fabricated skills, not just breakage        | Covered (DOCX only, H-067)                                  |
+| A3  | Degree and qualification ambiguity       | H-022, H-033, H-053 — "as", British forms, `X of Y`        | Covered                                                     |
+| A4  | Date range and tenure arithmetic         | H-040, H-089, H-095, H-101-H-104 — all closed              | **Covered** (attacked 2026-08-14; 6 findings, all fixed)    |
+| A5  | Section segmentation and header merging  | H-028 D1, H-062, H-100 — a merged header deletes a section | **Covered** (first run 2026-08-14; H-100 found and fixed)   |
+| A6  | Eligibility / must-have gate boundaries  | H-049, H-050, H-066 — empty jobs, negative weights         | Covered                                                     |
+| A7  | Evidence span correctness                | H-028 D4, H-064, H-066 — in-bounds span, wrong place       | Covered                                                     |
+| A8  | Score reproducibility over time / inputs | H-052, ADR-024, H-002 — same inputs, same number           | Covered (H-002 triaged; pinned by determinism.arch.test.ts) |
+| A9  | Unreadable or partial documents (C7)     | H-049 — an unreadable JOB scored candidates 100/100        | Covered                                                     |
+| A10 | Certification identity and level         | H-063, H-066 — Associate vs Professional collapse          | Covered (argued)                                            |
+| A11 | Format parity, PDF vs DOCX               | H-059, H-062, H-065 — same content, same score             | Covered (Phase 4)                                           |
+| A12 | Numeric edge cases in scoring            | H-056 — `roundHalfUp` bound; renormalization               | Covered                                                     |
 
 **E1 is MET when every row reads Covered and no row has an open wrong-score
-finding.** Two rows do not, and one has never been run:
+finding.** After the 2026-08-14 adversarial round, **one row does not**:
 
-- **A1 (H-041)** — open wrong-score. ADR-031 replaced the classifier but
-  deliberately did **not** close this: the residual is a segmentation geometry
-  problem, not a classifier-accuracy one (H-092), so a trailing sub-floor line
-  still never forms a judgeable window.
-- **A4 (H-089, H-095)** — H-040 was closed by ADR-029. Its successors have a
-  **landed remedy (ADR-032) that no independent verifier has attacked yet.**
-  Landing a remedy is not the same as closing a row, and this project's log
-  records four separate times a narrowing was reported as a closure (H-078,
-  H-085). This row reads REMEDY LANDED, not Covered, until an ADR-015 round
-  has tried to break it.
-- **A5** — still never run.
+- **A1 (H-041)** — the only remaining open wrong-score in the project.
+  ADR-031 replaced the classifier and deliberately did **not** close this: the
+  residual is segmentation geometry, not classifier accuracy (H-092), so a
+  trailing sub-floor line still never forms a judgeable window. **Its scope
+  note was itself wrong until H-105** — the residual is not "Germanic", it is
+  every language outside the function-word lexicon, Portuguese and Romanian
+  included. Any remedy aimed at Germanic would measure none of the languages
+  that actually fail.
 
-A8 was closed by the 2026-08-13 triage.
+**A4 and A5 are now Covered, and both were earned rather than argued.** A5 had
+never been executed in the project's history; its first run produced H-100, a
+wrong-score in both directions, now fixed. A4's ADR-032 remedy was attacked and
+five further defects survived it (H-101-H-104, plus H-095's two-part half); all
+are closed, each with a test that fails without its fix.
 
-**A1 and A4 were called "the same shape" and that is now only half true.** Both
-are the engine emitting a confident number while silently discarding something
-it could not account for — but A4's remedy (ADR-032) turned the discarded thing
-into emitted evidence, and A1 cannot use that remedy because there is nothing
-to emit: the language veto never gets a judgeable segment to abstain on. The
-shared diagnosis held; the shared remedy did not.
+**A1 and A4 were once called "the same shape". That is now only half true.**
+Both were the engine emitting a confident number while silently discarding
+something it could not account for — but A4's remedy turned the discarded thing
+into emitted evidence, and A1 cannot use it, because there is nothing to emit:
+the language veto never gets a judgeable segment to abstain on. The shared
+diagnosis held; the shared remedy did not.
+
+**What a future round need not re-run.** The 2026-08-14 round reported honest
+negatives on larger header fonts, page-boundary headers, mid-word font splits,
+three-part date forms of every separator, overlap merging, and the
+whole-document language gate on full-paragraph foreign text. Clean under
+genuine effort.
 
 ## Rows deliberately NOT on this list
 

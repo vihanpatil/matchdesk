@@ -131,4 +131,58 @@ describe('detectSections', () => {
       expect(sections.map((s) => s.name)).toEqual(['education']);
     });
   });
+
+  describe('headers sharing a visual line with trailing matter (H-100)', () => {
+    it.each([
+      ['Education   Leeds, UK', 'education'],
+      ['Education\tLeeds, UK', 'education'],
+      ['Education ________________', 'education'],
+      ['E D U C A T I O N', 'education'],
+      ['Experience   2010 - 2022', 'experience'],
+      ['Experience\tJan 2019 - Present', 'experience'],
+    ] as const)('recognizes "%s" as a %s header', (header, name) => {
+      const text = [header, 'Some content line.'].join('\n');
+      const sections = detectSections(text);
+      expect(sections.map((s) => s.name)).toEqual([name]);
+    });
+
+    it('still recognizes the plain whole-line synonyms after adding trailing-matter support', () => {
+      const text = ['EDUCATION:', 'Education & Training', '  Education  '].join('\n');
+      for (const line of text.split('\n')) {
+        const sections = detectSections([line, 'x'].join('\n'));
+        expect(sections.map((s) => s.name)).toEqual(['education']);
+      }
+    });
+
+    it('does not swallow the whole document when an education header carries a right-aligned location (H-100 deletion direction)', () => {
+      const text = [
+        'Experience',
+        'Senior Engineer, Acme Corp, Jan 2015 - Dec 2026',
+        '',
+        'Education   Leeds, UK',
+        "Bachelor's in Computer Science",
+      ].join('\n');
+      const sections = detectSections(text);
+      expect(sections.map((s) => s.name)).toEqual(['experience', 'education']);
+    });
+  });
+
+  describe('adversarial: ordinary prose and job titles must not become headers', () => {
+    it.each([
+      'Experience with Python and Docker',
+      'Education is important to me',
+      'Skills I want to develop further',
+      'Summary of the project I led',
+      'Experience: 5 years',
+      'My education and training to date',
+      'Led the Education team at Acme',
+      'Experience Manager, Acme Corp, 2019 - 2022',
+      'Experience Manager,   Acme Corp, 2019 - 2022',
+      'Experience Manager\tAcme Corp, 2019 - 2022',
+    ])('does not treat "%s" as a header', (line) => {
+      const text = [line, 'Some content line.'].join('\n');
+      const sections = detectSections(text);
+      expect(sections.map((s) => s.name)).toEqual([null]);
+    });
+  });
 });

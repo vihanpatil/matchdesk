@@ -177,18 +177,23 @@ describe('the REAL registry, as shipped', () => {
     // Do not read a rising count as the project getting worse. Every one of
     // these was already true of the code; what changed is that somebody
     // looked.
+    // SIXTH time, and the first that made the gate dramatically EASIER: the
+    // eight above went to one. Seven wrong-score findings were closed in a
+    // single round — H-062, H-095, H-100, H-101, H-102, H-103, H-104 — every
+    // one of them found by the ADR-015 pass that had just raised the count
+    // from three to eight.
+    //
+    // Both halves of that swing are the same fact: the defects were always in
+    // the code, and the only variable was whether anyone had looked. Do not
+    // read the fall as progress any more than the rise was decline. What is
+    // load-bearing is that each closure has a test that fails without its fix.
+    //
+    // H-041 is what remains, and it will not fall to this kind of round: it is
+    // a segmentation geometry problem (H-092), its scope note was itself wrong
+    // until H-105 corrected it, and closing it needs a change nobody has costed.
     const gate = computeGate(registry.findings);
     expect(gate.e5).toBe(false);
-    expect(gate.blockingE5.map((f) => f.id).sort()).toEqual([
-      'H-041',
-      'H-062',
-      'H-095',
-      'H-100',
-      'H-101',
-      'H-102',
-      'H-103',
-      'H-104',
-    ]);
+    expect(gate.blockingE5.map((f) => f.id).sort()).toEqual(['H-041']);
   });
 
   it('every remaining E5 blocker is a measured defect, not an untriaged one', () => {

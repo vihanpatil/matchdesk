@@ -303,6 +303,52 @@ const MAX_LINES_PER_WINDOW = 12;
  * Deliberately small and deliberately not a language identifier — it answers
  * only "does this short line carry non-English function words", which is the
  * narrowest question that closes the measured Romance gap.
+ *
+ * **H-106: this lexicon refused ordinary English (defect, fixed here).**
+ * `van`, `door`, `die`, `den`, `est`, `con` and `par` are ordinary English
+ * words (a delivery van, a door, a press die, a den, "est. 1994", "pros and
+ * cons", "on par with") that also happen to be French/German/Dutch function
+ * words. Two of them on one line refused the whole document. An adversarial
+ * round of 17 realistic lines — the 7 in the H-106 report plus 10 more
+ * constructed independently across every domain this module's own comment
+ * names (nursing, teaching, accountancy, catering, trades, logistics,
+ * science, law, admin, haulage) — found 15/17 falsely refused before the fix
+ * below; see `languageDetection.eval.test.ts`'s H-106 describe block.
+ *
+ * **Fix 1 — removed the seven ordinary-English-word tokens above.** Measured
+ * zero cost: neither closed Romance sub-floor test (H-087, the Spanish
+ * degree line and the French insert line) contains any of them, and the
+ * Germanic entries among them (`van`, `door`, `die`, `den`) were already
+ * inert for the one Germanic case this lexicon is measured against — H-087
+ * itself records "Germanic compound-noun lines contain no function words at
+ * all", so removing four Germanic tokens costs nothing already being caught.
+ *
+ * **Fix 2 — kept `el`, `los`, `la`, `le`, `de` but require the ORIGINAL token
+ * to be lowercase to count.** These five are genuine, common Romance
+ * function words ("en", "de", "la" carry the Spanish sub-floor catch on
+ * their own) but are also how English spells foreign proper nouns ("El
+ * Paso", "Los Angeles", "Le Gavroche", "Chef de Partie", "De Pere") — always
+ * capitalised when they are a proper noun, because English capitalises
+ * proper nouns and Romance languages do not capitalise mid-sentence function
+ * words. Removing them outright would have cost the French sub-floor test
+ * (it has exactly two hits, "une" and "de" — losing "de" drops it to one and
+ * the catch is lost); the case restriction costs nothing measured instead,
+ * because "de"/"la"/"en" appear lowercase in both closed Romance fixtures.
+ *
+ * **Rejected: raising `MIN_FUNCTION_WORD_HITS` to 3.** Measured directly:
+ * the closed French sub-floor line ("Encadrement d une equipe de six
+ * personnes") has exactly two distinct hits ("une", "de"). A threshold of 3
+ * loses that catch outright, so this was not a viable lever here — the fix
+ * had to come from the lexicon, not the count.
+ *
+ * **Residual, stated rather than chased.** A short line combining two of the
+ * remaining lowercase Romance tokens can still trip this — e.g. a founding
+ * date abbreviation ("est. 1998") on the same short line as the Latin legal
+ * phrase "de novo" ("est" + "de", both lowercase) is a contrived but
+ * possible law-domain line. Not observed in the 23-CV corpus or the 17-line
+ * adversarial set; flagged rather than engineered around, because
+ * special-casing an invented two-word combination risks the same
+ * over-fitting this fix exists to correct.
  */
 const NON_ENGLISH_FUNCTION_WORDS = new Set([
   // French
@@ -315,8 +361,6 @@ const NON_ENGLISH_FUNCTION_WORDS = new Set([
   'pour',
   'avec',
   'sur',
-  'par',
-  'est',
   'sont',
   'aux',
   'chez',
@@ -330,7 +374,6 @@ const NON_ENGLISH_FUNCTION_WORDS = new Set([
   'las',
   'una',
   'para',
-  'con',
   'por',
   'del',
   'su',
@@ -343,12 +386,10 @@ const NON_ENGLISH_FUNCTION_WORDS = new Set([
   'che',
   // German / Dutch
   'der',
-  'die',
   'das',
   'und',
   'mit',
   'von',
-  'den',
   'dem',
   'ein',
   'eine',
@@ -358,11 +399,9 @@ const NON_ENGLISH_FUNCTION_WORDS = new Set([
   'zum',
   'het',
   'een',
-  'van',
   'voor',
   'aan',
   'bij',
-  'door',
   'naar',
   // Scandinavian
   'och',
@@ -378,7 +417,9 @@ const NON_ENGLISH_FUNCTION_WORDS = new Set([
 ]);
 
 /** Two distinct hits: measured 0 false positives in 70 English lines; one hit
- *  gives 1, so this margin is the safety. */
+ *  gives 1, so this margin is the safety. Raising this to 3 was measured and
+ *  rejected (see the lexicon comment above) — it loses the closed French
+ *  sub-floor catch, which has exactly two hits. */
 const MIN_FUNCTION_WORD_HITS = 2;
 
 const EMAIL_OR_URL = /\S+@\S+|https?:\/\/\S+/g;
@@ -408,12 +449,32 @@ function letterCount(text: string): number {
   return (text.match(/\p{L}/gu) ?? []).length;
 }
 
+/** Word tokens with case PRESERVED (unlike {@link wordsOf}), so a capitalised
+ *  form can be told apart from a lowercase one. Used only by
+ *  {@link carriesNonEnglishFunctionWords}'s proper-noun guard. */
+const CASED_WORD = /[\p{L}']+/gu;
+
 /**
  * True when a LINE carries enough non-English function words to be foreign,
  * used below the window floor where even `eld` has nothing to judge (H-085).
+ *
+ * Runs `stripNeutralTokens` first (H-106) — this scan is language-BEARING
+ * text just like the window pass above, so emails, URLs, digit-bearing
+ * tokens and ALL-CAPS acronyms must not count here either. And it only
+ * counts a lexicon hit whose ORIGINAL token was lowercase, so a proper noun
+ * spelled with a foreign-looking word ("El Paso", "Le Gavroche") does not
+ * count as a function word (H-106) — see the lexicon's doc comment for what
+ * this costs and does not cost.
  */
 function carriesNonEnglishFunctionWords(text: string): boolean {
-  const distinct = new Set(wordsOf(text).filter((w) => NON_ENGLISH_FUNCTION_WORDS.has(w)));
+  const bearing = stripNeutralTokens(text);
+  const tokens = bearing.match(CASED_WORD) ?? [];
+  const distinct = new Set(
+    tokens
+      .filter((t) => /^\p{Ll}/u.test(t))
+      .map((t) => t.toLowerCase())
+      .filter((t) => NON_ENGLISH_FUNCTION_WORDS.has(t)),
+  );
   return distinct.size >= MIN_FUNCTION_WORD_HITS;
 }
 

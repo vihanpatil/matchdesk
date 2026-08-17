@@ -3852,3 +3852,73 @@ made up" is a worse artifact than either a correct refusal or a correct number.
 Recorded because the residual was disclosed honestly in the ADR and its
 _consequence_ was not: I wrote that it "cannot dedupe overlap", which is true,
 without noticing that the un-deduped figure is then shown to a human.
+
+---
+
+### H-108 · What H-100's fix does not cover, stated before anyone asks
+
+The engineer who fixed H-100 disclosed this residual unprompted, and I
+reproduced it. A **dateless** line of the shape `<header word>` + strict
+separator + Title-Case pair is recognised as a header:
+
+```
+"Experience   Team Lead, Acme Corp"          -> ["experience"]   WRONG
+"Experience   Team Lead, Acme Corp, 2019 - 2022" -> [null]       correct
+"Education   Leeds, UK"                      -> ["education"]    correct
+```
+
+`Team Lead, Acme Corp` and `Leeds, UK` are the same shape once no digits are
+present, and I could not separate them either. **The dated form is rejected,
+and dates are what drive tenure**, so there is no tenure impact — the blast
+radius is a section boundary shifting on a dateless line, which can misattribute
+following lines between education and experience.
+
+Also unhandled: a letter-spaced header carrying trailing matter
+(`E D U C A T I O N   Leeds, UK`). The collapse feeds only the whole-line path.
+
+Registered `coverage-gap`, which is the honest classification: it cannot move a
+number on its own. Recorded now rather than left for the next adversarial round
+to "discover".
+
+---
+
+### H-109 · Two fixes relocated a wrong number instead of removing it
+
+Both were reported to me as clean closures. Both had passing tests. Both were
+wrong, and only end-to-end probing of what the recruiter _sees_ caught them.
+
+**H-103's first implementation** required the literal word "experience" to
+follow a `N years` claim. That killed the fabrications — and also dropped:
+
+```
+"Over 20 years in backend engineering."               -> NONE
+"15 years as a registered nurse."                     -> NONE
+"A qualified electrician with 18 years in the trade." -> NONE
+```
+
+An explicit claim is what `totalYearsExperience` falls back to when no date
+range parses. So that fix did not remove a wrong number, it **moved it from
+fabricated-high to silently zero** — showing "found 0" for a candidate with
+twenty years. That is precisely H-101's and H-102's shape, being closed in the
+same commit. Replaced with a grammatical rule: English uses the singular
+attributively (`15 year old system`, `20 year partnership`) and the plural for
+time a person accumulated.
+
+**H-104's first implementation** correctly stopped rounding each range before
+the sum, then rounded the total at `quantize`'s **6 decimal places** — which is
+a float-drift guard, not a display precision. The recruiter would have been
+shown:
+
+```
+Requires at least 9 years of experience; found 11.583333.
+```
+
+The per-range rounding had been incidentally supplying the 1dp presentation all
+along. Arithmetic precision and display precision are different jobs, and
+collapsing them is what caused H-104 in the first place.
+
+**The lesson is not that the engineers erred.** Their tests genuinely passed,
+and each had watched them fail first. It is that **"the named defect is gone"
+and "the defect class is gone" are different claims**, and a unit test on an
+extractor cannot tell them apart — only tracing to the number a recruiter reads
+can. Every fix in this round was accepted only after that trace.

@@ -352,8 +352,8 @@
     {
       "id": "H-062",
       "severity": "wrong-score",
-      "status": "open",
-      "note": "RE-TRIAGED coverage-gap -> wrong-score on 2026-08-14. This entry's own note said 're-examine if a PDF fixture ever loses a section'; the ADR-015 round produced exactly that (H-100). It also falsifies this entry's stated MECHANISM: no pdfjs hasEOL error is required. hasEOL was correct in every arm - the runs genuinely are on one visual line - and the defect is detectSections' whole-line rule meeting ordinary CV typography. Confirmed format-independent, including the DOCX right-tab form."
+      "status": "closed",
+      "note": "CLOSED. Re-triaged to wrong-score when an ADR-015 round produced the PDF fixture losing a section that this entry asked to be re-examined for (H-100). Its stated MECHANISM was falsified in the same round - no pdfjs hasEOL error is involved, hasEOL was correct in every arm - and the actual defect, detectSections' whole-line header rule, is fixed. The original 'no vertical-gap fallback in the PDF line model' concern is NOT what this was, and no evidence of a line-model defect was found."
     },
     {
       "id": "H-063",
@@ -552,8 +552,8 @@
     {
       "id": "H-095",
       "severity": "wrong-score",
-      "status": "open",
-      "note": "NOT closed by ADR-032. Its three-part half (03-04-2013, 03.04.2013) is fixed, but this entry's own named mechanism - 'the \\d{1,2}/\\d{4} alternative is slash-only' - is the TWO-PART form and is still live. Verified by the lead: '03.2019 - Present' yields 7.6 against a truth of 7.4, evidence span truncated to '2019 - Present', reservations [] and warnings []. '2015-03 - Present' and '2015/03 - Present' delete the role entirely. This is H-040's original 03.2006 notation, and experience.ts documents it as deliberately out of ADR-032's scope - an honest disclosure in the module, but the finding is not closed by it."
+      "status": "closed",
+      "note": "CLOSED. The three-part half was fixed by ADR-032; this entry's own named mechanism - the slash-only \\d{1,2}/\\d{4} two-part alternative - is now fixed too. TWO_PART_DATE_TOKEN accepts . and - separators and both MM[sep]YYYY and YYYY[sep]MM orders. Verified: 03.2019 - Present now 7.4 (was 7.6 with the span truncated to '2019 - Present'), 2015-03 - Present now 11.4 (was a deleted role). No ambiguity machinery needed - a 4-digit group is unambiguously the year wherever it sits. H-040's original 03.2006 notation therefore parses at last."
     },
     {
       "id": "H-096",
@@ -582,32 +582,32 @@
     {
       "id": "H-100",
       "severity": "wrong-score",
-      "status": "open",
-      "note": "A5, run for the FIRST TIME in the project's history, and it broke in both directions. detectSections requires a header to be the whole trimmed line, so ordinary CV typography defeats it: 'Education   Leeds, UK' (right-aligned location on the header baseline), a decorative rule, or letter-spaced 'E D U C A T I O N' all make the section vanish. Measured: education dates then credited as employment, 98/INELIGIBLE -> 100/ELIGIBLE; and in the education-first ordering, 11.6 years of dated employment -> 'found 0', 48 points lost. warnings [] and reservations [] in both. Format-independent - the DOCX right-tab form breaks identically. NOT a pdfjs defect: hasEOL was correct in every arm. Lead reproduced the whole-line rule directly."
+      "status": "closed",
+      "note": "CLOSED for the wrong-score. detectSections now recognises a header that shares its line, via a strict separator (2+ spaces, tab, or 2+ rule characters - never a single space) plus CONSTRAINED trailing matter (date-shaped or location-shaped only). Letter-spaced headers are collapsed before matching. Verified by the lead: all 6 header forms recognised, all 6 adversarial lines rejected including 'Experience   Team Lead, Acme Corp, 2019 - 2022' (a dated job-title row), and end-to-end the education dates are no longer credited as employment. RESIDUAL registered separately as H-108."
     },
     {
       "id": "H-101",
       "severity": "wrong-score",
-      "status": "open",
-      "note": "One future-dated endpoint deletes the ENTIRE role, silently. 'Jan 2015 - Dec 2026' with reference 2026-08 - an ordinary current fixed-term contract - yields 0 years and 'found 0', where 'Jan 2015 - Present' yields 11.6. Verified by the lead. Also reachable with no future-dated text at all: ADR-024 requires re-scoring against the STORED (older) reference date, so any range extending past it is dropped the same way. Rejecting implausible dates is defensible; deleting the range rather than clamping or surfacing it is not, per ADR-029's own principle."
+      "status": "closed",
+      "note": "CLOSED. Only a future START now rejects a range; a future END is CLAMPED to the reference date, exactly as 'Present' already resolves. Chosen over surfacing a reservation because the target date is known, so materiality is directly computable and ADR-029's 'unaccounted-for evidence' case does not apply. Verified: 'Jan 2015 - Dec 2026' at ref 2026-08 now 11.6 (was a deleted role), and the far-future guard still rejects 'Jan 2030 - Jan 2032'."
     },
     {
       "id": "H-102",
       "severity": "wrong-score",
-      "status": "open",
-      "note": "The D5c quantity-context guard deletes REAL roles. NON_EMPLOYMENT_CONTEXT fires on a bare YYYY-YYYY range when a quantity word sits within 40 chars either side - and the line after a date line in a CV is almost always a metric bullet. Verified by the lead: '2015 - 2026' followed by 'Scaled the platform to two million users.' yields 0 years; the same CV with 'Scaled the platform considerably.' yields 11. reservations [] and warnings []. D5c was measured for false POSITIVES only; this false-negative direction was never measured. Distance-bounded, which narrows it but does not remove it - the tight form is the canonical CV bullet."
+      "status": "closed",
+      "note": "CLOSED. The D5c quantity-word window crossed newlines, so a metric bullet on the ADJACENT line tripped it. The window is now clamped to the same line. Verified: '2015 - 2026' followed by 'Scaled the platform to two million users.' now counts 11 years (was 0), while every same-line D5c positive still rejects - 'budget of 2000 - 2024 USD', 'Grew active users from 2015 - 2019' and all 29 parametrized quantity-word cases."
     },
     {
       "id": "H-103",
       "severity": "wrong-score",
-      "status": "open",
-      "note": "EXPLICIT_YEARS_PATTERN fabricates tenure from ordinary prose - it requires no experience context at all. Verified by the lead: 'Maintained a 15 year old legacy COBOL system.' yields 15 years with the evidence span '15 year', and explain.ts shows that literal string to the recruiter as proof of fifteen years' experience. ELIGIBLE against a 9-year must-have. SECOND FACE: with a real range also present the fabricated claim becomes a fabricated BLOCKING reservation quoting a number the document never made, so scoreStoredPair refuses an otherwise scoreable candidate - that half is false-refusal driven by fabricated evidence."
+      "status": "closed",
+      "note": "CLOSED, on the SECOND attempt. The first fix required the literal word 'experience' to follow; it killed the fabrications and also dropped 'Over 20 years in backend engineering', '15 years as a registered nurse' and 'with 18 years in the trade' - ordinary CV phrasing. The lead caught this before commit: an explicit claim is what totalYearsExperience falls back to when no range parses, so that fix relocated the wrong number from fabricated-high to silently-zero, which is H-101/H-102's own shape. Replaced with a GRAMMATICAL discriminator: English uses the singular attributively ('15 year old system', '20 year partnership') and the plural for accumulated time. Plural = claim; singular = claim only when 'experience' follows, which keeps '1 year of experience'. 'years old' excluded outright per ADR-007. Verified 5/5 fabrications rejected, 8/8 legitimate claims found."
     },
     {
       "id": "H-104",
       "severity": "wrong-score",
-      "status": "open",
-      "note": "Per-range rounding inflates tenure by up to 20%. Each merged range is rounded to 1 dp BEFORE totalYearsExperience sums them, so a 3-month range goes 0.25 -> 0.3, a systematic +20% that compounds with range count. Measured: 17 consecutive 3-month contracts (truth 4.25 years) report 5.1 against a 5-year must-have -> score 100, ELIGIBLE, unmet [], reservations []. The error is proportional, not bounded by the documented 0.1 quantization. Fix is arithmetic - sum credited months, round once. Realistic population: locum, agency, contractor and seasonal CVs."
+      "status": "closed",
+      "note": "CLOSED. Per-range roundHalfUp(months/12, 1) before summing biased every range up - a systematic +20% on 3-month ranges, compounding with range count. Ranges now carry the exact fraction and the sum is rounded ONCE. Verified: 17 consecutive 3-month contracts now report 4.3 against a truth of 4.25 (was 5.1, which wrongly cleared a 5-year must-have). SECOND HALF, caught by the lead before commit: rounding once at quantize's 6dp showed the recruiter 'found 11.583333'. Arithmetic precision and DISPLAY precision are different jobs - the per-range rounding had been incidentally supplying the 1dp presentation. Totals now round to 1dp at the sum, and normalizedValue is labelled at 1dp while `years` stays exact."
     },
     {
       "id": "H-105",
@@ -618,14 +618,26 @@
     {
       "id": "H-106",
       "severity": "false-refusal",
-      "status": "open",
-      "note": "NON_ENGLISH_FUNCTION_WORDS contains tokens that are ordinary English or English proper nouns - van, door, die, den, el, los, la, le, de, est, par, con - and two hits on one line refuse the whole document. carriesNonEnglishFunctionWords runs on the RAW line, so stripNeutralTokens never applies and ALL-CAPS forms count. 4 of 7 realistic English lines refused: 'Loaded the van each morning and completed door to door parcel deliveries', 'Chef de Partie at Le Gavroche', 'press die tooling for door panel assembly', 'between the El Paso and Los Angeles offices'. Breaks catering, trades and logistics/haulage - three of the ten professions the code comment names as its own corpus, whose '0 false positives in 70 lines' claim is true of those lines and does not generalise. Does NOT block E5, but the refusal message asserts the document mixes non-English text, which is false."
+      "status": "closed",
+      "note": "CLOSED. stripNeutralTokens is now applied before the function-word scan (it was running on the raw line), the 7 tokens that are ordinary English words were removed (van, door, die, den, est, con, par - measured cost: 0 against both closed Romance sub-floor cases), and the 5 proper-noun-prone tokens kept (el, los, la, le, de) now require lowercase in the original text, so El Paso / Los Angeles / Le Gavroche / De Pere no longer count. Raising MIN_FUNCTION_WORD_HITS to 3 was measured and REJECTED - it loses the French sub-floor catch outright - and is recorded in the code as a rejected lever. Final: 0/23 English CVs falsely refused, 0/17 adversarial English lines (was 15/17), 13/13 non-English still refused, 2/2 Romance sub-floor still caught."
     },
     {
       "id": "H-107",
       "severity": "false-refusal",
+      "status": "closed",
+      "note": "CLOSED under a disclosed assumption. Ambiguous ranges no longer each contribute an independent lower bound: when 2+ exist, they are merged under ONE locale reading applied to all of them (day-first, then month-first) and the smaller grand total wins, so overlap is deduped. For exactly one ambiguous range this reduces to the previous per-range computation. SOUNDNESS, stated rather than hidden: min(dayFirst, monthFirst) <= truth holds provided the document does not MIX locales across its own ambiguous ranges, which is not structurally provable. Disclosed in the code and in dimensions.ts."
+    },
+    {
+      "id": "H-108",
+      "severity": "coverage-gap",
       "status": "open",
-      "note": "Concurrent ambiguous date ranges double-count their lower bound. unreadableEmploymentDates sums each range's minPossibleYears with no interval merge (neither resolves to absolute months), so two identical concurrent ambiguous roles produce minPossibleYears 9.8 for what is really ~4.9, and a BLOCKING reservation whose recruiter-visible detail asserts 'at least 9.8'. Documented as a residual in dimensions.ts by ADR-032 and confirmed reachable by the ADR-015 round. System behaviour is refusal, so false-refusal per ADR-027 - but with a wrong number in the text shown to the recruiter."
+      "note": "Residual of H-100's fix, found and disclosed by the engineer who wrote it and reproduced by the lead. A DATELESS line of the form '<header word>' + strict separator + Title-Case pair - e.g. 'Experience   Team Lead, Acme Corp' - is recognised as a header, because a job-title-and-employer pair is syntactically indistinguishable from a location ('Leeds, UK') once no digits are present. NO TENURE IMPACT: the dated form 'Experience   Team Lead, Acme Corp, 2019 - 2022' is correctly rejected, and dates are what drive tenure. The blast radius is a section boundary shifting on a dateless line, which can misattribute following lines between education and experience. Also unhandled: a letter-spaced header WITH trailing matter ('E D U C A T I O N   Leeds, UK')."
+    },
+    {
+      "id": "H-109",
+      "severity": "process",
+      "status": "closed",
+      "note": "A fix relocated a wrong number instead of removing it, and it took the lead's own verification to catch. H-103's first implementation required the literal word 'experience', which killed the fabrications AND dropped ordinary claims like '15 years as a registered nurse' - producing 'found 0' for a candidate with fifteen years, the same silent-zero shape as H-101 and H-102 being closed in the same commit. Separately H-104's first implementation removed per-range rounding correctly but left the total at quantize's 6dp, so the recruiter would have been shown 'found 11.583333'. BOTH were reported by the engineer as clean closures with passing tests. The lesson is not that the engineer erred - the tests genuinely passed - but that 'the named defect is gone' and 'the defect class is gone' are different claims, and only end-to-end probing of what a recruiter SEES distinguishes them."
     }
   ]
 }
