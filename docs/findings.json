@@ -674,6 +674,18 @@
       "severity": "process",
       "status": "closed",
       "note": "H-041 closed after five sessions, and E5 is MET. It was named a language-detection defect and three sessions went into detecting the foreign line better - prose gate, compounding signal, function-word lexicon, mean-word-length threshold, institution exemption, a full classifier swap to eld, a 40-point threshold grid. Each narrowed it; none closed it. H-112 settled why with measurement: a person's NAME is foreign text, so no line-level classifier can separate the two, and every floor low enough to catch a short foreign degree line refuses candidates by the origin of their name. The actual defect was one sentence the engine had no right to say - 'Requires at least a bachelor degree', printed when it had extracted no education at all. ADR-034 makes it decline to assert a must-have unmet while holding unread text in that requirement's section. THE LESSON: the defect's NAME encoded a hypothesis about its cause, the hypothesis was wrong, and what closed it was asking what the recruiter was actually shown - the same shape as H-040, H-089, H-101 and H-102, all filed under different names. What closed it was not a smarter classifier but an engine more willing to say it did not know."
+    },
+    {
+      "id": "H-116",
+      "severity": "false-refusal",
+      "status": "open",
+      "note": "The first real CV ever uploaded was refused on its CONTACT line (mixed_language_content). Measured on the real file: whole-doc verdict English (correct), 1 of 58 segments flagged - line 1. Chain: stripNeutralTokens' URL pattern requires https:// so scheme-less 'linkedin.com/in/username' survives and splits into 4 junk words, lifting the line past the 6-word floor; the judged text is then a Spanish-origin US city plus the candidate's own name - H-112's 'a name is foreign text' arriving through the ADR-022 veto, which has NO header-block gate (ADR-034's exclusion covers only the unreadable_section path). Sixth instance of trap 1: the 258-line pool contained no real-shaped contact line. FIX PLAN in docs/NEXT_PHASE.md: strip dotted/scheme-less tokens as neutral, section-gate the veto's line pass, and add a real-shaped contact-line corpus before re-measuring."
+    },
+    {
+      "id": "H-117",
+      "severity": "process",
+      "status": "open",
+      "note": "Jobs cannot be deleted from the UI. DELETE /api/jobs/:id exists and is tested; no UI element calls it - jobs list and job page render no delete control, and the needs-attention job page (where deletion is most wanted) shows only the warning. PRODUCT_DECISIONS makes explicit deletion part of the privacy boundary. The ADR-036 browser verification missed it because the walkthrough only added things - a pass that never deletes cannot find a missing delete button."
     }
   ]
 }

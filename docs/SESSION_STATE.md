@@ -52,7 +52,13 @@ packaged launcher beyond `pnpm serve`, embeddings (cascade step 4), OCR.
 
 ## Next phase
 
-The defining workflow ships. What remains, in rough order of value:
+**➡ READ `docs/NEXT_PHASE.md` FIRST.** The product met its first real CV on
+2026-08-17 and failed twice: the contact line refused the whole document
+(H-116, false-refusal — the sixth instance of trap 1), and jobs cannot be
+deleted from the UI (H-117). Both are diagnosed from measurement with a fix
+plan and pass criteria. Fix those before anything below.
+
+After that, in rough order of value:
 
 - **Use it against a real pool** — the fastest way to find what the corpus
   cannot: real CVs, at volume, on the recruiter's own machine.

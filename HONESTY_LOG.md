@@ -4198,3 +4198,62 @@ names.
 **What did not close it, recorded so the pattern is visible:** every approach
 that tried to make the classifier smarter. What closed it was making the engine
 **more willing to say it did not know**.
+
+---
+
+### H-116 · The first real CV was refused on its contact line — trap 1, a sixth time
+
+The user uploaded their own resume. It was refused — as a candidate and as a
+job — with `mixed_language_content`. **Measured on the actual file** (content
+not reproduced here; ADR-014):
+
+```
+whole-document verdict:  isEnglish = TRUE (correct)
+flagged segments:        1 of 58 — line 1, the CONTACT line
+bearing-token shape:     <Proper> <Proper> • • • <dotted> •
+```
+
+The chain, each link verified:
+
+1. A real CV's first line is `City, ST • (phone) • email • linkedin.com/in/…`.
+2. `stripNeutralTokens` removes emails and URLs — but its URL pattern requires
+   `https?://`, and real contact lines write **scheme-less domains**.
+   `linkedin.com/in/username` survives, and `CASED_WORD` splits it into four
+   "words" (`linkedin`, `com`, `in`, `username`).
+3. Those junk tokens lift the line past `MIN_BEARING_WORDS_FOR_LINE_JUDGEMENT`
+   (6), so the sub-floor `eld` pass judges it.
+4. What it judges is a **Spanish-origin US city plus the candidate's own
+   name** — which is H-112's central finding ("a person's name IS foreign
+   text") arriving through the door the section gate does not cover: the
+   ADR-022 veto runs on every line, header block included. ADR-034's
+   header-exclusion insight was applied only to the `unreadable_section` path.
+
+**Classified `false-refusal`** — the gate held, no wrong score was shown, C7
+did exactly what it promises. And that classification must not soften the
+product fact: **the very first real document the product ever met was refused
+on the one line every real CV on earth carries.**
+
+**Why the 258-line pool missed it, stated plainly:** H-111 already recorded
+this exact lesson — hand-built corpora under-sample proper nouns and neutral
+token lists — and the pool STILL contained no real-shaped contact line with
+scheme-less domains. Its closest analogue (`Contact: email, City`) strips to
+2 bearing words and ducks under the floor. Real contact lines are longer.
+Sixth instance of trap 1, by the lead, one session after writing H-111.
+
+---
+
+### H-117 · Jobs cannot be deleted from the UI at all
+
+`DELETE /api/jobs/:id` exists, is tested, and cascades correctly. **No UI
+element calls it.** The candidates view has a Delete button; the jobs view and
+job page have none — so the user's refused resume-as-job sat on the Jobs list
+with no way to remove it, on a product whose PRODUCT_DECISIONS names explicit
+deletion as part of the privacy boundary.
+
+Compounding it: a needs-attention job's page shows only the refusal warning
+and returns — the one page where deletion is most wanted offers the least.
+
+The ADR-036 browser verification never caught it because the walkthrough only
+ever added things. **A verification pass that never deletes anything cannot
+find a missing delete button** — the same one-directional-testing shape as
+H-090's "tests that never watch anything fail".
