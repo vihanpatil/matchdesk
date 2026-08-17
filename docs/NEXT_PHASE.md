@@ -21,6 +21,9 @@ blocker, `H-041`.**
 
 **Do not carry E3/E4 figures forward from here.** Both are settled by running a
 command. Quoting a stale figure is trap 3 and this project has done it twice.
+As of this commit they were measured: E3 settled by `pnpm test` (1005 tests),
+E4 **80.02%** in 12m01s with no module below 60 — **both MET**. Re-run them
+rather than trusting these two sentences.
 
 **52 commits are unpushed and the user has HELD the push.** An ADR-014 content
 scan is clean and on file. Do not push without asking.
@@ -115,6 +118,15 @@ None of these blocks E5. All are registered in `docs/findings.json`.
   dependency is a decision nobody has taken.
 - **E2** — needs a metamorphic relation that generates the defect it names.
   R21/R22 landed for date notation; the language axis still has H-070's problem.
+- **`experience.ts` is the weakest module in the engine at 69.36% mutation
+  score, and it DECLINED this session** (was 71.04%) — see **H-110**. E4 still
+  passes on both criteria, which is precisely why this is easy to miss: the
+  ratchet watches only the aggregate, and the aggregate is carried by files
+  that are easy to test. This is the file that computes tenure and the file
+  every wrong-score finding here has ultimately been about. **A session aiming
+  to raise E4 should start here and nowhere else** — but note it means writing
+  tests against surviving mutants rather than against defects, which is a
+  different and larger activity.
 - **The fixture builder cannot express a multi-run visual line.**
   `buildFixturePdf` draws one run per line, so **no fixture can hold an H-100
   regression test.** Extending it is the prerequisite for a corpus-level guard.

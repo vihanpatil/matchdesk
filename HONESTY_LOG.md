@@ -3922,3 +3922,49 @@ and each had watched them fail first. It is that **"the named defect is gone"
 and "the defect class is gone" are different claims**, and a unit test on an
 extractor cannot tell them apart — only tracing to the number a recruiter reads
 can. Every fix in this round was accepted only after that trace.
+
+---
+
+### H-110 · E4 passes, and the file that matters most is the worst-pinned
+
+Re-measured after the adversarial fix round: **80.02% overall in 12m01s**,
+above the 79 ratchet. ADR-023 E4 also requires no extraction or scoring module
+below 60. Per-module, ascending:
+
+```
+69.36  experience.ts     79.70  education.ts     91.88  dimensions.ts
+72.97  certifications.ts 83.67  skills.ts        92.11  invisible.ts
+74.76  explain.ts        84.15  sections.ts      94.68  eligibility.ts
+76.92  extract.ts        86.00  bullets.ts       97.06  round.ts
+79.57  score.ts          88.46  lookup.ts       100.00  span.ts / types.ts
+```
+
+**E4 is MET on both criteria.** Two things about it are worth saying anyway.
+
+**`sections.ts` improved 74.07 → 84.15**, which is the H-100 work paying for
+itself — that file gained a real rule and real adversarial tests together.
+
+**`experience.ts` DECLINED, 71.04 → 69.36, and it is now the weakest module in
+the engine.** It is also:
+
+- the file this session changed most — ADR-032's ambiguity machinery, H-101's
+  clamping, H-102's window bound, H-104's exact-fraction arithmetic, H-095's
+  two-part dates and H-107's merge all landed in it;
+- the file that computes **tenure**, which is the number that decides
+  eligibility and the one every wrong-score finding in this project has
+  ultimately been about.
+
+The decline is not a regression in behaviour — 103 tests pass and every fix has
+a test that fails without it. It means the **new** code carries survived mutants
+at a higher rate than the code it joined: the tests pin the defects that were
+found, and pin the surrounding arithmetic less well.
+
+**Recorded rather than left implicit, because a passing gate is exactly where
+this would go unnoticed.** The ratchet only watches the aggregate, and the
+aggregate is carried by files that are easy to test. A future session raising
+E4 should start here and nowhere else.
+
+**Not fixed now, and the reason is stated:** raising it means writing tests
+against surviving mutants rather than against defects, which is a different and
+larger activity, and doing it while E5 still has an open blocker would be
+optimising the wrong thing.

@@ -15,7 +15,7 @@
     "!packages/core/src/index.ts",
     "!packages/core/src/taxonomy/data.ts"
   ],
-  "_thresholdComment": "RATCHET, not an aspiration. `break` sits just below the measured score so it can never get WORSE without failing the build. Measured 65.03% on 2026-08-12 (break 64); re-measured 80.42% on 2026-08-13 after the E4 work, so break is now 79. Re-measured 80.39% on 2026-08-14 after ADR-031/ADR-032 (17m30s): flat overall (-0.03), and the weakest module IMPROVED from 68.50% to 71.04% (experience.ts) despite ADR-032 adding a whole new code path there. `break` stays at 79 \u2014 the convention here is roughly a point of headroom below the measurement, not a ceiling pressed against it. Raise it as survivors fall; NEVER lower it without a HONESTY_LOG entry saying why. ADR-023 E4 requires >=75 overall with no extraction or scoring module below 60 \u2014 both hold.",
+  "_thresholdComment": "RATCHET, not an aspiration. `break` sits just below the measured score so it can never get WORSE without failing the build. Measured 65.03% on 2026-08-12 (break 64); 80.42% on 2026-08-13; 80.39% on 2026-08-14 after ADR-031/ADR-032; 80.02% on 2026-08-14 after the adversarial fix round (12m01s). `break` stays at 79 \u2014 the convention here is about a point of headroom below the measurement, not a ceiling pressed against it. Raise it as survivors fall; NEVER lower it without a HONESTY_LOG entry saying why. ADR-023 E4 requires >=75 overall with no extraction or scoring module below 60; both hold, the weakest being experience.ts at 69.36% (down from 71.04% \u2014 see H-110, it is the file this project changes most and pins least well).",
   "thresholds": {
     "high": 90,
     "low": 70,

@@ -638,6 +638,12 @@
       "severity": "process",
       "status": "closed",
       "note": "A fix relocated a wrong number instead of removing it, and it took the lead's own verification to catch. H-103's first implementation required the literal word 'experience', which killed the fabrications AND dropped ordinary claims like '15 years as a registered nurse' - producing 'found 0' for a candidate with fifteen years, the same silent-zero shape as H-101 and H-102 being closed in the same commit. Separately H-104's first implementation removed per-range rounding correctly but left the total at quantize's 6dp, so the recruiter would have been shown 'found 11.583333'. BOTH were reported by the engineer as clean closures with passing tests. The lesson is not that the engineer erred - the tests genuinely passed - but that 'the named defect is gone' and 'the defect class is gone' are different claims, and only end-to-end probing of what a recruiter SEES distinguishes them."
+    },
+    {
+      "id": "H-110",
+      "severity": "process",
+      "status": "open",
+      "note": "E4 re-measured 80.02% (12m01s), above the 79 ratchet, and no module below 60 - both ADR-023 criteria hold. BUT experience.ts DECLINED 71.04 -> 69.36 and is now the weakest module in the engine, while being both the file this session changed most (ADR-032, H-101, H-102, H-104, H-095, H-107 all landed in it) and the file that computes tenure - the number every wrong-score finding in this project has been about. Not a behavioural regression: 103 tests pass and every fix has a test that fails without it. It means the NEW code carries survived mutants at a higher rate than the code it joined. Left open deliberately: raising it means writing tests against surviving mutants rather than defects, which is a larger and different activity, and doing it while E5 has an open blocker optimises the wrong thing. sections.ts improved 74.07 -> 84.15 in the same round."
     }
   ]
 }
