@@ -4114,3 +4114,87 @@ letter of the taxonomy: the gate would read MET while the product refused
 Indian candidates by name. A gate that can be passed that way is measuring the
 wrong thing, and reporting it as success would be the exact dishonesty this log
 exists to prevent.
+
+---
+
+### H-113 · What ADR-034 does not cover, and the mistake I nearly recorded
+
+A foreign line **transliterated into bare ASCII** — diacritics and native
+alphabet stripped — is still not recognised, so the H-041 harm survives for that
+input.
+
+```
+                     native orthography    transliterated
+  Hungarian               CAUGHT              missed
+  Greek                   CAUGHT              missed
+  Vietnamese              CAUGHT              missed
+```
+
+**The mistake I nearly made is the point of this entry.** My first adversarial
+set for this fix was transliterated, because the fixture corpus avoids non-ASCII
+(`pdf-lib`'s StandardFonts are WinAnsi-encoded — H-067). Hungarian and Greek
+were missed, and I was one step from recording _"the residual is that `eld`
+cannot identify Hungarian or Greek"_. That would have been **false**, and it
+would have sent the next session looking for a better classifier — the same
+wrong turn H-041 already cost five sessions.
+
+Tested in native orthography, every language is caught: Hungarian, Greek,
+Vietnamese, Russian, Japanese, Arabic, Polish, German. **The residual is my test
+data's encoding, not the classifier's coverage.**
+
+Classified `coverage-gap`: bare-ASCII transliteration is not a CV format.
+Recorded rather than quietly dropped, because it is a real input someone could
+produce.
+
+---
+
+### H-114 · A simpler rule exists, costs more, and is written down so nobody "simplifies" into it
+
+ADR-034 keeps the language signal. A rule without it — _Education section
+present, zero education evidence, must-have unmet_ — is simpler, needs no
+classifier at all, and would close even H-113's residual.
+
+**Measured: it costs 1/50 corpus documents**, and the shape it refuses is a CV
+listing institutions and dates with no degree token —
+`"University of Manchester, 2009-2013"` — which is ordinary in real CVs. That
+trades a rare defect for a frequent refusal.
+
+Recorded because it is exactly the change a future reader would make while
+tidying, seeing a classifier dependency that looks unnecessary.
+
+---
+
+### H-115 · H-041 closed after five sessions, by abandoning its own name
+
+**E5 is MET.** Every wrong-score finding in the registry is closed.
+
+H-041 was called a language-detection defect from the day it was opened, and
+three sessions were spent trying to detect the foreign line better: a prose
+gate, a compounding signal, a function-word lexicon, a mean-word-length
+threshold, an institution-word exemption, a whole classifier swap to `eld`, and
+finally a 40-point threshold grid. Each narrowed it. None closed it.
+
+**It was never a detection problem.** H-112 settled that with measurement: a
+person's name _is_ foreign text, `"Nguyen Thi Minh Anh"` reads Vietnamese more
+strongly than any real foreign line, and every floor low enough to catch a short
+foreign degree line refuses candidates by the origin of their name — four of
+them from this project's own Indian corpus.
+
+**The defect was one sentence the engine had no right to say:**
+`"Requires at least a bachelor degree"`, printed when it extracted no education
+at all. Not "we could not read this candidate's education" — a claim about the
+person. ADR-034 makes the engine decline to assert a must-have unmet while it
+holds unread text in that requirement's own section. Zero cost across 50
+documents, and it catches nine languages in native orthography.
+
+**The lesson, and it is the one this whole log keeps circling.** The defect's
+_name_ encoded a hypothesis about its cause, and the hypothesis was wrong. Five
+sessions of work went into the thing the name pointed at. What closed it was
+asking what the recruiter was actually shown, and noticing the engine was
+asserting a negative it could not support — which is the same shape as H-040,
+H-089, H-101 and H-102, all closed the same way and all filed under different
+names.
+
+**What did not close it, recorded so the pattern is visible:** every approach
+that tried to make the classifier smarter. What closed it was making the engine
+**more willing to say it did not know**.

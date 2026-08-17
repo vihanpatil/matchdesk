@@ -1,4 +1,5 @@
-import type { SkillAttribute } from '../extraction/types.js';
+import type { ExtractedAttribute, SkillAttribute } from '../extraction/types.js';
+import type { SectionName } from '../extraction/sections.js';
 import { quantize, roundHalfUp } from '../numeric/round.js';
 import type { SemanticMatcher } from './cascade.js';
 import {
@@ -17,6 +18,7 @@ import type {
   Candidate,
   DimensionContribution,
   DimensionId,
+  EligibilityResult,
   Job,
   RankedCandidates,
   Reservation,
@@ -200,6 +202,52 @@ function contributionsFor(active: readonly ActiveDimension[]): readonly Dimensio
  * presented as complete and the reservation blocks. If it would not, the
  * reservation is still surfaced so the recruiter can see the gap.
  */
+/**
+ * Which dimension's must-have a given CV section feeds. Only sections whose
+ * content can decide an eligibility gate appear here (H-041).
+ */
+const SECTION_DIMENSION: Partial<Record<SectionName, DimensionId>> = {
+  education: 'education_certs',
+  certifications: 'education_certs',
+  experience: 'experience_relevance',
+  skills: 'skills',
+};
+
+/**
+ * A must-have reported UNMET while the engine holds unread text in that very
+ * section (H-041). `unreadable_section` attributes are only emitted when the
+ * dimension had NO other evidence, so reaching here means the engine is about
+ * to assert a negative purely from silence.
+ *
+ * Blocking without a materiality computation, unlike
+ * `unverified_tenure_claim`: an unmet must-have IS the eligibility verdict, so
+ * there is no non-material version of it to surface instead.
+ */
+function unsupportedNegatives(candidate: Candidate, eligibility: EligibilityResult): Reservation[] {
+  const unread = candidate.attributes.filter(
+    (a): a is Extract<ExtractedAttribute, { kind: 'unreadable_section' }> =>
+      a.kind === 'unreadable_section',
+  );
+  if (unread.length === 0) return [];
+
+  const reservations: Reservation[] = [];
+  for (const requirement of eligibility.unmet) {
+    const blocker = unread.find((a) => SECTION_DIMENSION[a.section] === requirement.dimension);
+    if (blocker === undefined) continue;
+    reservations.push({
+      kind: 'unsupported_negative',
+      blocking: true,
+      dimension: requirement.dimension,
+      detail:
+        `"${requirement.reason}" cannot be asserted: the ${blocker.section} section ` +
+        `contains text the engine could not read ("${blocker.value.slice(0, 60)}"), and no ` +
+        `${blocker.section} evidence was extracted at all. This is a document we could not ` +
+        `fully read, not a candidate who does not meet the requirement.`,
+    });
+  }
+  return reservations;
+}
+
 function reservationsFor(job: Job, candidate: Candidate): Reservation[] {
   const requirement = job.experience?.requirement;
   const gates = requirement?.mustHave === true;
@@ -291,7 +339,10 @@ export function scoreCandidate(
     eligibility,
     dimensions,
     explanation,
-    reservations: reservationsFor(job, candidate),
+    reservations: [
+      ...reservationsFor(job, candidate),
+      ...unsupportedNegatives(candidate, eligibility),
+    ],
   };
 }
 

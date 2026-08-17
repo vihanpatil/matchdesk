@@ -147,53 +147,36 @@ describe('the REAL registry, as shipped', () => {
     expect(validateRegistry(registry.findings, logIds)).toEqual([]);
   });
 
-  it('records H-041 as the open wrong-score finding ADR-027 made it', () => {
+  it('records H-041 as CLOSED, and still as wrong-score', () => {
+    // The severity stays `wrong-score`. It was reclassified once already
+    // (ADR-027, from the opposite direction) and the temptation on the way out
+    // is to soften the label rather than close the defect. What closed it is
+    // ADR-034: the engine no longer asserts a must-have unmet while holding
+    // text it could not read.
     const h041 = registry.findings.find((f) => f.id === 'H-041');
-    expect(h041).toMatchObject({ severity: 'wrong-score', status: 'open' });
+    expect(h041).toMatchObject({ severity: 'wrong-score', status: 'closed' });
   });
 
-  it('E5 is NOT MET at HEAD, and says so for the reasons on record', () => {
-    // Asserts the CURRENT, WRONG state on purpose, like the corpus's
-    // documented-gap fixtures. When a remediation lands this must be updated
-    // deliberately, which is the point — the gate result cannot change
-    // silently.
-    //
-    // It has now earned that FIVE times: H-002 triaged out, H-040 closed by
-    // ADR-029, H-089 registered, H-095 split out of H-089 by an ADR-015
-    // verifier, and now an ADR-015 round that took the count from 3 to 8.
+  it('E5 is MET at HEAD, with every wrong-score finding closed', () => {
+    // This assertion has been flipped SEVEN times, and it was worth every one.
     //   ['H-002','H-040','H-041'] -> ['H-040','H-041'] -> ['H-041']
-    //   -> ['H-041','H-089'] -> ['H-041','H-089','H-095']
-    //   -> the eight below.
+    //   -> ['H-041','H-089'] -> ['H-041','H-089','H-095'] -> eight -> ['H-041']
+    //   -> [].
     //
-    // The trend is the finding. Two moves made the gate easier; three made it
-    // HARDER, every one of those because somebody measured rather than
-    // reasoned. Two sessions ago the plan assumed H-041 was the last blocker
-    // and that closing it would flip E5; there are now eight, and five of them
-    // were found by ONE adversarial round against rows the checklist already
-    // named. H-062 is on this list because that round falsified its recorded
-    // mechanism, not merely its severity — it had been sitting as a
-    // coverage-gap describing a pdfjs defect that does not exist.
+    // Five of those moves made the gate HARDER, every one because somebody
+    // measured rather than reasoned. Reaching zero is not the interesting part;
+    // the interesting part is that the count went UP three times on the way,
+    // and that H-041 - open across five sessions - was finally closed by
+    // abandoning the approach its own name implied. It was never really a
+    // language-detection defect: it was the engine asserting a NEGATIVE from
+    // silence (ADR-034).
     //
-    // Do not read a rising count as the project getting worse. Every one of
-    // these was already true of the code; what changed is that somebody
-    // looked.
-    // SIXTH time, and the first that made the gate dramatically EASIER: the
-    // eight above went to one. Seven wrong-score findings were closed in a
-    // single round — H-062, H-095, H-100, H-101, H-102, H-103, H-104 — every
-    // one of them found by the ADR-015 pass that had just raised the count
-    // from three to eight.
-    //
-    // Both halves of that swing are the same fact: the defects were always in
-    // the code, and the only variable was whether anyone had looked. Do not
-    // read the fall as progress any more than the rise was decline. What is
-    // load-bearing is that each closure has a test that fails without its fix.
-    //
-    // H-041 is what remains, and it will not fall to this kind of round: it is
-    // a segmentation geometry problem (H-092), its scope note was itself wrong
-    // until H-105 corrected it, and closing it needs a change nobody has costed.
+    // If a future change flips this back, that is the system working. Do not
+    // reach for the severity field to make it green again - that is the loop
+    // ADR-028 exists to end.
     const gate = computeGate(registry.findings);
-    expect(gate.e5).toBe(false);
-    expect(gate.blockingE5.map((f) => f.id).sort()).toEqual(['H-041']);
+    expect(gate.e5).toBe(true);
+    expect(gate.blockingE5).toEqual([]);
   });
 
   it('every remaining E5 blocker is a measured defect, not an untriaged one', () => {

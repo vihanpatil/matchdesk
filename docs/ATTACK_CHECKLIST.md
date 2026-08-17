@@ -35,7 +35,7 @@ is re-run. Anything found outside these classes gets added as a new row.
 
 | #   | Attack class                             | Why it is here                                             | Status                                                      |
 | --- | ---------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- |
-| A1  | Mixed / code-switched language           | H-041, H-043, H-068 — the open wrong-score defect          | **FINDING OPEN** (H-041)                                    |
+| A1  | Mixed / code-switched language           | H-041, H-043, H-068 — closed by ADR-034, not by detection  | **Covered** (H-041 closed 2026-08-14)                       |
 | A2  | Invisible / homoglyph / RTL characters   | H-034, H-048 — fabricated skills, not just breakage        | Covered (DOCX only, H-067)                                  |
 | A3  | Degree and qualification ambiguity       | H-022, H-033, H-053 — "as", British forms, `X of Y`        | Covered                                                     |
 | A4  | Date range and tenure arithmetic         | H-040, H-089, H-095, H-101-H-104 — all closed              | **Covered** (attacked 2026-08-14; 6 findings, all fixed)    |
@@ -49,37 +49,38 @@ is re-run. Anything found outside these classes gets added as a new row.
 | A12 | Numeric edge cases in scoring            | H-056 — `roundHalfUp` bound; renormalization               | Covered                                                     |
 
 **E1 is MET when every row reads Covered and no row has an open wrong-score
-finding.** After the 2026-08-14 adversarial round, **one row does not**:
+finding.** As of 2026-08-14, **every row reads Covered and the registry holds no
+open wrong-score finding** — run `pnpm gate` rather than trusting this sentence.
 
-- **A1 (H-041)** — the only remaining open wrong-score in the project, now
-  **narrowed but not closed** (H-111). A sub-floor `eld` line pass took the
-  class from Romance-only to 11 of 26 measured foreign lines across 15
-  languages, at 0/258 English lines refused, and every language H-105 measured
-  as wrong-scoring is now caught. **The residual is a foreign line of ≤5
-  bearing words, and the axis is a word count rather than a language family** —
-  the four remaining cases are Germanic, Germanic, Germanic and Turkic.
-  Closing it means lowering the evidence floor, which is measured to refuse
-  technology lists at 5 words and candidate NAMES at 4. That last cost is
-  H-028 D3's shape and makes it a user decision, not a tuning one.
+**A1 was the last, and how it closed is the part worth reading.** It stayed open
+across five sessions while three of them tried to detect the foreign line
+better. H-112 settled by measurement that this is impossible at line
+granularity: **a person's name is foreign text**, `"Nguyen Thi Minh Anh"` reads
+Vietnamese more strongly than any genuine foreign line, and every evidence floor
+low enough to catch a short foreign degree line refuses candidates by the origin
+of their name — four of them from this project's own Indian corpus.
 
-**A4 and A5 are now Covered, and both were earned rather than argued.** A5 had
-never been executed in the project's history; its first run produced H-100, a
-wrong-score in both directions, now fixed. A4's ADR-032 remedy was attacked and
-five further defects survived it (H-101-H-104, plus H-095's two-part half); all
-are closed, each with a test that fails without its fix.
+**It was never a detection defect.** It was the engine printing "Requires at
+least a bachelor degree" while holding text it could not read — asserting a
+negative from silence. ADR-034 makes it decline to assert a must-have unmet in
+that situation. Zero cost across 50 documents; nine languages caught in native
+orthography.
 
-**A1 and A4 were once called "the same shape". That is now only half true.**
-Both were the engine emitting a confident number while silently discarding
-something it could not account for — but A4's remedy turned the discarded thing
-into emitted evidence, and A1 cannot use it, because there is nothing to emit:
-the language veto never gets a judgeable segment to abstain on. The shared
-diagnosis held; the shared remedy did not.
+**A4 and A5 were earned the same way.** A5 had never been executed in the
+project's history; its first run produced H-100, a wrong-score in both
+directions. A4's ADR-032 remedy was attacked and five further defects survived
+it, all now closed with tests that fail without their fixes.
 
 **What a future round need not re-run.** The 2026-08-14 round reported honest
 negatives on larger header fonts, page-boundary headers, mid-word font splits,
 three-part date forms of every separator, overlap merging, and the
-whole-document language gate on full-paragraph foreign text. Clean under
-genuine effort.
+whole-document language gate on full-paragraph foreign text. Clean under genuine
+effort.
+
+**Covered is not finished.** Open `coverage-gap` findings remain against these
+rows — H-108 (a dateless header-shaped line), H-113 (bare-ASCII
+transliteration). Neither can move a number on its own, which is why they do not
+block, and both are registered rather than folded into a Covered label.
 
 ## Rows deliberately NOT on this list
 

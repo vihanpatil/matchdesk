@@ -1,3 +1,4 @@
+import { unreadableSectionAttributes } from '../ingestion/unreadableSections.js';
 import {
   extractAttributes,
   scoreCandidate,
@@ -148,7 +149,7 @@ export async function ingestCandidateDocument(
   return {
     candidate,
     outcome,
-    attributes: extractAttributes(candidate.rawText, { referenceDate }),
+    attributes: attributesWithUnreadable(candidate.rawText, referenceDate),
     extraction,
     alreadyExisted,
   };
@@ -248,6 +249,21 @@ function assertJobReadable(db: Database.Database, jobId: string): void {
  * is a cache keyed by (text hash, engine version) — not a parallel
  * representation.
  */
+
+/**
+ * Extracted attributes, plus a record of any section the engine could not read
+ * and found no other evidence for (H-041). Kept in one place so every entry
+ * point derives the same attribute list — a second, subtly different derivation
+ * is the H-099 shape, where the batch path and the single path disagreed.
+ */
+function attributesWithUnreadable(
+  rawText: string,
+  referenceDate: ReferenceDate,
+): readonly ExtractedAttribute[] {
+  const attributes = extractAttributes(rawText, { referenceDate });
+  return [...attributes, ...unreadableSectionAttributes(rawText, attributes)];
+}
+
 export function scoreStoredPair(
   db: Database.Database,
   job: ScoringJob,
@@ -268,7 +284,7 @@ export function scoreStoredPair(
   const scoringCandidate: ScoringCandidate = {
     id: candidate.id,
     createdAt: candidate.createdAt,
-    attributes: extractAttributes(candidate.rawText, { referenceDate }),
+    attributes: attributesWithUnreadable(candidate.rawText, referenceDate),
   };
 
   const result = scoreCandidate(job, scoringCandidate);
@@ -351,7 +367,7 @@ export function scoreJobAgainstCandidates(
     const scoringCandidate: ScoringCandidate = {
       id: candidate.id,
       createdAt: candidate.createdAt,
-      attributes: extractAttributes(candidate.rawText, { referenceDate }),
+      attributes: attributesWithUnreadable(candidate.rawText, referenceDate),
     };
     const result = scoreCandidate(job, scoringCandidate);
 

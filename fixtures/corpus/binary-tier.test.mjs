@@ -197,6 +197,8 @@ describe('corpus · binary tier · format parity (metamorphic)', () => {
                 return `years:${String(a.years)}:${String(a.isExplicitStatement ?? false)}`;
               case 'unreadable_date_range':
                 return `unreadable:${String(a.minPossibleYears)}`;
+              case 'unreadable_section':
+                return `unreadable-section:${a.section}`;
             }
           })
           .sort();

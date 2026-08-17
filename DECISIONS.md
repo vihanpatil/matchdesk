@@ -1780,3 +1780,79 @@ nobody here controls gets reverted, and then the hole is invisible again.
   of the patterns recognise and fail wrongly; the waiver path is the remedy, and
   `hasLicenseText` deliberately fails an empty path list rather than passing it,
   so an unresolvable package cannot slip through the way the original hole did.
+
+---
+
+## ADR-034 — An unmet must-have may not be asserted from silence (closes H-041)
+
+**Date:** 2026-08-14 · **Status:** Accepted · **Extends ADR-029**
+
+H-041 was open across five sessions. Every attempt to close it tried to detect
+the foreign line better. **That was the wrong problem**, and the measurement
+that proves it is H-112: at line granularity a person's **name is foreign
+text**. `"Nguyen Thi Minh Anh"` scores Vietnamese at 0.834 with English at
+0.000 — a stronger foreign signal than any genuine foreign line measured. Every
+evidence floor low enough to catch a short foreign degree line also refuses
+candidates in proportion to how non-Anglo their name is, and four of the names
+it refuses come from this project's own `INDIAN_CV_CORPUS`. Margin thresholds,
+absolute-score cuts, a 40-point grid and larger ngram tiers were all measured
+and all rejected.
+
+**The actual defect was never detection.** It is that the engine reports
+`"Requires at least a bachelor degree"` when it extracted **no education at
+all** — asserting a negative from silence. That sentence is a claim about a
+person, and the engine cannot support it when it is holding text it could not
+read. Measured, it flipped the same candidate between 100/eligible and
+50/ineligible on nothing but the language their degree was written in.
+
+### Decision
+
+`apps/server` emits an `unreadable_section` attribute for a line it cannot read
+**inside a recognised section whose dimension has no other evidence**.
+`scoreCandidate` raises a **blocking** `unsupported_negative` reservation when a
+must-have in that dimension is unmet. `scoreStoredPair` and the batch path
+already refuse on any blocking reservation (H-099), so the wrong verdict reaches
+neither the recruiter nor the `matches` table.
+
+**Two gates make a 2-word evidence floor safe where 6 was required before, and
+neither is a threshold on the classifier's output:**
+
+1. **Inside a recognised section.** A CV's name sits above the first section
+   header, so it is never judged. This is what buys back the floor — names, not
+   short lines, were what made a low floor unsafe.
+2. **The dimension has no other evidence.** A technology list reads as foreign
+   to any classifier (`"Java, Spring Boot, PostgreSQL, Docker, AWS"` reads as
+   Swedish) but produces skill attributes, so nothing is being asserted from
+   silence and nothing is emitted.
+
+**Measured: 0 of 50 documents** — all 23 English CVs plus the entire fixture
+corpus — produce an attribute here, while a foreign Education line is caught in
+German, Dutch, Turkish, Hungarian, Greek, Vietnamese, Russian, Japanese and
+Arabic.
+
+**Why the language signal is kept**, when a simpler rule exists. Dropping it —
+"Education section present, zero education evidence, must-have unmet" — closes
+even the transliteration residual and needs no classifier. It costs 1/50
+documents, and the shape it refuses is a CV listing institutions and dates with
+no degree token (`"University of Manchester, 2009-2013"`), which is common in
+real CVs. That trades a rare defect for a frequent refusal. Recorded as H-114 so
+it is not "simplified" into later.
+
+### Costs, accepted
+
+- **A new attribute kind crossing a package boundary.** `packages/core` must
+  never import an inference runtime (`core-determinism.test.mjs` enforces it),
+  so the language judgement happens in `apps/server` and reaches scoring as an
+  attribute — the same bridge `unreadable_date_range` uses.
+- **Bare-ASCII transliteration is still missed** (H-113). Hungarian, Greek and
+  Vietnamese are all caught in native orthography and all missed with the
+  diacritics stripped. Recorded as a coverage-gap rather than wrong-score
+  because that is not a CV format; it is an artefact of writing test data around
+  the corpus's WinAnsi font constraint (H-067). **It would have been easy to
+  record "eld cannot do Hungarian" as the residual, and it would have been
+  false.**
+- **A foreign line in a dimension that HAS other evidence still moves the score
+  without flipping eligibility**, and raises nothing. That is the boundary
+  ADR-029 already accepted for H-040 and is unchanged here.
+- **More documents will reach the needs-attention tray.** That is the trade: a
+  visible "we could not read this" instead of a confident wrong verdict.

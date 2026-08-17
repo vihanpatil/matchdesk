@@ -1,3 +1,5 @@
+import type { SectionName } from './sections.js';
+
 /**
  * Pure text -> structured attributes (Section 2 of the engine task).
  *
@@ -9,7 +11,12 @@
  */
 
 export type AttributeKind =
-  'skill' | 'years_experience' | 'education' | 'certification' | 'unreadable_date_range';
+  | 'skill'
+  | 'years_experience'
+  | 'education'
+  | 'certification'
+  | 'unreadable_date_range'
+  | 'unreadable_section';
 
 /** Character offsets into the input text. `end` is exclusive. */
 export interface SourceSpan {
@@ -100,7 +107,35 @@ export interface UnreadableDateRangeAttribute extends BaseAttribute {
   readonly minPossibleYears: number;
 }
 
+/**
+ * Text inside a recognised CV section that the engine could not read, in a
+ * section whose dimension it then found NO other evidence for (H-041).
+ *
+ * **Why this exists.** A foreign degree line yields no education attribute, and
+ * the engine then reports "Requires at least a bachelor degree" — asserting a
+ * negative from silence about a candidate who holds one. Measured, that flipped
+ * the same person between 100/eligible and 50/ineligible on the language their
+ * degree was written in.
+ *
+ * The engine cannot read the line, and it cannot be made to: a person's NAME is
+ * foreign text too, and no line-level classifier separates the two (H-112). So
+ * this does not try to read it. It records that unread text was there, so
+ * scoring can decline to assert a negative rather than assert a wrong one —
+ * ADR-029's principle, the same remedy shape as H-040 and H-089.
+ *
+ * Produced in `apps/server` (the language detector lives there; `packages/core`
+ * must never import an inference runtime — see `core-determinism.test.mjs`) and
+ * consumed by `reservationsFor`.
+ */
+export interface UnreadableSectionAttribute extends BaseAttribute {
+  readonly kind: 'unreadable_section';
+  /** The section the unread line sat in, which decides which dimension's
+   *  must-have may no longer be asserted from silence. */
+  readonly section: SectionName;
+}
+
 export type ExtractedAttribute =
+  | UnreadableSectionAttribute
   | SkillAttribute
   | YearsExperienceAttribute
   | EducationAttribute

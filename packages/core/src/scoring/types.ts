@@ -190,7 +190,10 @@ export interface Explanation {
  * engine could not read AT ALL, so there is no `claimed` number to name —
  * only a computed lower bound on what is missing.
  */
-export type Reservation = UnverifiedTenureClaimReservation | UnreadableEmploymentDatesReservation;
+export type Reservation =
+  | UnverifiedTenureClaimReservation
+  | UnreadableEmploymentDatesReservation
+  | UnsupportedNegativeReservation;
 
 interface BaseReservation {
   readonly blocking: boolean;
@@ -210,6 +213,28 @@ export interface UnreadableEmploymentDatesReservation extends BaseReservation {
   readonly minPossibleYears: number;
   /** Total years the engine computed WITHOUT the unreadable range(s). */
   readonly computed: number;
+}
+
+/**
+ * A must-have the engine reported as UNMET while holding text it could not
+ * read in that requirement's own section (H-041, ADR-029's principle).
+ *
+ * The distinction that matters is between "we read this candidate and they do
+ * not have a degree" and "we could not read this candidate's education". Both
+ * produce zero education attributes, and the engine used to say the first in
+ * both cases — measured, that told a recruiter a graduate had no degree, and
+ * flipped the same person between 100/eligible and 50/ineligible on nothing but
+ * the language their degree was written in.
+ *
+ * Always blocking: an unmet must-have IS the eligibility verdict, so there is no
+ * non-material version of this. That is the difference from
+ * `unverified_tenure_claim`, where materiality has to be computed because a
+ * discarded claim may or may not cross the gate.
+ */
+export interface UnsupportedNegativeReservation extends BaseReservation {
+  readonly kind: 'unsupported_negative';
+  /** The dimension whose must-have cannot be asserted from silence. */
+  readonly dimension: DimensionId;
 }
 
 export interface ScoreResult {

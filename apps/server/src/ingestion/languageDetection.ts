@@ -530,6 +530,14 @@ const MIN_BEARING_WORDS_FOR_LINE_JUDGEMENT = 6;
  * ({@link MIN_BEARING_WORDS_FOR_LINE_JUDGEMENT}), and `eld`'s OWN reliability
  * flag.
  *
+ * **The floor is a parameter because its right value depends on what else
+ * gates the call.** The document-wide veto below passes the default 6, which
+ * is where the cost of judging arbitrary lines reaches zero. The
+ * section-scoped caller in `unreadableSections.ts` passes 2, because
+ * restricting to lines INSIDE a recognised section already excludes the header
+ * block where names live — and names, not short lines, were what made a low
+ * floor unsafe (H-112).
+ *
  * **A confidence margin was measured and rejected**, as was an absolute-score
  * cut: the classes genuinely overlap, so neither separates them. A real Dutch
  * line scores 0.109 above English while `"Kwabena Boateng - HGV Driver"`
@@ -542,10 +550,13 @@ const MIN_BEARING_WORDS_FOR_LINE_JUDGEMENT = 6;
  * would lose the sub-floor Romance catches with nothing to replace them —
  * H-092 reached the same conclusion and said so.
  */
-function lineReadsNonEnglish(text: string): boolean {
+export function lineReadsNonEnglish(
+  text: string,
+  minBearingWords: number = MIN_BEARING_WORDS_FOR_LINE_JUDGEMENT,
+): boolean {
   const bearing = stripNeutralTokens(text);
   const words = bearing.match(CASED_WORD) ?? [];
-  if (words.length < MIN_BEARING_WORDS_FOR_LINE_JUDGEMENT) return false;
+  if (words.length < minBearingWords) return false;
 
   const detection = eld.detect(bearing);
   // `eld` returns an empty string when it will not commit to a language; that

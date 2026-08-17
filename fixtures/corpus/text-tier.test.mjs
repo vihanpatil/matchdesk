@@ -113,6 +113,8 @@ function snapshotOf(attrs, text) {
         };
       case 'unreadable_date_range':
         return { ...common, minPossibleYears: a.minPossibleYears };
+      case 'unreadable_section':
+        return { ...common, section: a.section };
     }
   });
 }

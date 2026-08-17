@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import type { SkillAttribute, YearsExperienceAttribute } from '../extraction/types.js';
+import type {
+  SkillAttribute,
+  UnreadableSectionAttribute,
+  YearsExperienceAttribute,
+} from '../extraction/types.js';
 import { rankCandidates, scoreCandidate } from './score.js';
 import type { Candidate, Job } from './types.js';
 
@@ -550,5 +554,92 @@ describe('reservations (H-040, ADR-029)', () => {
       ],
     };
     expect(scoreCandidate(job, clean).reservations).toEqual([]);
+  });
+});
+
+describe('unsupported negatives (H-041, ADR-029 principle)', () => {
+  const unreadEducation = (): UnreadableSectionAttribute => ({
+    kind: 'unreadable_section',
+    value: 'Diplom Wirtschaftsinformatik, Universitaet Mannheim',
+    normalizedValue: 'education',
+    confidence: 1,
+    sourceSpan: { start: 0, end: 51 },
+    section: 'education',
+  });
+
+  const degreeJob = (): Job => ({
+    id: 'j1',
+    educationCerts: {
+      weight: 1,
+      requirement: { minDegreeLevel: 'bachelor', mustHave: true },
+    },
+  });
+
+  it('BLOCKS when a must-have is unmet and that section could not be read', () => {
+    // The H-041 harm, end to end. A foreign degree line yields no education
+    // attribute, so the engine reported "Requires at least a bachelor degree"
+    // — asserting a negative from silence about someone who holds one, and
+    // flipping the same person between 100/eligible and 50/ineligible on
+    // nothing but the language their degree was written in.
+    const result = scoreCandidate(degreeJob(), {
+      id: 'c1',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      attributes: [unreadEducation()],
+    });
+
+    expect(result.eligibility.eligible).toBe(false);
+    const reservation = result.reservations.find((r) => r.kind === 'unsupported_negative');
+    expect(reservation).toBeDefined();
+    expect(reservation?.blocking).toBe(true);
+    // `scoreStoredPair` and the batch path both refuse on ANY blocking
+    // reservation (H-099), so this is what stops the wrong verdict reaching a
+    // recruiter or the `matches` table.
+    expect(reservation?.detail).toContain('could not read');
+  });
+
+  it('does NOT block a candidate who simply has no degree', () => {
+    // The distinction the whole mechanism exists to draw. Same job, same empty
+    // education evidence — but nothing unread, so the engine really did read
+    // this candidate and they really do not meet the requirement. Blocking
+    // here would refuse every trades candidate in the corpus.
+    const result = scoreCandidate(degreeJob(), candidate('c2', '2026-01-01T00:00:00.000Z', []));
+
+    expect(result.eligibility.eligible).toBe(false);
+    expect(result.reservations.filter((r) => r.kind === 'unsupported_negative')).toEqual([]);
+  });
+
+  it('does NOT block when the unread section is irrelevant to the unmet requirement', () => {
+    // An unread SKILLS line says nothing about whether the candidate has a
+    // degree. Materiality is what makes this a reservation rather than a
+    // blanket refusal (ADR-029).
+    const result = scoreCandidate(degreeJob(), {
+      id: 'c3',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      attributes: [{ ...unreadEducation(), normalizedValue: 'skills', section: 'skills' }],
+    });
+
+    expect(result.reservations.filter((r) => r.kind === 'unsupported_negative')).toEqual([]);
+  });
+
+  it('does NOT block when the must-have is MET despite unread text', () => {
+    const result = scoreCandidate(degreeJob(), {
+      id: 'c4',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      attributes: [
+        unreadEducation(),
+        {
+          kind: 'education',
+          value: 'BSc Computer Science',
+          normalizedValue: 'bachelor',
+          confidence: 0.9,
+          sourceSpan: { start: 0, end: 5 },
+          degreeLevel: 'bachelor',
+          field: 'computer-science',
+        },
+      ],
+    });
+
+    expect(result.eligibility.eligible).toBe(true);
+    expect(result.reservations.filter((r) => r.kind === 'unsupported_negative')).toEqual([]);
   });
 });

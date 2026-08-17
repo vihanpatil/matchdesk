@@ -19,6 +19,7 @@ export type {
   DegreeLevel,
   EducationAttribute,
   ExtractedAttribute,
+  UnreadableSectionAttribute,
   ExtractionOptions,
   LineSegment,
   Section,
