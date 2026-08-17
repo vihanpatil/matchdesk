@@ -10,7 +10,8 @@ docs/SESSION_STATE.md`. A hardcoded hash here went stale twice; don't add one
 back. Working tree clean, `pnpm verify` exit 0 — see H-058 before quoting any
 branch-coverage figure, and H-074 before quoting a coverage total.
 
-**Current work: E5 has TWO blockers, and a decision is waiting for the user.**
+**Current work: E5 has ONE blocker — `H-041`. See the UPDATE block below,
+which supersedes everything after it.**
 
 **➡ NEXT PHASE BRIEF: `docs/NEXT_PHASE.md`** — tasks, deliverables, pass
 criteria and the tiger-team decomposition for the next session. Read
@@ -18,34 +19,37 @@ SESSION_STATE for state, NEXT_PHASE for what to do.
 
 ---
 
-## ⚠ UPDATE 2026-08-14 (later session) — READ THIS BEFORE THE REST OF THIS FILE
+## ⚠ UPDATE 2026-08-14 (latest session) — READ THIS BEFORE THE REST OF THIS FILE
 
-Everything below this block predates the language-ID measurement and the Indian
-date-format work. Where it disagrees with this block, **this block is right.**
+Everything below this block predates the ADR-031 classifier swap, the
+numeric-date remedy and the adversarial round. Where it disagrees with this
+block, **this block is right.**
 
-1. **E5 now has TWO blockers, not one.** `H-089` joined `H-041`: an ambiguous
-   numeric date range (`03/04/2019 - 05/08/2022`, both leading numbers 1-12)
-   **silently deletes an entire role** and reports a smaller total tenure with
-   `warnings: []`. H-040's shape exactly. **Closing H-041 alone will no longer
-   reach E5 MET** — the plan below assumes it will, and that assumption is now
-   wrong.
-2. **The language-ID library does NOT close H-041 for free.** 64 configurations
-   measured (H-092). At window granularity `eld` is blind to the sub-floor
-   class; at line granularity it catches 13/13 but falsely refuses 2/23 English
-   CVs. **The defect is segmentation geometry, not classifier accuracy** — a
-   trailing sub-floor line never forms a window, so swapping the classifier was
-   never going to fix it. `eld` is **not installed** and **no ADR is written**;
-   three options and the H-080 precedent are in `docs/NEXT_PHASE.md` §1, and
-   **the decision is the user's.**
-3. **`franc` was measured and rejected** — 10/13, because it is itself a
-   trigram classifier, the same method as the existing code (H-091). The
-   previous brief named it first on an argument that did not survive contact.
-4. **Task B landed** (uncommitted at time of writing → now committed):
-   `FIELD_VOCAB` 14 → 22, `INDIAN_CV_CORPUS`, a committed H-088 twin test, and
-   a bounded fix for unambiguous `DD/MM/YYYY` dates.
-5. **Housekeeping owed:** `pnpm test:manifest` not run (69 tests added,
-   `minTests` stale at 844), full `pnpm verify` not run end-to-end since Task B,
-   `pnpm mutate` not re-run since E4 was measured.
+1. **E5 has ONE blocker: `H-041`.** It went 3 → 8 → 1 in one session. The rise
+   was an ADR-015 round finding nine defects; the fall was fixing them. Both
+   are the same fact — the defects were always there, and the variable was
+   whether anyone looked.
+2. **H-041's scope note was WRONG for three sessions** and is corrected in
+   H-105. The residual is **not Germanic**: Polish, Turkish, Romanian,
+   Indonesian and Portuguese all score too. It is **every language outside the
+   function-word lexicon**, and it is a **segmentation geometry** problem.
+   A remedy aimed at "Germanic" would measure none of the failing languages.
+3. **`eld@2.1.0` is installed and live** (ADR-031), replacing the Cavnar &
+   Trenkle classifier at window granularity. It deleted that whole apparatus
+   plus `MAX_ENGLISH_MEAN_WORD_LENGTH`, `ENGLISH_INSTITUTION_WORDS` and
+   `MIN_FOREIGN_MARGIN` — 223 lines — at zero measured regression. It
+   deliberately does **not** close H-041.
+4. **ADR-032** — an unreadable date is emitted as evidence, never guessed at or
+   deleted. **ADR-033** — a declared licence with no text is unverified; two
+   live risk acceptances print on every audit run.
+5. **ATTACK_CHECKLIST A4 and A5 now read Covered.** A5 had never been run in
+   the project's history. A1 is the only row left.
+6. **Do not trust E3/E4 figures in any document**, including this one. Both are
+   settled by running a command.
+
+**Read `docs/NEXT_PHASE.md` for what to do next.** It carries the ruled-out
+options for H-041 with their measurements, so the next session does not
+re-derive them.
 
 **Do not read the gate from here either — run `pnpm gate`.**
 
