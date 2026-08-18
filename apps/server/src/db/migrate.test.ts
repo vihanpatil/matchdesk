@@ -75,6 +75,7 @@ describe('applyMigrations', () => {
       '0002_audit_log.sql',
       '0003_derive_attributes_on_demand.sql',
       '0004_job_scoring_configs.sql',
+      '0005_job_source_url.sql',
     ]);
   });
 
@@ -86,7 +87,7 @@ describe('applyMigrations', () => {
 
     const count = (db.prepare('SELECT COUNT(*) as c FROM schema_migrations').get() as { c: number })
       .c;
-    expect(count).toBe(4);
+    expect(count).toBe(5);
   });
 
   it('applies migrations from an arbitrary directory in filename order, tracked by version', () => {

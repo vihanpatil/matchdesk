@@ -176,6 +176,7 @@ export async function ingestJobDocument(
   bytes: Buffer,
   originalFilename: string,
   title: string,
+  sourceUrl?: string,
 ): Promise<IngestedJob> {
   const extraction = await extractText(bytes, originalFilename);
 
@@ -188,6 +189,7 @@ export async function ingestJobDocument(
     parseConfidence: extraction.parseConfidence,
     warnings: [...extraction.warnings],
     language: extraction.language,
+    sourceUrl: sourceUrl ?? null,
   });
 
   return { job, outcome: outcomeOf(extraction), extraction };

@@ -14,6 +14,12 @@ verification failures remain append-only in `../HONESTY_LOG.md`.
 - CVs and job descriptions **never leave the recruiter's machine**. The local
   API binds to loopback only; v1 has no LAN mode, remote sharing, cloud
   processing, or external document-content API.
+- **One bounded outbound action exists (ADR-037): fetching a job-posting
+  link the recruiter pastes.** It runs only on that explicit action,
+  contacts only the pasted URL, and sends nothing from the local store — no
+  candidate content, no job content, no identifiers. The fetched page is
+  stored and treated exactly like an uploaded file, refusal gates included.
+  Nothing is ever re-fetched in the background.
 - V1 supports macOS, Windows, and Linux. It must have documented setup and a
   launcher that opens the local browser app.
 - Data persists locally until explicit deletion. Deletion removes original files
@@ -22,8 +28,10 @@ verification failures remain append-only in `../HONESTY_LOG.md`.
 
 ## Documents, extraction, and scoring
 
-- V1 accepts text-based PDF and DOCX documents only. Scans, unsupported
-  formats, insufficient text, untrusted extraction, non-English content, and
+- V1 accepts text-based PDF and DOCX documents, and — for JOBS only — an
+  HTML page fetched from a pasted link (ADR-037). Scans, unsupported
+  formats, insufficient text (including JavaScript-rendered pages that ship
+  no markup text), untrusted extraction, non-English content, and
   uncertain language classification go to **Needs attention** and are never
   scored. There is no v1 OCR, manual text correction, or local translation.
 - V1 is English-only and must state that limitation plainly in the product.

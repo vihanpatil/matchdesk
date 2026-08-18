@@ -56,6 +56,8 @@ export const JobSchema = z.object({
   parseConfidence: z.number().min(0).max(1).nullable(),
   warnings: z.array(z.string()),
   language: z.string().nullable(),
+  /** Provenance for link-ingested jobs (ADR-037); null for file uploads. */
+  sourceUrl: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -70,6 +72,8 @@ export const CreateJobInputSchema = z.object({
   parseConfidence: z.number().min(0).max(1).nullable(),
   warnings: z.array(z.string()),
   language: z.string().nullable(),
+  /** Provenance for link-ingested jobs (ADR-037); omitted for uploads. */
+  sourceUrl: z.string().nullable().optional(),
 });
 export type CreateJobInput = z.infer<typeof CreateJobInputSchema>;
 

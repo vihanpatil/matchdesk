@@ -326,6 +326,7 @@ button.big {
 }
 input[type='text'],
 input[type='number'],
+input[type='url'],
 select {
   font: inherit;
   color: var(--ink);

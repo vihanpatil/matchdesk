@@ -47,6 +47,14 @@ results, requirement confirmation, needs-attention tray with reasons, evidence
 highlighting, light/dark, ambient motion. Verified end-to-end in a real
 browser.
 
+**Exists since ADR-037:** jobs from pasted links. `POST /api/jobs/from-url`
+fetches the URL (the product's only outbound action, bounds recorded in
+PRODUCT_DECISIONS), a zero-dependency HTML→text extractor feeds the same
+gates uploads face, PDFs served from links pass through the PDF path,
+`source_url` (migration 0005) records provenance, and the jobs view has a
+paste-a-link input. JS-rendered pages are refused with guidance. Verified
+end-to-end over real sockets and in the browser, destructive paths included.
+
 **Does not exist:** the match matrix (secondary view, PRODUCT_DECISIONS), a
 packaged launcher beyond `pnpm serve`, embeddings (cascade step 4), OCR.
 
@@ -63,7 +71,9 @@ lowercase-particle names were being refused; all 14 now pass with the five
 Romance-prose guards intact) and **D7** (`PRAGMA recursive_triggers` shuts
 the `INSERT OR REPLACE` audit-rewrite bypass ADR-018 D4 named). **The user
 still needs to re-test their real resume on their machine** — the repo only
-holds the synthetic shapes.
+holds the synthetic shapes. **Update, same evening: the user re-tested the
+real resume — it ingests cleanly.** Their report also named a transparency
+gap, recorded in NEXT_PHASE: parse detail is only visible after scoring.
 
 Next, in rough order of value:
 

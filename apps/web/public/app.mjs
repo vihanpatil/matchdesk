@@ -194,6 +194,47 @@ async function jobsView(view) {
   });
   view.append(stagger(zone, 0));
 
+  // ADR-037: most postings are links, not files. The fetch happens on this
+  // explicit action only, to this URL only; the page's own <title> becomes
+  // the job title unless one is given at the prompt.
+  const linkInput = document.createElement('input');
+  linkInput.type = 'url';
+  linkInput.placeholder = '…or paste a job posting link — https://';
+  linkInput.className = 'grow';
+  const linkBtn = btn('ghost', 'Add from link');
+  const addFromLink = () => {
+    const url = linkInput.value.trim();
+    if (url === '') {
+      toast('Paste a link first');
+      return;
+    }
+    const title = window.prompt('Job title? Leave blank to use the page’s own title.', '');
+    if (title === null) return;
+    linkBtn.disabled = true;
+    linkBtn.textContent = 'Fetching…';
+    api('/api/jobs/from-url', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(title.trim() === '' ? { url } : { url, title: title.trim() }),
+    })
+      .then((out) => {
+        toast(out.outcome === 'scoreable' ? 'Job added from link' : 'Added — needs attention');
+        render();
+      })
+      .catch((e) => {
+        toast(String(e.message ?? e));
+      })
+      .finally(() => {
+        linkBtn.disabled = false;
+        linkBtn.textContent = 'Add from link';
+      });
+  };
+  linkBtn.addEventListener('click', addFromLink);
+  linkInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addFromLink();
+  });
+  view.append(stagger(el('div', 'card row-actions', [linkInput, linkBtn]), 1));
+
   const grid = el('div', 'grid');
   jobs.forEach((/** @type {any} */ job, /** @type {number} */ i) => {
     const card = el('div', 'card tappable', [
@@ -205,7 +246,9 @@ async function jobsView(view) {
             ? pill('good', 'ready')
             : pill('neutral', 'review requirements'),
       ]),
-      el('div', 'hint', [job.originalFilename]),
+      // A link job's synthesized filename means nothing to the recruiter;
+      // the URL it came from does (ADR-037 provenance).
+      el('div', 'hint', [job.sourceUrl ?? job.originalFilename]),
     ]);
     card.addEventListener('click', () => {
       location.hash = `#/jobs/${String(job.id)}`;
@@ -246,6 +289,13 @@ async function jobView(view, jobId) {
   const back = el('a', 'crumb', ['← Jobs']);
   back.setAttribute('href', '#/jobs');
   view.append(back, el('h1', '', [job.title]));
+  if (job.sourceUrl) {
+    const source = el('a', 'hint', [String(job.sourceUrl)]);
+    source.setAttribute('href', String(job.sourceUrl));
+    source.setAttribute('target', '_blank');
+    source.setAttribute('rel', 'noopener noreferrer');
+    view.append(el('p', '', [source]));
+  }
 
   if (job.parseStatus !== 'ok' || job.language !== 'en') {
     // Guidance, not a dead end (NEXT_PHASE/H-117): say what can be done

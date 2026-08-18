@@ -41,9 +41,20 @@ The first-contact failures are fixed and closed in `HONESTY_LOG.md` /
 ## 1 · Use it against a real pool
 
 Real CVs, at volume, on the recruiter's own machine — the fastest way to
-find what the corpus cannot (trap 1 has now cost seven findings). The user
-runs their real resume first (H-116's final pass criterion), then a batch.
-Nothing known blocks this: zero open false-refusal or integrity findings.
+find what the corpus cannot (trap 1 has now cost seven findings). **The
+real resume now ingests cleanly (user-confirmed 2026-08-17)**, and jobs can
+arrive from pasted links (ADR-037), so nothing known blocks a real pool:
+zero open false-refusal or integrity findings.
+
+## 1b · Parse transparency (user-reported gap, 2026-08-17)
+
+"No errors popped up. I do not know whether it worked fully or not." A
+candidate's parse detail is only visible today AFTER scoring (the detail
+view), and a job's only via the proposal chips. The recruiter should be
+able to open any ingested document and see what was extracted — attributes
+with evidence highlights — without scoring anything. The pieces exist
+(detail view, highlighter, attributes endpoint-shaped data in the pipeline);
+this is wiring, not research.
 
 ## 2 · Then, in rough order of value
 

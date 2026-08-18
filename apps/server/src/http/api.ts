@@ -21,6 +21,8 @@ import {
 import { listMatchesForJob } from '../repositories/matches.js';
 import { proposeRequirements } from '../scoring/proposeRequirements.js';
 
+import { fetchJobSource, JobFetchError } from './fetchJobSource.js';
+
 /**
  * The HTTP API the UI talks to (ADR-035). Loopback-only by construction — the
  * caller binds `127.0.0.1` — plus a Host-header check here, because a
@@ -50,7 +52,17 @@ export interface ApiOptions {
    *  requires the reference date to be recorded with every score, which the
    *  pipeline already does). */
   readonly now: () => { referenceDate: ReferenceDate; computedAt: string };
+  /** ADR-037 link-fetch timeout; injectable so tests can use a stalled local
+   *  server without waiting 20s. */
+  readonly fetchTimeoutMs?: number;
 }
+
+/** ADR-037: body of POST /api/jobs/from-url. `title` overrides the page's
+ *  own <title>; blank/absent means "use what the page calls itself". */
+const JobFromUrlSchema = z.object({
+  url: z.string().min(1),
+  title: z.string().optional(),
+});
 
 type Handler = (req: IncomingMessage, res: ServerResponse) => Promise<void>;
 
@@ -85,6 +97,8 @@ const HOST_ALLOWED = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
 export function createApi(options: ApiOptions): Handler {
   const { db, filesDir, now } = options;
 
+  const fetchTimeoutMs = options.fetchTimeoutMs;
+
   return async (req, res) => {
     const host = req.headers.host ?? '';
     if (!HOST_ALLOWED.test(host)) {
@@ -100,6 +114,10 @@ export function createApi(options: ApiOptions): Handler {
     } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         sendJson(res, 400, { error: 'invalid request body', issues: error.issues });
+        return;
+      }
+      if (error instanceof JobFetchError) {
+        sendJson(res, error.httpStatus, { error: error.message });
         return;
       }
       sendJson(res, 500, { error: error instanceof Error ? error.message : 'internal error' });
@@ -179,6 +197,54 @@ export function createApi(options: ApiOptions): Handler {
         }
         const bytes = await readBody(req);
         const ingested = await ingestJobDocument(db, filesDir, bytes, filename, title);
+        sendJson(res, 201, { job: ingested.job, outcome: ingested.outcome });
+        return;
+      }
+      if (method === 'POST' && id === 'from-url' && sub === undefined) {
+        // ADR-037: the product's only outbound network action. A browser page
+        // from another origin must not be able to make this machine issue
+        // fetches (blind-SSRF via CSRF): browsers always attach Origin to
+        // cross-origin POSTs, so an Origin that is present and not local is
+        // refused. Non-browser clients (curl) send no Origin and pass.
+        const origin = req.headers.origin;
+        if (origin !== undefined) {
+          let originHost: string;
+          try {
+            originHost = new URL(origin).host;
+          } catch {
+            // "null" from a sandboxed context, or garbage: no valid origin
+            // host exists, and the sentinel can never pass HOST_ALLOWED.
+            originHost = 'unparseable-origin';
+          }
+          if (!HOST_ALLOWED.test(originHost)) {
+            sendJson(res, 403, {
+              error: 'cross-origin requests may not trigger link fetches (ADR-037)',
+            });
+            return;
+          }
+        }
+
+        let parsedBody: unknown;
+        try {
+          parsedBody = JSON.parse((await readBody(req)).toString('utf8'));
+        } catch {
+          sendJson(res, 400, {
+            error: 'request body must be JSON: {"url": "...", "title"?: "..."}',
+          });
+          return;
+        }
+        const { url: link, title: givenTitle } = JobFromUrlSchema.parse(parsedBody);
+
+        const fetched = await fetchJobSource(link, fetchTimeoutMs);
+        const title = (givenTitle ?? '').trim() || fetched.pageTitle || new URL(link).hostname;
+        const ingested = await ingestJobDocument(
+          db,
+          filesDir,
+          fetched.bytes,
+          fetched.filename,
+          title,
+          link,
+        );
         sendJson(res, 201, { job: ingested.job, outcome: ingested.outcome });
         return;
       }

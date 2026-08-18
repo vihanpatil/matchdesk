@@ -16,6 +16,7 @@ interface JobRow {
   parse_confidence: number | null;
   warnings: string;
   language: string | null;
+  source_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -31,6 +32,7 @@ function mapRow(row: JobRow): Job {
     parseConfidence: row.parse_confidence,
     warnings: parseWarnings(row.warnings),
     language: row.language,
+    sourceUrl: row.source_url,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
@@ -53,8 +55,8 @@ export function createJob(db: Database.Database, filesDir: string, input: Create
 
   db.prepare(
     `INSERT INTO jobs
-       (id, title, original_filename, file_sha256, raw_text, parse_status, parse_confidence, warnings, language, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, title, original_filename, file_sha256, raw_text, parse_status, parse_confidence, warnings, language, source_url, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     parsed.title,
@@ -65,6 +67,7 @@ export function createJob(db: Database.Database, filesDir: string, input: Create
     parsed.parseConfidence,
     serializeWarnings(parsed.warnings),
     parsed.language,
+    parsed.sourceUrl ?? null,
     now,
     now,
   );

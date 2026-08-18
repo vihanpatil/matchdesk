@@ -1,6 +1,7 @@
 import path from 'node:path';
 
 import { extractDocxText } from './docxExtractor.js';
+import { extractHtmlText } from './htmlExtractor.js';
 import {
   detectLanguageHeuristic,
   findNonEnglishSegments,
@@ -54,6 +55,10 @@ const MIN_CHARS_PER_PAGE = 100;
 /** Below this total, a DOCX (which has no fixed "page" concept via mammoth)
  *  is treated the same way. */
 const MIN_TOTAL_CHARS_DOCX = 100;
+
+/** Same floor for a fetched page (ADR-037): under this, the markup carried
+ *  almost no text — the JavaScript-rendered-SPA analogue of a scanned PDF. */
+const MIN_TOTAL_CHARS_HTML = 100;
 
 function judgeLanguage(
   text: string,
@@ -183,8 +188,50 @@ async function extractFromDocx(bytes: Buffer): Promise<ExtractionResult> {
   return { text, ...judged };
 }
 
+function extractFromHtml(bytes: Buffer): ExtractionResult {
+  const { text, significantCharCount } = extractHtmlText(bytes.toString('utf8'));
+
+  if (significantCharCount === 0) {
+    return {
+      text,
+      parseStatus: 'failed',
+      parseConfidence: 0,
+      warnings: ['No extractable text found in this page.'],
+      language: null,
+      reason: 'no_extractable_text',
+    };
+  }
+
+  if (significantCharCount < MIN_TOTAL_CHARS_HTML) {
+    // The HTML analogue of a scanned PDF: a page that renders its content
+    // with JavaScript ships nearly no text in its markup. Flagged for a
+    // human rather than scored on a navigation bar (C7).
+    return {
+      text,
+      parseStatus: 'needs_attention',
+      parseConfidence: 0.2,
+      warnings: [
+        `Only ${String(significantCharCount)} characters of text found in the page markup ` +
+          `(under ${String(MIN_TOTAL_CHARS_HTML)}) — this page likely renders its content with ` +
+          'JavaScript, which is not executed here. Try the posting’s "print" or "save as PDF" ' +
+          'view and upload that instead.',
+      ],
+      language: null,
+      reason: 'low_text_density',
+    };
+  }
+
+  // 0.75, deliberately below the PDF/DOCX paths' 0.9: the tag-stripper keeps
+  // page boilerplate (navigation, footers), so the text is noisier than a
+  // document export of the same posting. See htmlExtractor.ts for the trade.
+  const judged = judgeLanguage(text, [], 0.75);
+  return { text, ...judged };
+}
+
 /**
  * Extracts plain text from uploaded bytes, dispatching on file extension.
+ * `.html` exists for the ADR-037 link path, which synthesizes the filename
+ * from the fetched content type — recruiters upload PDFs and DOCX files.
  *
  * NO OCR in this slice (deferred) — a low-text-density PDF page is flagged
  * `needs_attention` rather than silently attempted (C7). Non-English text
@@ -203,9 +250,12 @@ export async function extractText(
   if (ext === '.docx') {
     return extractFromDocx(bytes);
   }
+  if (ext === '.html' || ext === '.htm') {
+    return extractFromHtml(bytes);
+  }
 
   throw new UnsupportedFormatError(
     originalFilename,
-    `only .pdf and .docx are supported (got "${ext === '' ? 'no extension' : ext}")`,
+    `only .pdf, .docx and .html are supported (got "${ext === '' ? 'no extension' : ext}")`,
   );
 }

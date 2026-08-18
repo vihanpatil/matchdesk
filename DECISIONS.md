@@ -2000,3 +2000,74 @@ with evidence marks on the exact phrases in the document. Light and dark.
   browser pass above. Coverage headline dropped ~3 points accordingly.
 - **No packaging/launcher beyond `pnpm serve`** — documented setup, not a
   double-clickable app. PRODUCT_DECISIONS' launcher requirement remains open.
+
+---
+
+## ADR-037 — Jobs from links: the product's first (and only) outbound fetch
+
+**Date:** 2026-08-17 · **Status:** Accepted
+
+The user went looking for job PDFs to test with and found what every
+recruiter finds: postings live at URLs, not in files. `POST
+/api/jobs/from-url` accepts a pasted link, fetches it, and hands the bytes
+to the exact machinery uploads use.
+
+### The privacy boundary, extended deliberately rather than eroded
+
+"Content never leaves the machine" was, until now, enforced by the absence
+of any outbound network code. It is now enforced by bounds, stated in
+PRODUCT_DECISIONS and carried on the fetch module's doc comment: the fetch
+runs only on an explicit recruiter action; it contacts only the pasted URL;
+the request carries nothing from the local store (a disclosed `MatchDesk/1.0`
+user-agent, no cookies, no identifiers); the fetched bytes are stored
+content-addressed like an upload and face the same refusal gates; nothing is
+ever re-fetched in the background. A `source_url` column (migration 0005)
+records provenance and is deleted with the row.
+
+**Cross-origin hardening, because this endpoint is different in kind:** a
+malicious page could not previously gain anything by CSRF-posting to the
+loopback API beyond storing junk locally. An endpoint that makes the machine
+ISSUE requests is a blind-SSRF primitive, so it refuses any request whose
+`Origin` header is present and not local — browsers always attach `Origin`
+to cross-origin POSTs, the UI's same-origin calls pass, and non-browser
+clients send none. Verified by test in both directions.
+
+### HTML → text with zero new dependencies
+
+A readability library would drag a dependency tree through the licence gate
+(ADR-003/016/033) to solve a problem job postings do not have: they are
+text-heavy documents. `htmlExtractor.ts` is a conservative tag-stripper —
+script/style/head dropped whole, block tags become line breaks, entities
+decoded — whose stated trade is that page boilerplate (nav, cookie banners,
+footers) survives into the text. That noise is bounded by the product's own
+confirmation step: proposals are chips a person reviews before anything is
+scored, so a footer's stray "Java" cannot become a requirement unseen.
+Extraction confidence is 0.75 against the document paths' 0.9 for the same
+reason. A JavaScript-rendered shell (near-zero markup text) goes to Needs
+attention with guidance to use the posting's print/save-as-PDF view — the
+SPA analogue of a scanned PDF, refused rather than scored on a nav bar (C7).
+Links that serve a PDF directly go through the PDF path unchanged.
+
+### Verified end-to-end, both harness and browser
+
+`apiJobsFromUrl.test.ts` runs the ADR-035 pattern with a second local server
+playing the job board (no test fetches a real site — ADR-014): the full
+fetch → extract → gate → store → propose → confirm → score → delete chain,
+the page-title default (entities decoded), recruiter-title override, the
+PDF-link path, the French-page refusal, the SPA refusal with its guidance,
+distinct statuses for bad URL / wrong scheme / HTTP error / non-document
+type / timeout, the Origin guard in both directions, and non-JSON bodies.
+The browser walkthrough drove the same flows through the real UI — including
+the destructive leg (H-117's rule) and a schema upgrade of an existing
+database by migration 0005.
+
+### Costs, accepted
+
+- **Boilerplate noise in fetched text.** Bounded by human confirmation;
+  a trimming pass is a measured future step.
+- **JavaScript-rendered postings do not work** and say so with an
+  actionable message. Executing pages (a headless browser) is out of all
+  proportion to v1.
+- **The candidate side is unchanged** — CVs arrive as files, and a
+  recruiter pasting a LinkedIn _profile_ link is a different product
+  decision nobody has taken.
