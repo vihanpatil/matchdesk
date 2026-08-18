@@ -175,6 +175,26 @@ const NO_LICENSE_TEXT_WAIVERS = new Map([
     },
   ],
   [
+    '@napi-rs/canvas-linux-x64-gnu@1.0.5',
+    {
+      declared: 'MIT',
+      basis: 'verified-elsewhere',
+      verifiedVia: '@napi-rs/canvas@1.0.5 LICENSE (sibling package) + GitHub licence API',
+      evidence:
+        'The darwin-arm64 waiver above, on the platform CI actually runs (H-121: the waiver was recorded only for the platform the audit had run on, so the first Linux run — GitHub Actions — failed on the identically-shaped sibling). Tarball fetched from the npm registry and listed 2026-08-17: package.json, README.md (first line "# @napi-rs/canvas-linux-x64-gnu", zero licence mentions), and skia.linux-x64-gnu.node — no LICENSE/COPYING/NOTICE. Same repository, version and publisher as @napi-rs/canvas@1.0.5, which ships the full MIT text; the GitHub licence API for Brooooooklyn/canvas independently re-confirmed spdx_id "MIT" on 2026-08-17.',
+    },
+  ],
+  [
+    '@napi-rs/canvas-win32-x64-msvc@1.0.5',
+    {
+      declared: 'MIT',
+      basis: 'verified-elsewhere',
+      verifiedVia: '@napi-rs/canvas@1.0.5 LICENSE (sibling package) + GitHub licence API',
+      evidence:
+        'The same platform-binary shape on Windows — the platform the product\u2019s target recruiter runs (ADR-038), waived now so a `pnpm verify` on a Windows machine does not repeat H-121 a third time. Tarball fetched from the npm registry and listed 2026-08-17: icudtl.dat, package.json, README.md, skia.win32-x64-msvc.node — no LICENSE/COPYING/NOTICE. Same repository, version and publisher as @napi-rs/canvas@1.0.5 (full MIT text in-tree); GitHub licence API re-confirmed "MIT" 2026-08-17.',
+    },
+  ],
+  [
     'dingbat-to-unicode@1.0.1',
     {
       declared: 'BSD-2-Clause',

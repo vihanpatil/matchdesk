@@ -704,6 +704,12 @@
       "severity": "process",
       "status": "closed",
       "note": "ADR-037's first three real links all failed. (1) 'unknown job' was UI/server deployment skew - a pre-feature server process routed the POST into the job-by-id 404; the UI now names the fix (restart pnpm serve). (2) Ashby-class: posting embedded as schema.org JSON-LD in a script the stripper dropped (measured: 0 markup chars, 8950 JSON-LD chars) - now extracted, preferred over page soup at 0.9. (3) BambooHR-class: JS shell, no JSON-LD; posting at same-host /careers/<id>/detail JSON - recognised-board fallback (path convention, not hostname; white-label safe), re-expressed as a JobPosting document; ADR-037 bound amended. Trap 1 at feature scale: the e2e fixtures were all server-rendered HTML while the real board population is JS shells. Fixture corpus now carries the missing shapes. CLOSED same session: all three real links measured ok/en through production code; BambooHR link driven through the real UI to a 20-chip proposal."
+    },
+    {
+      "id": "H-121",
+      "severity": "process",
+      "status": "closed",
+      "note": "First public push failed CI while local was green - two platform assumptions: (1) the @napi-rs/canvas no-licence-text waiver existed only for darwin-arm64, the platform the audit had run on; ubuntu CI failed on the identically-shaped linux-x64-gnu sibling. Fixed with hand-verified waivers for linux-x64-gnu AND win32-x64-msvc (the recruiter's platform), tarballs fetched and listed 2026-08-17, MIT re-confirmed via sibling LICENSE + GitHub API. (2) The mutation job's 30-minute cap dated from a ~14-minute run; at 1135 tests the job was killed at 30m15s. Trap 3 in CI config - a figure carried without re-measurement; raised to 60 with the measurement quoted."
     }
   ]
 }

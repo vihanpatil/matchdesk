@@ -4532,3 +4532,33 @@ proposal. The fixture corpus now carries the shapes that were missing
 shell with a dead probe), so this class regresses against a test, not a
 user. What still does not work is stated in the ADR: a JS-rendered page
 with no JSON-LD and no recognised convention refuses with guidance.
+
+---
+
+### H-121 · Green local, red CI — two platform assumptions surfaced by the first public push
+
+The first push to GitHub failed CI while every local run was green, for two
+reasons that are the same mistake at different scales: **a check calibrated
+on the machine it happened to run on.**
+
+1. **The licence audit is platform-dependent and the waiver was not.**
+   `@napi-rs/canvas` installs one native binary package per platform; the
+   no-licence-text waiver existed only for `darwin-arm64` — the platform
+   the audit had actually run on — so ubuntu CI failed on the
+   identically-shaped `linux-x64-gnu` sibling. Both the Linux and the
+   Windows (`win32-x64-msvc` — the target recruiter's platform, ADR-038)
+   tarballs were fetched and listed by hand 2026-08-17: no licence text in
+   either, MIT re-confirmed via the sibling package and the GitHub licence
+   API. Both waivers added with that evidence, per the audit's own rule
+   that a waiver must be backed by files actually read.
+2. **The mutation job's 30-minute cap was a stale figure** — written when
+   the run took ~14 minutes, still in place after the suite grew to 1135
+   tests (~22 min on Apple Silicon, slower on the CI runner). The job was
+   killed mid-run at 30m15s. Trap 3's shape in CI configuration: a number
+   carried across change after change without re-measurement. Raised to 60
+   with the measurement quoted in the workflow comment.
+
+CLOSED same session. Residual, stated: CI still cannot re-verify what only
+a platform it does not run on can show (a Windows contributor's first
+`pnpm verify` exercises the win32 waiver for the first time), and the
+actions' Node-20 deprecation warnings are cosmetic and untouched.
