@@ -60,8 +60,17 @@ against the real links themselves. JS-rendered pages with neither are
 refused with guidance. Verified end-to-end over real sockets and in the
 browser, destructive paths included.
 
-**Does not exist:** the match matrix (secondary view, PRODUCT_DECISIONS), a
-packaged launcher beyond `pnpm serve`, embeddings (cascade step 4), OCR.
+**Exists since ADR-038:** the candidate inspect view (exactly what
+evaluation reads, evidence-highlighted, gaps explained — closes the
+user-reported transparency gap), reverse scoring (one candidate against
+ticked jobs, same derivation/persistence/skip semantics as the batch path),
+double-click launchers (`start-matchdesk.cmd`/`.command`) and
+`docs/USER_GUIDE.md` for non-technical setup on Windows and Mac. Windows is
+verified by audit, not yet by a real run — the ADR states the audit.
+
+**Does not exist:** the match matrix (secondary view, PRODUCT_DECISIONS),
+embeddings (cascade step 4), OCR, a per-pair detail route reachable from
+the candidate side.
 
 ## Next phase
 

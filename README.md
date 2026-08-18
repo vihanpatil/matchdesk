@@ -9,10 +9,22 @@ read.** A confident wrong number about a real person is the one failure this
 project treats as unacceptable, and the entire process — the gate, the
 adversarial rounds, the append-only logs — exists to catch it.
 
-## Quick start
+## For recruiters — using the app
+
+**You do not need to be technical.** Read
+[docs/USER_GUIDE.md](docs/USER_GUIDE.md): it walks you from the green
+"Code → Download ZIP" button on this page to a running app in about ten
+minutes, on Windows or Mac — install Node.js 24 from nodejs.org, then
+double-click **`start-matchdesk.cmd`** (Windows) or
+**`start-matchdesk.command`** (Mac). The guide also covers day-to-day use,
+what the scores mean, and fixes for common issues. Your documents and
+scores live in a `.matchdesk` folder in your home directory and never
+leave your machine.
+
+## Quick start (developers)
 
 ```bash
-export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use 24.19.0
+export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use 24.19.0   # macOS/Linux; on Windows install Node 24 and use `corepack pnpm`
 pnpm install
 pnpm gate      # the release gate, computed from docs/findings.json — an exit code, not prose
 pnpm verify    # typecheck + lint + format + licence audit + full test suite (~1 min)
@@ -45,7 +57,8 @@ the command.
 
 | File                                                   | Role                                                                                                              |
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| [docs/SESSION_STATE.md](docs/SESSION_STATE.md)         | **Start here.** Current state and what to do next.                                                                |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md)               | **For recruiters.** Non-technical setup (Windows and Mac), day-to-day use, troubleshooting.                       |
+| [docs/SESSION_STATE.md](docs/SESSION_STATE.md)         | **Start here (developers).** Current state and what to do next.                                                   |
 | [docs/PRODUCT_DECISIONS.md](docs/PRODUCT_DECISIONS.md) | Product source of truth for v1: scope, privacy boundary, refusal rules.                                           |
 | [DECISIONS.md](DECISIONS.md)                           | The ADRs. Append-only. Why the architecture is the way it is.                                                     |
 | [HONESTY_LOG.md](HONESTY_LOG.md)                       | Every known weakness, measured not asserted. Append-only.                                                         |

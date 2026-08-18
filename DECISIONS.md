@@ -2102,3 +2102,58 @@ fixture corpus gained the shapes that were missing so the class regresses
 against tests. Still refused, with guidance: JS-rendered pages with no
 JSON-LD and no recognised convention (executing pages remains out of
 proportion for v1).
+
+---
+
+## ADR-038 — The inspect view, reverse scoring, and a double-click launcher
+
+**Date:** 2026-08-17 · **Status:** Accepted
+
+Three user requests in one sitting, all of them about the product meeting
+people where they are.
+
+**1 · The CV inspect view.** The user's own words after H-116's fix: "no
+errors popped up. I do not know whether it worked fully or not." Parse
+detail was visible only AFTER scoring. `GET /api/candidates/:id/attributes`
+now derives — via the pipeline's own `deriveAttributes`, H-099's
+one-derivation rule, never a parallel rendition that could drift — exactly
+what evaluation reads, and the candidate page shows it: recognised skills,
+counted employment ranges with the tenure total, degrees, certifications,
+unreadable sections, each claim highlighted in the document. Gaps are
+explained rather than hidden ("tenure written in words is not parsed —
+only digits"), because an honest zero the recruiter can see beats a silent
+one they discover in a score. Unreadable candidates get the same 409 the
+job proposal route uses (C7).
+
+**2 · Reverse scoring.** `POST /api/candidates/:id/score {jobIds}` — one
+candidate against the ticked jobs (or all), the mirror of the job page's
+button. Same `deriveAttributes` (once per run — the measured 150x
+extraction/scoring ratio, roles swapped), same persisted match rows
+(ADR-024), same blocking-reservation skip semantics as the batch path
+(H-099's lesson: the two directions must not disagree). Unconfigured and
+unreadable jobs are reported as skipped with named reasons and shown
+disabled in the UI — an unconfirmed job scoring anyone is the H-049
+failure, and the checklist says so instead of silently omitting.
+
+**3 · The launcher (PRODUCT_DECISIONS' open requirement, minimal form).**
+`start-matchdesk.cmd` (Windows) and `start-matchdesk.command` (macOS):
+check Node, `corepack pnpm install` on first run (corepack ships with Node
+and reads `packageManager`, so nothing global is installed), start the
+server, open the browser. `docs/USER_GUIDE.md` walks a non-technical
+recruiter from GitHub's Download ZIP to a running app, and README's top
+section points there before anything developer-facing.
+
+**Windows, stated honestly:** verified by audit, not by execution — this
+project has no Windows machine. The audit: no `child_process` in product
+code, all paths through `node:path`, loopback binding and `homedir()` are
+portable, better-sqlite3 ships win32 prebuilds for Node 24, npm scripts use
+cmd-compatible `&&`, and corepack honours the pinned `pnpm@11.21.0`. The
+first Windows run is the remaining test, and the guide's troubleshooting
+table covers the known failure modes (SmartScreen, port in use, blocked
+installs, stale-build restarts).
+
+**Costs, accepted:** the candidate-side results link to the job page rather
+than the per-pair detail view (that view reads the job-side run cache; a
+persisted-match detail route is a later step). The launcher opens the
+browser on a timer rather than a readiness probe — a refresh note covers
+the cold-build case.

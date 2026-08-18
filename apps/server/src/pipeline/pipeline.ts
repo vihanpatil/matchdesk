@@ -149,7 +149,7 @@ export async function ingestCandidateDocument(
   return {
     candidate,
     outcome,
-    attributes: attributesWithUnreadable(candidate.rawText, referenceDate),
+    attributes: deriveAttributes(candidate.rawText, referenceDate),
     extraction,
     alreadyExisted,
   };
@@ -258,7 +258,7 @@ function assertJobReadable(db: Database.Database, jobId: string): void {
  * point derives the same attribute list — a second, subtly different derivation
  * is the H-099 shape, where the batch path and the single path disagreed.
  */
-function attributesWithUnreadable(
+export function deriveAttributes(
   rawText: string,
   referenceDate: ReferenceDate,
 ): readonly ExtractedAttribute[] {
@@ -286,7 +286,7 @@ export function scoreStoredPair(
   const scoringCandidate: ScoringCandidate = {
     id: candidate.id,
     createdAt: candidate.createdAt,
-    attributes: attributesWithUnreadable(candidate.rawText, referenceDate),
+    attributes: deriveAttributes(candidate.rawText, referenceDate),
   };
 
   const result = scoreCandidate(job, scoringCandidate);
@@ -381,7 +381,7 @@ export function scoreJobAgainstCandidates(
     const scoringCandidate: ScoringCandidate = {
       id: candidate.id,
       createdAt: candidate.createdAt,
-      attributes: attributesWithUnreadable(candidate.rawText, referenceDate),
+      attributes: deriveAttributes(candidate.rawText, referenceDate),
     };
     const result = scoreCandidate(job, scoringCandidate);
 
@@ -403,6 +403,85 @@ export function scoreJobAgainstCandidates(
     if (blocking.length > 0) {
       skipped.push({
         candidateId: candidate.id,
+        reason: 'blocking_reservation',
+        details: blocking.map((r) => r.detail),
+      });
+      continue;
+    }
+
+    upsertMatch(db, {
+      jobId: job.id,
+      candidateId: candidate.id,
+      score: result.score,
+      engineVersion: ENGINE_VERSION,
+      embeddingModelRevision: null,
+      computedAt,
+      referenceDate: formatReferenceDate(referenceDate),
+    });
+
+    scored.push({ jobId: job.id, candidateId: candidate.id, result });
+  }
+
+  return { scored, skipped };
+}
+
+/**
+ * The reverse direction (ADR-038): one candidate against many jobs, for the
+ * candidate page's "evaluate against jobs" action. The candidate's
+ * attributes are derived exactly ONCE (the measured 150x ratio above applies
+ * with the roles swapped), and every per-job decision mirrors
+ * {@link scoreJobAgainstCandidates}' semantics — same {@link deriveAttributes}
+ * (H-099: one derivation for every entry point), same persisted match rows
+ * (ADR-024), same blocking-reservation SKIP (ADR-029/H-099: no row is
+ * persisted, and one unreconcilable pairing must not deny the rest).
+ *
+ * The caller passes only readable, CONFIGURED jobs — unconfigured and
+ * unreadable ones never reach a scorer (ADR-035/H-049) and are reported as
+ * skipped by the API layer, which owns that filtering because it also owns
+ * telling the recruiter why.
+ */
+export interface SkippedJob {
+  readonly jobId: string;
+  readonly reason: 'not_scoreable' | 'not_configured' | 'blocking_reservation';
+  readonly details: readonly string[];
+}
+
+export function scoreCandidateAgainstJobs(
+  db: Database.Database,
+  candidate: StoredCandidate,
+  jobs: readonly ScoringJob[],
+  referenceDate: ReferenceDate,
+  computedAt: string,
+): { readonly scored: readonly ScoredPair[]; readonly skipped: readonly SkippedJob[] } {
+  if (candidate.parseStatus !== 'ok' || candidate.language !== 'en') {
+    throw new Error(
+      `scoreCandidateAgainstJobs: refusing to score candidate ${candidate.id} with ` +
+        `parseStatus="${candidate.parseStatus}" language="${String(candidate.language)}". ` +
+        'A document that was not fully read is never scored (C7).',
+    );
+  }
+
+  const scoringCandidate: ScoringCandidate = {
+    id: candidate.id,
+    createdAt: candidate.createdAt,
+    attributes: deriveAttributes(candidate.rawText, referenceDate),
+  };
+
+  const scored: ScoredPair[] = [];
+  const skipped: SkippedJob[] = [];
+
+  for (const job of jobs) {
+    // Defence in depth: the API filters, this guard still holds (H-049's
+    // lesson — an invariant reachable only through one entry point is not
+    // an invariant).
+    assertJobReadable(db, job.id);
+
+    const result = scoreCandidate(job, scoringCandidate);
+
+    const blocking = result.reservations.filter((r) => r.blocking);
+    if (blocking.length > 0) {
+      skipped.push({
+        jobId: job.id,
         reason: 'blocking_reservation',
         details: blocking.map((r) => r.detail),
       });

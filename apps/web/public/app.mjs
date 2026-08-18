@@ -628,35 +628,287 @@ async function candidatesView(view) {
   const grid = el('div', 'grid');
   candidates.forEach((/** @type {any} */ c, /** @type {number} */ i) => {
     const remove = btn('danger', 'Delete');
-    remove.addEventListener('click', () => {
+    remove.addEventListener('click', (e) => {
+      // The card navigates on click (ADR-038); deleting must not also open
+      // the page being deleted.
+      e.stopPropagation();
       if (!window.confirm(`Delete ${String(c.originalFilename)} and its file?`)) return;
       api(`/api/candidates/${String(c.id)}`, { method: 'DELETE' })
         .then(() => {
           toast('Deleted');
           render();
         })
-        .catch((e) => {
-          toast(String(e.message ?? e));
+        .catch((e2) => {
+          toast(String(e2.message ?? e2));
         });
     });
-    grid.append(
-      stagger(
-        el('div', 'card', [
-          el('div', 'row-actions', [
-            el('strong', '', [c.originalFilename]),
-            c.parseStatus === 'ok' && c.language === 'en'
-              ? pill('good', 'readable')
-              : pill('warn', 'needs attention'),
-          ]),
-          ...(c.warnings.length > 0 ? [el('p', 'hint', [c.warnings.join(' ')])] : []),
-          el('div', 'row-actions', [remove]),
-        ]),
-        i + 1,
-      ),
-    );
+    const card = el('div', 'card tappable', [
+      el('div', 'row-actions', [
+        el('strong', '', [c.originalFilename]),
+        c.parseStatus === 'ok' && c.language === 'en'
+          ? pill('good', 'readable')
+          : pill('warn', 'needs attention'),
+      ]),
+      ...(c.warnings.length > 0 ? [el('p', 'hint', [c.warnings.join(' ')])] : []),
+      el('div', 'row-actions', [remove]),
+    ]);
+    card.addEventListener('click', () => {
+      location.hash = `#/candidates/${String(c.id)}`;
+    });
+    grid.append(stagger(card, i + 1));
   });
   if (candidates.length === 0) view.append(el('div', 'empty', ['No candidates yet.']));
   else view.append(grid);
+}
+
+/**
+ * The CV inspect view (ADR-038): what the engine extracted — THE SAME
+ * attribute list scoring reads — with every claim highlighted in the
+ * document, plus "evaluate against jobs", the reverse of the job page's
+ * score button.
+ * @param {HTMLElement} view @param {string} candidateId
+ */
+async function candidateInspectView(view, candidateId) {
+  const { candidate } = await api(`/api/candidates/${candidateId}`);
+  const back = el('a', 'crumb', ['← Candidates']);
+  back.setAttribute('href', '#/candidates');
+  view.append(back, el('h1', '', [candidate.originalFilename]));
+
+  const remove = btn('danger', 'Delete candidate');
+  remove.addEventListener('click', () => {
+    if (!window.confirm(`Delete ${String(candidate.originalFilename)} and its file?`)) return;
+    api(`/api/candidates/${candidateId}`, { method: 'DELETE' })
+      .then(() => {
+        toast('Deleted');
+        location.hash = '#/candidates';
+      })
+      .catch((e) => {
+        toast(String(e.message ?? e));
+      });
+  });
+
+  if (candidate.parseStatus !== 'ok' || candidate.language !== 'en') {
+    view.append(
+      el('p', 'subtitle', [
+        'This document could not be read, so it cannot be evaluated. Replace the file with a cleaner export, or delete it.',
+      ]),
+      el('div', 'reservation', [String(candidate.warnings.join(' ') || 'Unreadable document.')]),
+      stagger(el('div', 'row-actions', [remove]), 0),
+    );
+    return;
+  }
+
+  const { attributes, totalYearsExperience } = await api(
+    `/api/candidates/${candidateId}/attributes`,
+  );
+  view.append(
+    el('p', 'subtitle', [
+      'Everything below is exactly what evaluation reads — nothing more, nothing less.',
+    ]),
+  );
+
+  /** @param {string} kind */
+  const ofKind = (kind) => attributes.filter((/** @type {any} */ a) => a.kind === kind);
+  const skills = ofKind('skill');
+  const experience = ofKind('years_experience');
+  const education = ofKind('education');
+  const certifications = ofKind('certification');
+  const unreadableRanges = ofKind('unreadable_date_range');
+  const unreadableSections = ofKind('unreadable_section');
+
+  const left = el('div', 'stack');
+
+  const skillChips = el('div', 'chips');
+  const seenSkills = new Set();
+  for (const skill of skills) {
+    if (seenSkills.has(skill.canonicalId)) continue;
+    seenSkills.add(skill.canonicalId);
+    const chip = el('span', 'chip on', [skill.value]);
+    chip.title = `Evidence: "${String(skill.value)}" in the document`;
+    skillChips.append(chip);
+  }
+  left.append(
+    el('div', 'card', [
+      el('h2', '', ['Skills ', el('small', '', [`${String(seenSkills.size)} recognised`])]),
+      seenSkills.size > 0 ? skillChips : el('div', 'empty', ['No skills recognised.']),
+    ]),
+  );
+
+  left.append(
+    el('div', 'card', [
+      el('h2', '', [
+        'Experience ',
+        el('small', '', [`${String(totalYearsExperience)} years counted`]),
+      ]),
+      experience.length > 0 || unreadableRanges.length > 0
+        ? el('ul', 'plain', [
+            ...experience.map((/** @type {any} */ x) =>
+              el('li', '', [
+                pill('good', x.isExplicitStatement ? 'stated' : 'dated role'),
+                `${String(x.value)} — ${String(x.years)} years`,
+              ]),
+            ),
+            ...unreadableRanges.map((/** @type {any} */ x) =>
+              el('li', '', [
+                pill('warn', 'ambiguous dates'),
+                `${String(x.value)} — at least ${String(x.minPossibleYears)} years, not counted (the notation is ambiguous between day-first and month-first)`,
+              ]),
+            ),
+          ])
+        : el('div', 'empty', [
+            'No dated employment ranges or explicit "N years" statements found. Tenure written in words ("five years") is not parsed — only digits.',
+          ]),
+    ]),
+  );
+
+  left.append(
+    el('div', 'card', [
+      el('h2', '', ['Education & certifications']),
+      education.length + certifications.length > 0
+        ? el('ul', 'plain', [
+            ...education.map((/** @type {any} */ x) =>
+              el('li', '', [
+                pill('good', String(x.degreeLevel)),
+                `${String(x.value)}${x.field ? ` — ${String(x.field)}` : ''}`,
+              ]),
+            ),
+            ...certifications.map((/** @type {any} */ x) =>
+              el('li', '', [pill('good', 'certification'), String(x.value)]),
+            ),
+          ])
+        : el('div', 'empty', ['No degrees or certifications recognised.']),
+    ]),
+  );
+
+  if (unreadableSections.length > 0) {
+    left.append(
+      el('div', 'card', [
+        el('h2', '', ['Sections the engine could not read']),
+        el(
+          'div',
+          'stack',
+          unreadableSections.map((/** @type {any} */ x) =>
+            el('div', 'reservation', [
+              `The ${String(x.section)} section contains text the engine could not read ("${String(x.value)}"). Nothing is asserted about this dimension from silence.`,
+            ]),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  // ── evaluate against jobs (the reverse of the job page's score button) ──
+  const { jobs } = await api('/api/jobs');
+  const evalCard = el('div', 'card');
+  evalCard.append(el('h2', '', ['Evaluate against jobs']));
+  /** @type {Map<string, HTMLInputElement>} */
+  const checks = new Map();
+  const jobList = el('div', 'stack');
+  for (const job of jobs) {
+    const scoreable = job.parseStatus === 'ok' && job.language === 'en' && job.configured;
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = scoreable;
+    box.disabled = !scoreable;
+    if (scoreable) checks.set(job.id, box);
+    const why = scoreable
+      ? ''
+      : job.parseStatus !== 'ok' || job.language !== 'en'
+        ? ' — unreadable, cannot be scored'
+        : ' — review requirements first';
+    jobList.append(el('label', 'field', [box, `${String(job.title)}${why}`]));
+  }
+  const runBtn = btn('big', 'Score selected jobs');
+  const results = el('div');
+  runBtn.addEventListener('click', () => {
+    const jobIds = [...checks.entries()].filter(([, box]) => box.checked).map(([id]) => id);
+    if (jobIds.length === 0) {
+      toast('Tick at least one job');
+      return;
+    }
+    runBtn.disabled = true;
+    runBtn.textContent = 'Scoring…';
+    api(`/api/candidates/${candidateId}/score`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jobIds }),
+    })
+      .then((run) => {
+        results.textContent = '';
+        const titles = new Map(jobs.map((/** @type {any} */ j) => [j.id, j.title]));
+        const ranked = [...run.scored].sort(
+          (/** @type {any} */ a, /** @type {any} */ b) => b.result.score - a.result.score,
+        );
+        results.append(el('h2', '', ['Results ', el('small', '', ['best match first'])]));
+        const stack = el('div', 'stack');
+        ranked.forEach((/** @type {any} */ entry, /** @type {number} */ i) => {
+          const row = el('div', 'card tappable result-row', [
+            el('span', 'rank', [String(i + 1)]),
+            el('div', 'who', [
+              el('div', 'name', [titles.get(entry.jobId) ?? entry.jobId]),
+              el('div', 'meta', [
+                entry.result.eligibility.eligible
+                  ? 'Eligible'
+                  : 'Ineligible — a must-have is unmet',
+              ]),
+            ]),
+            scoreRing(entry.result.score, entry.result.eligibility.eligible),
+          ]);
+          row.addEventListener('click', () => {
+            location.hash = `#/jobs/${String(entry.jobId)}`;
+          });
+          stack.append(stagger(row, i));
+        });
+        results.append(stack);
+        for (const skip of run.skipped) {
+          results.append(
+            el('div', 'reservation', [
+              `${String(titles.get(skip.jobId) ?? skip.jobId)}: ${String(skip.details.join(' ') || 'not scored')}`,
+            ]),
+          );
+        }
+      })
+      .catch((e) => {
+        toast(String(e.message ?? e));
+      })
+      .finally(() => {
+        runBtn.disabled = false;
+        runBtn.textContent = 'Score selected jobs';
+      });
+  });
+  evalCard.append(
+    jobList,
+    el('p', 'hint', [
+      'Only jobs with confirmed requirements can be scored — the others say why they are unavailable.',
+    ]),
+    el('div', 'row-actions', [runBtn]),
+  );
+  left.append(evalCard, el('div', 'row-actions', [remove]));
+
+  // The document, with every extracted claim highlighted (Section 6.2).
+  const spans = attributes
+    .map((/** @type {any} */ a) => a.sourceSpan)
+    .filter((/** @type {any} */ x) => x !== null && x !== undefined);
+  const doc = el('div', 'card docpane');
+  for (const segment of highlightSegments(candidate.rawText, spans)) {
+    doc.append(
+      segment.marked ? el('mark', '', [segment.text]) : document.createTextNode(segment.text),
+    );
+  }
+
+  view.append(
+    el('div', 'split', [
+      stagger(left, 0),
+      stagger(
+        el('div', '', [
+          el('h2', '', ['Document ', el('small', '', ['every extracted claim highlighted'])]),
+          doc,
+        ]),
+        1,
+      ),
+    ]),
+  );
+  view.append(results);
 }
 
 /** @param {HTMLElement} view @param {string} jobId @param {string} candidateId */
@@ -802,7 +1054,9 @@ function render() {
 
   /** @type {Promise<void>} */
   let painted;
-  if (parts[0] === 'candidates') painted = candidatesView(view);
+  if (parts[0] === 'candidates' && parts[1] !== undefined)
+    painted = candidateInspectView(view, parts[1]);
+  else if (parts[0] === 'candidates') painted = candidatesView(view);
   else if (
     parts[0] === 'jobs' &&
     parts[1] !== undefined &&

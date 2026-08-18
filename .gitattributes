@@ -1,0 +1,3 @@
+# Batch files must reach Windows with CRLF endings whatever platform
+# checked them out (LF batch files can misparse in cmd.exe).
+*.cmd text eol=crlf

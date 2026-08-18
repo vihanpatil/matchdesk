@@ -4,10 +4,13 @@ import type Database from 'better-sqlite3';
 import { z } from 'zod';
 
 import {
+  deriveAttributes,
   ingestCandidateDocument,
   ingestJobDocument,
+  scoreCandidateAgainstJobs,
   scoreJobAgainstCandidates,
   type ReferenceDate,
+  type SkippedJob,
 } from '../pipeline/pipeline.js';
 import { getCandidateById, listCandidates } from '../repositories/candidates.js';
 import { deleteCandidate, deleteJob } from '../repositories/deletion.js';
@@ -20,6 +23,7 @@ import {
 } from '../repositories/jobScoringConfigs.js';
 import { listMatchesForJob } from '../repositories/matches.js';
 import { proposeRequirements } from '../scoring/proposeRequirements.js';
+import { totalYearsExperience } from '@matchdesk/core';
 
 import { fetchJobSource, JobFetchError } from './fetchJobSource.js';
 
@@ -62,6 +66,12 @@ export interface ApiOptions {
 const JobFromUrlSchema = z.object({
   url: z.string().min(1),
   title: z.string().optional(),
+});
+
+/** ADR-038: body of POST /api/candidates/:id/score. Absent/empty `jobIds`
+ *  means "every job that can be scored". */
+const CandidateScoreSchema = z.object({
+  jobIds: z.array(z.string().min(1)).optional(),
 });
 
 type Handler = (req: IncomingMessage, res: ServerResponse) => Promise<void>;
@@ -183,6 +193,106 @@ export function createApi(options: ApiOptions): Handler {
           else sendJson(res, 404, { error: 'unknown candidate' });
           return;
         }
+      }
+
+      if (id !== undefined && sub === 'attributes' && method === 'GET') {
+        // ADR-038: the inspect view. Derives THE SAME attribute list scoring
+        // uses (H-099: one derivation for every entry point) so what the
+        // recruiter reviews is what evaluation reads — never a parallel
+        // rendition that could drift.
+        const candidate = getCandidateById(db, id);
+        if (candidate === null) {
+          sendJson(res, 404, { error: 'unknown candidate' });
+          return;
+        }
+        if (candidate.parseStatus !== 'ok' || candidate.language !== 'en') {
+          // Mirrors the proposal route's 409: a document we could not fully
+          // read has no trustworthy attributes to show (C7).
+          sendJson(res, 409, {
+            error: 'candidate document is not readable; attributes cannot be derived',
+            parseStatus: candidate.parseStatus,
+            warnings: candidate.warnings,
+          });
+          return;
+        }
+        const { referenceDate } = now();
+        const attributes = deriveAttributes(candidate.rawText, referenceDate);
+        sendJson(res, 200, {
+          attributes,
+          totalYearsExperience: totalYearsExperience(attributes),
+          referenceDate,
+        });
+        return;
+      }
+
+      if (id !== undefined && sub === 'score' && method === 'POST') {
+        // ADR-038: the reverse of POST /api/jobs/:id/score — one candidate
+        // against the selected (or all) jobs.
+        const candidate = getCandidateById(db, id);
+        if (candidate === null) {
+          sendJson(res, 404, { error: 'unknown candidate' });
+          return;
+        }
+        if (candidate.parseStatus !== 'ok' || candidate.language !== 'en') {
+          sendJson(res, 409, {
+            error: 'candidate document is not readable; it is never scored (C7)',
+            parseStatus: candidate.parseStatus,
+            warnings: candidate.warnings,
+          });
+          return;
+        }
+
+        let parsedBody: unknown = {};
+        const raw = (await readBody(req)).toString('utf8');
+        if (raw.trim() !== '') {
+          try {
+            parsedBody = JSON.parse(raw);
+          } catch {
+            sendJson(res, 400, { error: 'request body must be JSON: {"jobIds"?: ["..."]}' });
+            return;
+          }
+        }
+        const { jobIds } = CandidateScoreSchema.parse(parsedBody);
+
+        const allJobs = listJobs(db);
+        const requested =
+          jobIds === undefined || jobIds.length === 0
+            ? allJobs
+            : jobIds.map((jobId) => allJobs.find((j) => j.id === jobId) ?? jobId);
+
+        const scoringJobs = [];
+        const skipped: SkippedJob[] = [];
+        for (const entry of requested) {
+          if (typeof entry === 'string') {
+            sendJson(res, 404, { error: `unknown job "${entry}"` });
+            return;
+          }
+          if (entry.parseStatus !== 'ok' || entry.language !== 'en') {
+            skipped.push({ jobId: entry.id, reason: 'not_scoreable', details: entry.warnings });
+            continue;
+          }
+          const scoringJob = scoringJobFor(db, entry.id);
+          if (scoringJob === null) {
+            skipped.push({
+              jobId: entry.id,
+              reason: 'not_configured',
+              details: ['Requirements have not been confirmed for this job.'],
+            });
+            continue;
+          }
+          scoringJobs.push(scoringJob);
+        }
+
+        const { referenceDate, computedAt } = now();
+        const run = scoreCandidateAgainstJobs(
+          db,
+          candidate,
+          scoringJobs,
+          referenceDate,
+          computedAt,
+        );
+        sendJson(res, 200, { scored: run.scored, skipped: [...skipped, ...run.skipped] });
+        return;
       }
     }
 

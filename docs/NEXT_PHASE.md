@@ -46,15 +46,17 @@ real resume now ingests cleanly (user-confirmed 2026-08-17)**, and jobs can
 arrive from pasted links (ADR-037), so nothing known blocks a real pool:
 zero open false-refusal or integrity findings.
 
-## 1b · Parse transparency (user-reported gap, 2026-08-17)
+## 1b · Parse transparency — DELIVERED (ADR-038, same day)
 
-"No errors popped up. I do not know whether it worked fully or not." A
-candidate's parse detail is only visible today AFTER scoring (the detail
-view), and a job's only via the proposal chips. The recruiter should be
-able to open any ingested document and see what was extracted — attributes
-with evidence highlights — without scoring anything. The pieces exist
-(detail view, highlighter, attributes endpoint-shaped data in the pipeline);
-this is wiring, not research.
+The candidate inspect view shows exactly what evaluation reads (the
+pipeline's own derivation, H-099) with every claim highlighted, gaps
+explained rather than hidden. The same page scores the candidate against
+ticked jobs (the reverse direction), and a double-click launcher plus
+`docs/USER_GUIDE.md` cover the non-technical recruiter on Windows and Mac.
+Remaining from that batch: the candidate-side result rows link to the job
+page, not a per-pair detail view (needs a persisted-match detail route),
+and the first REAL Windows run is still the outstanding test of the
+launcher path.
 
 ## 2 · Then, in rough order of value
 
