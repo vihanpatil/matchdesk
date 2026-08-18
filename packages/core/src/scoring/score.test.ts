@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import type {
+  ExtractedAttribute,
   SkillAttribute,
+  UnreadableDateRangeAttribute,
   UnreadableSectionAttribute,
   YearsExperienceAttribute,
 } from '../extraction/types.js';
@@ -554,6 +556,73 @@ describe('reservations (H-040, ADR-029)', () => {
       ],
     };
     expect(scoreCandidate(job, clean).reservations).toEqual([]);
+  });
+});
+
+describe('H-036 hardening: reservation-blocking boundaries, exactly at the bar', () => {
+  // Mutation testing (2026-08-17) showed both `flips` conditions in
+  // reservationsFor carried surviving boundary mutants: no test placed
+  // `minYears` exactly ON either edge. Whether a reservation BLOCKS is the
+  // difference between a candidate appearing ranked and appearing held back
+  // — recruiter-visible. Every expectation below was measured before it was
+  // written (H-109).
+  const yrs = (years: number, explicit: boolean, s: number): YearsExperienceAttribute => ({
+    kind: 'years_experience',
+    years,
+    isExplicitStatement: explicit,
+    value: `${String(years)} years`,
+    normalizedValue: String(years),
+    confidence: 1,
+    sourceSpan: { start: s, end: s + 1 },
+  });
+  const unread = (minPossibleYears: number, s: number): UnreadableDateRangeAttribute => ({
+    kind: 'unreadable_date_range',
+    minPossibleYears,
+    value: '03/04/2019 - 07/09/2024',
+    normalizedValue: String(minPossibleYears),
+    confidence: 1,
+    sourceSpan: { start: s, end: s + 1 },
+  });
+  const cand = (attributes: readonly ExtractedAttribute[]): Candidate => ({
+    id: 'c1',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    attributes,
+  });
+  const job = (minYears: number): Job => ({
+    id: 'j1',
+    experience: { weight: 1, requirement: { minYears, mustHave: true } },
+  });
+
+  it('discarded claim: minYears EXACTLY equal to verified tenure does not block — the bar is already met', () => {
+    const r = scoreCandidate(job(2.9), cand([yrs(20, true, 0), yrs(2.9, false, 2)]));
+    expect(r.eligibility.eligible).toBe(true);
+    expect(r.reservations[0]?.kind).toBe('unverified_tenure_claim');
+    expect(r.reservations[0]?.blocking).toBe(false);
+  });
+
+  it('discarded claim: minYears EXACTLY equal to the claim blocks — reading the dates could flip the verdict', () => {
+    const r = scoreCandidate(job(20), cand([yrs(20, true, 0), yrs(2.9, false, 2)]));
+    expect(r.eligibility.eligible).toBe(false);
+    expect(r.reservations[0]?.blocking).toBe(true);
+  });
+
+  it('unreadable dates: minYears EXACTLY equal to verified tenure does not block', () => {
+    const r = scoreCandidate(job(3), cand([yrs(3, false, 0), unread(5.2, 2)]));
+    expect(r.eligibility.eligible).toBe(true);
+    expect(r.reservations[0]?.kind).toBe('unreadable_employment_dates');
+    expect(r.reservations[0]?.blocking).toBe(false);
+  });
+
+  it('unreadable dates: minYears EXACTLY equal to verified + lower bound blocks — the bound just reaches the bar', () => {
+    const r = scoreCandidate(job(8.2), cand([yrs(3, false, 0), unread(5.2, 2)]));
+    expect(r.eligibility.eligible).toBe(false);
+    expect(r.reservations[0]?.blocking).toBe(true);
+  });
+
+  it('unreadable dates: minYears just above the bound does not block — even the bound cannot reach it', () => {
+    const r = scoreCandidate(job(8.3), cand([yrs(3, false, 0), unread(5.2, 2)]));
+    expect(r.eligibility.eligible).toBe(false);
+    expect(r.reservations[0]?.blocking).toBe(false);
   });
 });
 

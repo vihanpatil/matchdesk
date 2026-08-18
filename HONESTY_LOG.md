@@ -4378,3 +4378,105 @@ Closure evidence, honestly itemised:
   regression of the BUTTON (not the cascade) would again need a browser pass
   to catch — which is why "walk the destructive paths" is now written into
   the session-state verification instructions rather than left to memory.
+
+---
+
+### H-119 addendum · CLOSED (2026-08-17, second session)
+
+Rule C landed, corpus-first (ADR-028). The name corpus was widened before the
+code was touched — Spanish, Portuguese, Italian, Dutch, French and Arabic
+particle conventions, 14 shapes — and the new tests were watched failing:
+**8 of 14 falsely refused** (the measured six plus `Maria de las Nieves
+Fernandez` and `Alessandro di Stefano della Rovere`, whose `di`/`della` are
+both lexicon tokens). Five header-block Romance prose lines went in alongside
+as regression guards and passed throughout.
+
+The rule, implemented exactly as measured: for a line OUTSIDE any recognised
+section, `carriesNonEnglishFunctionWords` may only veto when the line also
+carries at least one lowercase token NOT in the lexicon. A name's only
+lowercase tokens ARE its particles; Romance prose always carries lowercase
+content words (`equipe`, `personnes`, `oportunidad`). In-section lines are
+untouched, so the H-087 degree-line catches cannot reopen. Veto-only safety
+is preserved by construction: the rule can only withhold a refusal, never
+manufacture one.
+
+**Mechanism note, stated because a prediction failed in the good direction:**
+the H-106 regression guard's SECTIONLESS Spanish degree line was expected to
+lose its lexicon catch under rule C — and did — but stayed caught at WINDOW
+granularity, paired with the English line above it. The refusal is unchanged;
+only the mechanism moved (the refuse-mixed-language precedent, ADR-031). A
+mechanism note now sits on that test so the window dependency is visible.
+
+**Manifest shrink, deliberate:** the `DOCUMENTED GAP (H-116 residual)` test
+asserted the wrong behaviour on purpose and was REPLACED by the 19-test
+closure block above (14 names + 5 prose). `--allow-shrink` was used for
+exactly this one identity; the manifest gained 18 net tests.
+
+The remaining trade is stated on the rule's doc comment: a header-block
+Romance line whose lowercase words are all function words is no longer
+caught. Every measured line of that shape is a name or a title — the
+population the rule exists to protect.
+
+---
+
+### D7 addendum · CLOSED (2026-08-17) — the REPLACE bypass is shut
+
+ADR-018 Decision 4 named the mechanism the day the gate was re-worded:
+SQLite's REPLACE conflict resolution deletes the conflicting row **without
+firing BEFORE DELETE triggers unless `PRAGMA recursive_triggers` is on** —
+and the pragma was never turned on. Measured tonight, failing test first:
+`INSERT OR REPLACE` on an existing `audit_log` id silently rewrote the row.
+
+The fix is one pragma in `connection.ts` (`recursive_triggers = ON`), safe by
+enumeration: the only triggers in the schema are the two audit_log guards,
+and audit_log carries no foreign keys, so no cascade path changes behaviour.
+Two tests now cover the statement forms the original gate missed — `INSERT
+OR REPLACE` (aborts via the DELETE trigger, exact message asserted) and
+`INSERT ... ON CONFLICT DO UPDATE` (was already blocked by the UPDATE
+trigger; now pinned so it stays that way). The property the gate states —
+"no statement of any form may alter or remove a committed audit row" — is
+now tested across every form SQLite offers.
+
+---
+
+### H-036 addendum · the survivor list is now a worklist (2026-08-17)
+
+Two tranches of survivor-killing tests this session, every expectation
+measured before it was written (H-109):
+
+- **experience.ts** (69.36% → 70.83% confirmed by the second E4 run): nine
+  tests — decimal explicit claims, space-eaten "12years" (H-062's PDF
+  artefact), the singular year/yr forms, the "years old" age exclusion under
+  irregular spacing (ADR-007), day-31 as an unambiguous day, month-0 as
+  INVALID, an end date equal to the reference month, ZERO-length ranges, and
+  reverse-chronological overlapping roles — the standard CV order, which
+  every prior overlap test happened to avoid, leaving the merge's sort
+  comparator mutable.
+- **certifications.ts + score.ts** (third E4 run pending at this writing):
+  a table-driven test proving all 28 gazetteer terms and aliases extract
+  with their measured confidences (most gazetteer DATA entries carried
+  surviving mutants — an entry could break silently), plus five
+  reservation-blocking boundary tests placing `minYears` exactly ON each
+  edge of both `flips` conditions (whether a reservation blocks is
+  recruiter-visible; no prior test sat on a boundary).
+
+Caveat recorded rather than hidden: stryker attributes module-init DATA
+mutants to no test (`static: true, coveredBy: []`), so the gazetteer test's
+value is the behavioural pin itself; whether stryker's bookkeeping credits
+it will be read from the run, not assumed.
+
+---
+
+### H-110 addendum · CLOSED (2026-08-17) — the trend reversed, held, and was banked
+
+The finding was never "E4 fails"; it was four consecutive declining
+measurements with the ratchet 0.85 beneath the last of them. Tonight, three
+measurements in one evening: **79.85** (flat — the H-116 session touched no
+core code), **80.18** (nine tenure-hardening tests; `experience.ts`
+69.36 → 70.83), **80.78** (five reservation-boundary tests;
+`score.ts` 77.73 → 84.09). Two consecutive rises, produced the way the
+finding prescribed — from the survivor list, not from defect-chasing — and
+**the ratchet was raised 79 → 80 to bank them**, so the recovered ground can
+no longer erode silently. The survivor worklist stays open as H-036;
+`experience.ts` (157 survivors) is still the largest block and still the
+module that computes tenure.

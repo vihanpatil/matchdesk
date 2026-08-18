@@ -213,7 +213,7 @@
       "id": "H-036",
       "severity": "process",
       "status": "open",
-      "note": "369 mutation survivors (was 607). explain.ts largest block at 74.76%. E4 passes regardless."
+      "note": "369 mutation survivors (was 607). explain.ts largest block at 74.76%. E4 passes regardless. 2026-08-17 run 3: 470 survived + 5 no-coverage at 80.78 overall. score.ts 77.73 -> 84.09 (boundary tests); experience.ts holds 70.83 (157 survivors, still the largest block). Caveat confirmed by measurement: stryker attributes module-init DATA mutants to no test (static, coveredBy empty), so certifications.ts's 39 gazetteer survivors did not move despite the new table test proving all 28 terms extract - the pin is behavioural, the score will not credit it."
     },
     {
       "id": "H-037",
@@ -426,8 +426,8 @@
     {
       "id": "D7",
       "severity": "integrity",
-      "status": "open",
-      "note": "audit_log INSERT OR REPLACE bypass. Cannot produce a wrong score; corrupts the audit trail. Not tracked in HONESTY_LOG as its own heading \u2014 it is an H-028 sub-item."
+      "status": "closed",
+      "note": "audit_log INSERT OR REPLACE bypass. Cannot produce a wrong score; corrupts the audit trail. Not tracked in HONESTY_LOG as its own heading \u2014 it is an H-028 sub-item. CLOSED 2026-08-17: PRAGMA recursive_triggers=ON in connection.ts (failing test first - INSERT OR REPLACE silently rewrote an audit row). Safe by enumeration: the only schema triggers are the two audit_log guards and audit_log has no FKs. Both missed statement forms now tested: INSERT OR REPLACE aborts via the DELETE trigger; INSERT..ON CONFLICT DO UPDATE was already blocked by the UPDATE trigger and is pinned."
     },
     {
       "id": "H-075",
@@ -642,8 +642,8 @@
     {
       "id": "H-110",
       "severity": "process",
-      "status": "open",
-      "note": "E4 holds but the TREND is the finding, and four measurements now show it: 80.42 -> 80.39 -> 80.02 -> 79.85 across ADR-031, ADR-032 and ADR-034. Headroom above the 79 ratchet is down to 0.85, below this project's usual ~1 point, so the next core change may break the build. experience.ts remains the weakest module at 69.36% while being the file that computes TENURE - the number every wrong-score finding here has been about. Not a behavioural regression: every fix has a test that fails without it. The cause is that defect-targeted tests pin the defect and not the surrounding arithmetic, so each round of fixes adds more mutable code than it adds mutation coverage. Left open deliberately: raising it means writing tests against surviving mutants rather than defects, a different and larger activity. The right response to a future break is to raise the score, not to lower the ratchet. 2026-08-17: trend reversed - 79.85 (flat, core untouched) then 80.18 after nine hardening tests targeting experience.ts survivors (69.36 -> 70.83). Still the weakest module; 157 survivors remain."
+      "status": "closed",
+      "note": "E4 holds but the TREND is the finding, and four measurements now show it: 80.42 -> 80.39 -> 80.02 -> 79.85 across ADR-031, ADR-032 and ADR-034. Headroom above the 79 ratchet is down to 0.85, below this project's usual ~1 point, so the next core change may break the build. experience.ts remains the weakest module at 69.36% while being the file that computes TENURE - the number every wrong-score finding here has been about. Not a behavioural regression: every fix has a test that fails without it. The cause is that defect-targeted tests pin the defect and not the surrounding arithmetic, so each round of fixes adds more mutable code than it adds mutation coverage. Left open deliberately: raising it means writing tests against surviving mutants rather than defects, a different and larger activity. The right response to a future break is to raise the score, not to lower the ratchet. 2026-08-17: trend reversed - 79.85 (flat, core untouched) then 80.18 after nine hardening tests targeting experience.ts survivors (69.36 -> 70.83). Still the weakest module; 157 survivors remain. CLOSED 2026-08-17: the trend REVERSED and held - 79.85 (flat) -> 80.18 -> 80.78 across two hardening tranches in one evening, and the ratchet was raised 79 -> 80 to bank it. The standing instruction lives in stryker.config.json; the survivor worklist is H-036, which stays open."
     },
     {
       "id": "H-111",
@@ -696,8 +696,8 @@
     {
       "id": "H-119",
       "severity": "false-refusal",
-      "status": "open",
-      "note": "Found measuring H-116/F2, carved out so the closure does not hide a narrowing (trap 4). 'Maria del Carmen Gutierrez de la Torre' - lowercase particles, an ordinary real name shape - carries three lowercase lexicon tokens (del/de/la) and is refused by the sub-floor function-word pass, which is deliberately not section-gated (gating it loses the header-block Romance-prose catch). The 0/258 pool under-sampled lowercase-particle Hispanic names - trap 1, seventh instance. Capitalised spelling is clean post-F2. DOCUMENTED GAP test pins the wrong behaviour. Same H-028 D3 discrimination-adjacent shape as H-112. Remediation not chosen. MEASURED 2026-08-17 (docs/research/h119-particle-names-2026-08-17): 6 of 10 lowercase-particle names falsely refused (incl. 'Ana de la Cruz', 'Jose de la Torre'); all 5 header-block Romance prose lines correctly refused. Candidate rule C (out-of-section lines: lexicon vetoes only when a lowercase non-lexicon token is present) separates the populations at zero measured cost; not landed - implementing session should widen the name corpus first, then flip the DOCUMENTED GAP test."
+      "status": "closed",
+      "note": "Found measuring H-116/F2, carved out so the closure does not hide a narrowing (trap 4). 'Maria del Carmen Gutierrez de la Torre' - lowercase particles, an ordinary real name shape - carries three lowercase lexicon tokens (del/de/la) and is refused by the sub-floor function-word pass, which is deliberately not section-gated (gating it loses the header-block Romance-prose catch). The 0/258 pool under-sampled lowercase-particle Hispanic names - trap 1, seventh instance. Capitalised spelling is clean post-F2. DOCUMENTED GAP test pins the wrong behaviour. Same H-028 D3 discrimination-adjacent shape as H-112. Remediation not chosen. MEASURED 2026-08-17 (docs/research/h119-particle-names-2026-08-17): 6 of 10 lowercase-particle names falsely refused (incl. 'Ana de la Cruz', 'Jose de la Torre'); all 5 header-block Romance prose lines correctly refused. Candidate rule C (out-of-section lines: lexicon vetoes only when a lowercase non-lexicon token is present) separates the populations at zero measured cost; not landed - implementing session should widen the name corpus first, then flip the DOCUMENTED GAP test. CLOSED 2026-08-17 (second session): rule C landed corpus-first - name corpus widened to 14 shapes (es/pt/it/nl/fr/ar particle conventions), watched failing 8/14, then 0/14 after the rule; 5 header-block Romance prose regression guards caught throughout. Out-of-section lexicon veto now requires a lowercase non-lexicon token; in-section untouched (H-087 catches cannot reopen); veto-only safety preserved by construction. The flipped DOCUMENTED GAP test is a deliberate manifest shrink, explained in the log."
     }
   ]
 }

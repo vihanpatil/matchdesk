@@ -56,10 +56,14 @@ packaged launcher beyond `pnpm serve`, embeddings (cascade step 4), OCR.
 2026-08-17 and failed twice; **both failures were fixed and closed the same
 day** (H-116 via F1/F2 plus a 15-header contact-line corpus and a binary-tier
 fixture, H-117 via a Delete-job button on all three job-page branches plus
-the jobs-DELETE e2e test the endpoint never had — see H-118). The user still
-needs to re-test their real resume on their machine; the repo only holds the
-synthetic shapes. H-119 (lowercase-particle Hispanic name refused by the
-un-gated lexicon) is the new open false-refusal carved out of that closure.
+the jobs-DELETE e2e test the endpoint never had — see H-118). A second
+session the same evening closed **H-119** (rule C: an out-of-section lexicon
+veto now requires a lowercase non-lexicon token — 8 of 14 measured
+lowercase-particle names were being refused; all 14 now pass with the five
+Romance-prose guards intact) and **D7** (`PRAGMA recursive_triggers` shuts
+the `INSERT OR REPLACE` audit-rewrite bypass ADR-018 D4 named). **The user
+still needs to re-test their real resume on their machine** — the repo only
+holds the synthetic shapes.
 
 Next, in rough order of value:
 
@@ -75,22 +79,16 @@ Next, in rough order of value:
 
 ## Watch items — open, none blocking
 
-- **H-119 · lowercase name particles refuse via the lexicon.** `Maria del
-Carmen Gutierrez de la Torre` trips the sub-floor function-word pass
-  (`del`/`de`/`la`, lowercase), which F2 deliberately left un-gated because
-  it carries the header-block Romance-prose catch. A `DOCUMENTED GAP` test
-  pins it. H-028 D3's discrimination-adjacent shape — do not let it age.
-
-- **H-110 · mutation-score trend — reversed 2026-08-17.** After four declines
-  (80.42 → 79.85), this session measured 79.85 (flat; core untouched by the
-  H-116 fix) and then **80.18** after nine hardening tests written from the
-  survivor list (`experience.ts` 69.36 → 70.83 — reverse-chronological
-  overlapping roles, decimal claims, the age exclusion, day-31 boundaries).
-  Still the weakest module, 157 survivors remain, ratchet stays 79 with the
-  usual ~1 point of headroom. If a core change breaks the build, **raise the
-  score, never lower the ratchet** — the instruction is in
-  `stryker.config.json` where you'll read it when tempted. E4 runs take ~20
-  min at 1078 tests and are silent while running.
+- **H-036 · mutation survivors (H-110 closed 2026-08-17).** The declining
+  trend reversed and held — 79.85 → 80.18 → 80.78 across two hardening
+  tranches — and the ratchet was **raised 79 → 80** to bank it. 470
+  survivors remain the worklist; `experience.ts` (70.83%, 157 survivors)
+  computes tenure and is still the largest block. Known caveat: stryker
+  credits no test for module-init DATA mutants, so gazetteer entries pin
+  behaviourally without moving the score. If a core change breaks the
+  build, **raise the score, never lower the ratchet** — the instruction is
+  in `stryker.config.json` where you'll read it when tempted. E4 runs take
+  ~22 min at 1105 tests and are silent while running.
 - **ADR-033 · two live licence risk acceptances.** `dingbat-to-unicode@1.0.1`
   ships to the recruiter with no licence text anywhere (via `mammoth`);
   `stackback@0.0.2` is dev-only. Replacing `mammoth`'s dependency is a

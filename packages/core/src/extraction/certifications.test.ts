@@ -314,3 +314,65 @@ describe('extractCertifications', () => {
     }
   });
 });
+
+describe('H-036 hardening: every gazetteer entry and alias is proven extractable', () => {
+  // Mutation testing (2026-08-17) showed most gazetteer DATA entries carried
+  // surviving mutants: no test extracted them, so an entry could be edited,
+  // broken, or deleted silently. This table mirrors the gazetteer on
+  // purpose — the duplication IS the pin: a change to either side that the
+  // other does not intend fails here. Confidences measured before writing
+  // (H-109): 0.9 for an id/label (exact) match, 0.75 for an alias.
+  // 'comptia a+' normalizes identically to the label, so it is exact.
+  const EVERY_TERM: readonly [string, string, number][] = [
+    ['AWS Certified Solutions Architect', 'aws-saa', 0.9],
+    ['aws solutions architect', 'aws-saa', 0.75],
+    ['aws csa', 'aws-saa', 0.75],
+    ['AWS Certified Developer Associate', 'aws-dev-associate', 0.9],
+    ['aws developer associate', 'aws-dev-associate', 0.75],
+    ['Project Management Professional', 'pmp', 0.9],
+    ['pmp', 'pmp', 0.9],
+    ['Certified ScrumMaster', 'csm', 0.9],
+    ['certified scrum master', 'csm', 0.75],
+    ['CISSP', 'cissp', 0.9],
+    ['certified information systems security professional', 'cissp', 0.75],
+    ['Certified Public Accountant', 'cpa', 0.9],
+    ['cpa', 'cpa', 0.9],
+    ['Chartered Financial Analyst', 'cfa', 0.9],
+    ['cfa', 'cfa', 0.9],
+    ['Six Sigma', 'six-sigma', 0.9],
+    ['six sigma black belt', 'six-sigma', 0.75],
+    ['six sigma green belt', 'six-sigma', 0.75],
+    ['ITIL', 'itil', 0.9],
+    ['itil foundation', 'itil', 0.75],
+    ['CompTIA A+', 'comptia-a-plus', 0.9],
+    ['comptia a+', 'comptia-a-plus', 0.9],
+    ['Microsoft Certified: Azure Administrator', 'azure-admin', 0.9],
+    ['azure administrator', 'azure-admin', 0.75],
+    ['az-104', 'azure-admin', 0.75],
+    ['Google Cloud Professional', 'gcp-professional', 0.9],
+    ['google cloud certified', 'gcp-professional', 0.75],
+    ['gcp professional', 'gcp-professional', 0.75],
+  ];
+
+  it('extracts the right id and confidence for all 28 known terms', () => {
+    const wrong = EVERY_TERM.filter(([term, id, confidence]) => {
+      const attrs = extractCertifications(`Certifications\n${term}`);
+      const first = attrs[0];
+      return (
+        first === undefined ||
+        attrs.length !== 1 ||
+        first.canonicalId !== id ||
+        first.confidence !== confidence
+      );
+    }).map(([term]) => term);
+    expect(wrong).toEqual([]);
+  });
+
+  it('matches case-insensitively: a shouting or mangled term still resolves', () => {
+    // "aWs SoLuTiOnS aRcHiTeCt" normalizes to the ALIAS 'aws solutions
+    // architect' (not the longer label), so alias confidence — measured.
+    expect(extractCertifications('aWs SoLuTiOnS aRcHiTeCt')[0]?.canonicalId).toBe('aws-saa');
+    expect(extractCertifications('aWs SoLuTiOnS aRcHiTeCt')[0]?.confidence).toBe(0.75);
+    expect(extractCertifications('ITIL FOUNDATION')[0]?.confidence).toBe(0.75);
+  });
+});

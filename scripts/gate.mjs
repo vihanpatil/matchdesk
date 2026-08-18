@@ -47,7 +47,7 @@ console.log(
 );
 console.log(row('E3', null, 'corpus runs in the suite — `pnpm test`'));
 console.log(
-  row('E4', null, 'run `pnpm mutate` (~22 min, silent while running); floor 75, ratchet 79'),
+  row('E4', null, 'run `pnpm mutate` (~22 min, silent while running); floor 75, ratchet 80'),
 );
 console.log(
   row(

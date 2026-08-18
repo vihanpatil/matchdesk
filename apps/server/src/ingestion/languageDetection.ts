@@ -495,17 +495,40 @@ const CASED_WORD = /[\p{L}']+/gu;
  * spelled with a foreign-looking word ("El Paso", "Le Gavroche") does not
  * count as a function word (H-106) — see the lexicon's doc comment for what
  * this costs and does not cost.
+ *
+ * **`requireLowercaseContentWord` — rule C (H-119).** A name's particles are
+ * lowercase Romance function words: `Maria del Carmen Gutierrez de la Torre`
+ * carries three distinct lexicon hits and was refused — H-028 D3's shape,
+ * refusal in proportion to how Spanish a name's spelling is, and measured at
+ * 8 of 14 real name shapes (Spanish, Italian, French particle conventions).
+ * The separating signal, measured before it was chosen
+ * (`docs/research/h119-particle-names-2026-08-17/`): Romance PROSE always
+ * carries lowercase CONTENT words too (`equipe`, `personnes`,
+ * `oportunidad`), while a name's only lowercase tokens ARE its particles.
+ * With the flag set, the lexicon may veto only when at least one lowercase
+ * bearing token is NOT in the lexicon.
+ *
+ * The caller sets the flag for lines OUTSIDE any recognised section — the
+ * header block, where names live — and never in-section: the closed H-087
+ * degree-line catches (`Licenciatura en Ciencias de la Computacion,
+ * Universidad de Salamanca`) have all-capitalised content words exactly like
+ * a name does, and gating them would reopen what H-085 closed. Stated trade:
+ * a header-block Romance line whose lowercase words are all function words
+ * is no longer caught; every measured line of that shape is a name or a
+ * title, which is the population this rule exists to protect.
  */
-function carriesNonEnglishFunctionWords(text: string): boolean {
+function carriesNonEnglishFunctionWords(
+  text: string,
+  requireLowercaseContentWord = false,
+): boolean {
   const bearing = stripNeutralTokens(text);
-  const tokens = bearing.match(CASED_WORD) ?? [];
+  const lowercase = (bearing.match(CASED_WORD) ?? []).filter((t) => /^\p{Ll}/u.test(t));
   const distinct = new Set(
-    tokens
-      .filter((t) => /^\p{Ll}/u.test(t))
-      .map((t) => t.toLowerCase())
-      .filter((t) => NON_ENGLISH_FUNCTION_WORDS.has(t)),
+    lowercase.map((t) => t.toLowerCase()).filter((t) => NON_ENGLISH_FUNCTION_WORDS.has(t)),
   );
-  return distinct.size >= MIN_FUNCTION_WORD_HITS;
+  if (distinct.size < MIN_FUNCTION_WORD_HITS) return false;
+  if (!requireLowercaseContentWord) return true;
+  return lowercase.some((t) => !NON_ENGLISH_FUNCTION_WORDS.has(t.toLowerCase()));
 }
 
 /**
@@ -809,8 +832,15 @@ export function findNonEnglishSegments(text: string): MixedLanguageResult {
     // 5-word floor where `eld` is not allowed to speak, and `eld` covers the
     // languages a 60-word lexicon never could. Neither is a threshold on the
     // other's output; deleting either loses measured recall (H-092, H-041).
-    const eldVeto = insideRecognisedSection(line.start) && lineReadsNonEnglish(line.text);
-    if (!carriesNonEnglishFunctionWords(line.text) && !eldVeto) continue;
+    //
+    // Both signals are conditioned on the section gate, differently: `eld`
+    // is skipped outright for out-of-section lines (F2, H-116), while the
+    // lexicon stays live there but demands a lowercase content word before
+    // it may veto (rule C, H-119) — a name's particles alone are not
+    // evidence of foreign prose.
+    const inSection = insideRecognisedSection(line.start);
+    const eldVeto = inSection && lineReadsNonEnglish(line.text);
+    if (!carriesNonEnglishFunctionWords(line.text, !inSection) && !eldVeto) continue;
     const alreadyReported = nonEnglishSegments.some(
       (s) => s.sourceSpan.start <= line.start && s.sourceSpan.end >= line.end,
     );

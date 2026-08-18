@@ -762,6 +762,15 @@ describe('H-106: ordinary English lines must not be refused by the sub-floor lex
   // (H-087) must still fire after any token removal or case-sensitivity
   // change made to close the false refusals above. Local copy of the H-085
   // `withInsert` body — that helper is scoped to its own describe block.
+  //
+  // MECHANISM NOTE (H-119/rule C): in this SECTIONLESS body the Spanish
+  // degree line is no longer lexicon-caught (its lowercase words are all
+  // function words, so rule C withholds the out-of-section lexicon veto) —
+  // it is caught at WINDOW granularity, paired with the English line above
+  // it. The refusal is unchanged; only the mechanism moved (the
+  // refuse-mixed-language precedent, ADR-031). The lexicon's own catch is
+  // pinned in-section by the H-085 CLOSED tests and out-of-section by the
+  // H-119 prose tests.
   const englishBody = [
     'Marisol Okonkwo',
     'Senior Data Engineer, Northwind Freight, Jan 2023 - Dec 2025',
@@ -886,20 +895,72 @@ describe('H-116: real-shaped contact headers must not refuse the document', () =
   ])('a name-heavy header line of >= 6 bearing words is NOT refused: %s', (line) => {
     expect(findNonEnglishSegments(`${line}\n${englishBody}`).hasNonEnglishSegment).toBe(false);
   });
+});
 
-  it('DOCUMENTED GAP (H-116 residual): lowercase name particles still refuse via the lexicon', () => {
-    // Asserts the WRONG behaviour on purpose so it cannot be lost (the H-085
-    // idiom). "Maria del Carmen Gutierrez de la Torre" — the Spanish-language
-    // spelling, particles lowercase — carries three lowercase lexicon tokens
-    // ('del', 'de', 'la'), and the function-word pass is deliberately NOT
-    // section-gated: gating it would lose the header-block Romance-prose
-    // catch it exists for (a French cover line above the first section
-    // header), and it costs 0/258 on the measured English pool. That pool
-    // under-sampled lowercase-particle Hispanic names — trap 1 again. Closing
-    // this means finding a signal that separates a name's particles from
-    // Romance prose on the same short line; not chosen yet, recorded rather
-    // than papered over.
-    const line = 'Maria del Carmen Gutierrez de la Torre';
+describe('H-119: lowercase-particle names must not refuse the document', () => {
+  // This block replaces the DOCUMENTED GAP test that pinned the residual
+  // H-116's closure carved out. The gap turned out far wider than the one
+  // pinned name: measured 2026-08-17 (evidence in
+  // `docs/research/h119-particle-names-2026-08-17/`), **8 of the 14 names
+  // below were falsely refused** — Ana de la Cruz, Jose de la Torre,
+  // Alessandro di Stefano della Rovere — because a name's particles (`de`,
+  // `la`, `del`, `di`, `della`, `le`) are lowercase Romance function words,
+  // and two distinct lowercase lexicon hits refused the whole document.
+  // H-028 D3's discrimination shape: refusal in proportion to how Spanish,
+  // Italian or French a candidate's name spelling is.
+  //
+  // The fix ("rule C", measured before it was chosen): for a line OUTSIDE
+  // any recognised section, the lexicon may only veto when the line also
+  // carries at least one lowercase token that is NOT in the lexicon. Romance
+  // PROSE always has lowercase content words (`equipe`, `personnes`,
+  // `oportunidad`); a name's only lowercase tokens ARE its particles. A pure
+  // narrowing of a veto — it cannot create a new refusal by construction —
+  // and in-section lines (the H-087 degree-line catches) are untouched.
+  //
+  // Stated trade: a header-block Romance line whose lowercase words are all
+  // function words is no longer caught. Measured, every such line in the
+  // corpus is a name or a title — the shapes this fix exists to protect.
+  const englishBody = [
+    'Experience',
+    'Senior Software Engineer, Meridian Analytics, 2019 to present',
+    'Built and maintained data ingestion services in Python and Go.',
+    'Education',
+    'Bachelor of Science in Computer Science, 2015',
+  ].join('\n');
+
+  // Synthetic values (ADR-014), real shapes: Spanish, Portuguese, Italian,
+  // Dutch, French and Arabic particle conventions, lowercase as their
+  // languages write them.
+  it.each([
+    'Maria del Carmen Gutierrez de la Torre',
+    'Lucia de los Santos del Rio',
+    'Ana de la Cruz',
+    'Carmen de la Fuente Ortiz',
+    'Jose de la Torre',
+    'Maria de las Nieves Fernandez',
+    'Diego Fernandez de Cordoba y Aguilar',
+    'Joao Pedro dos Santos da Silva',
+    'Alessandro di Stefano della Rovere',
+    'Jan van der Berg',
+    'Willem van den Broek',
+    'Amelie le Roux de Montfort',
+    'Omar bin Rashid al Maktoum',
+    'Nadia el-Amin bint Rashid',
+  ])('a lowercase-particle name is NOT refused: %s', (line) => {
+    expect(findNonEnglishSegments(`${line}\n${englishBody}`).hasNonEnglishSegment).toBe(false);
+  });
+
+  // The catch the lexicon exists for, and the reason rule C requires a
+  // lowercase NON-lexicon token instead of section-gating the lexicon
+  // outright: header-block Romance prose must still be refused. Every line
+  // here carries lowercase content words, so rule C leaves it caught.
+  it.each([
+    'Encadrement d une equipe de six personnes',
+    'Je recherche un poste de developpeuse dans une equipe agile',
+    'Busco una oportunidad para crecer en el area de datos',
+    'Responsable des operations pour la region sud avec une equipe locale',
+    'Profesional con experiencia en la gestion de proyectos para el sector bancario',
+  ])('header-block Romance prose is still refused: %s', (line) => {
     expect(findNonEnglishSegments(`${line}\n${englishBody}`).hasNonEnglishSegment).toBe(true);
   });
 });

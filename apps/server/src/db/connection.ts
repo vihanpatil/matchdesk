@@ -31,6 +31,14 @@ export function openDatabase(options: OpenDatabaseOptions = {}): Database.Databa
   // audit_log append-only guarantee to compose with FK cascades correctly,
   // and for referential integrity generally (Section 4).
   db.pragma('foreign_keys = ON');
+  // D7 (ADR-018 Decision 4): without this, `INSERT OR REPLACE` rewrites a
+  // committed audit row — REPLACE's conflict resolution deletes the old row
+  // WITHOUT firing the audit_log BEFORE DELETE trigger. With it, the delete
+  // fires the trigger and the statement aborts, closing the last statement
+  // form that could alter history. The only triggers in this schema are the
+  // two audit_log guards, and audit_log carries no foreign keys, so no
+  // cascade path changes behaviour under this pragma.
+  db.pragma('recursive_triggers = ON');
 
   applyMigrations(db, options.migrationsDir ?? getDefaultMigrationsDir());
 

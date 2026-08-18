@@ -87,4 +87,47 @@ describe('audit_log is append-only (ADR-010 Phase 1 gate)', () => {
     const count = (db.prepare('SELECT COUNT(*) as c FROM audit_log').get() as { c: number }).c;
     expect(count).toBe(2);
   });
+
+  // ── D7: the gate is the PROPERTY, not the statement form (ADR-018 D4) ────
+  // "No statement of any form may alter or remove a committed audit row."
+  // The original gate proved UPDATE fails; `INSERT OR REPLACE` still rewrote
+  // history because SQLite's REPLACE resolution deletes the conflicting row
+  // WITHOUT firing BEFORE DELETE triggers unless `PRAGMA recursive_triggers`
+  // is on. The pragma is set in connection.ts; these tests cover the two
+  // statement forms the original gate missed.
+
+  it('rejects INSERT OR REPLACE on an existing id — REPLACE must not rewrite history (D7)', () => {
+    const now = new Date().toISOString();
+    expect(() =>
+      db
+        .prepare(
+          `INSERT OR REPLACE INTO audit_log (id, entity_type, entity_id, action, details, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run('audit_1', 'candidate', 'cand_1', 'tampered', null, now, now),
+    ).toThrow('audit_log is append-only: DELETE is not permitted');
+
+    const row = db.prepare('SELECT action FROM audit_log WHERE id = ?').get('audit_1') as {
+      action: string;
+    };
+    expect(row.action).toBe('created');
+  });
+
+  it('rejects an upsert (INSERT ... ON CONFLICT DO UPDATE) on an existing id (D7)', () => {
+    const now = new Date().toISOString();
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO audit_log (id, entity_type, entity_id, action, details, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET action = excluded.action`,
+        )
+        .run('audit_1', 'candidate', 'cand_1', 'tampered', null, now, now),
+    ).toThrow('audit_log is append-only: UPDATE is not permitted');
+
+    const row = db.prepare('SELECT action FROM audit_log WHERE id = ?').get('audit_1') as {
+      action: string;
+    };
+    expect(row.action).toBe('created');
+  });
 });
