@@ -4480,3 +4480,55 @@ finding prescribed — from the survivor list, not from defect-chasing — and
 no longer erode silently. The survivor worklist stays open as H-036;
 `experience.ts` (157 survivors) is still the largest block and still the
 module that computes tenure.
+
+---
+
+### H-120 · The link feature failed on its first three real links — trap 1, at feature scale
+
+ADR-037 shipped "verified end-to-end flawlessly", and the user's first three
+real links all failed. Brutal honesty first: **the e2e verification was real
+but its fixture population was not** — every fixture was server-rendered
+HTML, and the dominant hosted-board reality is a JavaScript shell whose
+markup carries no text. The corpus lacked the population it fails on. That
+is trap 1, the same lesson H-116 taught at ingest level, repeated at
+feature level by the same author in the same session.
+
+Three distinct root causes, each measured before it was fixed:
+
+1. **"unknown job" was deployment skew, not the feature.** The UI is served
+   from disk and updates on refresh; the API lives in the running process.
+   A pre-ADR-037 server routed `POST /api/jobs/from-url` into the
+   job-by-id handler, whose 404 says exactly "unknown job". The UI now
+   recognises that one error (it can arise no other way on this endpoint)
+   and says "restart `pnpm serve`" instead of gaslighting the recruiter.
+2. **Ashby-class boards embed the posting as schema.org JSON-LD** — the
+   standard emitted for job-search SEO — inside a script tag the stripper
+   deliberately dropped. Measured: markup text 0 chars, JSON-LD description
+   8,950 chars. `extractJobPostingJsonLd` now reads it (arrays, `@graph`,
+   HTML-string descriptions, one bad block never hides a good one), the
+   posting text is preferred over page soup (0.9 vs 0.75 — it is the
+   posting itself, boilerplate-free), and the JSON-LD title beats the page
+   `<title>`.
+3. **BambooHR-class boards ship a shell with NO JSON-LD**; the posting
+   lives at the same-host `/careers/<id>/detail` JSON endpoint — the exact
+   request the page's own JavaScript makes. A recognised-board fallback
+   (detected by the `/careers/<id>` PATH convention, deliberately not
+   hostname — BambooHR white-labels custom domains) fetches it only when
+   the page carried no text, and re-expresses the board's data as a
+   schema.org JobPosting document, so extraction takes the same JSON-LD
+   path. Any deviation from the convention's response shape falls through
+   to the SPA guidance. ADR-037's outbound bound is AMENDED accordingly
+   and PRODUCT_DECISIONS updated: same posting, same host, one extra
+   request, only on an explicit recruiter action.
+
+**CLOSED same session, validated against reality, not fixtures:** all three
+of the user's links now ingest `ok`/`en` through the production code path —
+BambooHR "Full Stack Developer: Back End Focus" (0.9, via the board
+endpoint), Samsara (0.75, server-rendered markup, boilerplate bounded by
+the confirmation step), Ashby "Software Engineer, New Grad" (0.9, JSON-LD)
+— and the BambooHR link was driven through the real UI to a 20-chip
+proposal. The fixture corpus now carries the shapes that were missing
+(JSON-LD shell, board-convention shell + detail endpoint, careers-path
+shell with a dead probe), so this class regresses against a test, not a
+user. What still does not work is stated in the ADR: a JS-rendered page
+with no JSON-LD and no recognised convention refuses with guidance.

@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 import { extractDocxText } from './docxExtractor.js';
-import { extractHtmlText } from './htmlExtractor.js';
+import { extractJobPageText, MIN_HTML_TEXT_CHARS } from './htmlExtractor.js';
 import {
   detectLanguageHeuristic,
   findNonEnglishSegments,
@@ -55,10 +55,6 @@ const MIN_CHARS_PER_PAGE = 100;
 /** Below this total, a DOCX (which has no fixed "page" concept via mammoth)
  *  is treated the same way. */
 const MIN_TOTAL_CHARS_DOCX = 100;
-
-/** Same floor for a fetched page (ADR-037): under this, the markup carried
- *  almost no text — the JavaScript-rendered-SPA analogue of a scanned PDF. */
-const MIN_TOTAL_CHARS_HTML = 100;
 
 function judgeLanguage(
   text: string,
@@ -189,7 +185,7 @@ async function extractFromDocx(bytes: Buffer): Promise<ExtractionResult> {
 }
 
 function extractFromHtml(bytes: Buffer): ExtractionResult {
-  const { text, significantCharCount } = extractHtmlText(bytes.toString('utf8'));
+  const { text, significantCharCount, source } = extractJobPageText(bytes.toString('utf8'));
 
   if (significantCharCount === 0) {
     return {
@@ -202,7 +198,7 @@ function extractFromHtml(bytes: Buffer): ExtractionResult {
     };
   }
 
-  if (significantCharCount < MIN_TOTAL_CHARS_HTML) {
+  if (significantCharCount < MIN_HTML_TEXT_CHARS) {
     // The HTML analogue of a scanned PDF: a page that renders its content
     // with JavaScript ships nearly no text in its markup. Flagged for a
     // human rather than scored on a navigation bar (C7).
@@ -212,7 +208,7 @@ function extractFromHtml(bytes: Buffer): ExtractionResult {
       parseConfidence: 0.2,
       warnings: [
         `Only ${String(significantCharCount)} characters of text found in the page markup ` +
-          `(under ${String(MIN_TOTAL_CHARS_HTML)}) — this page likely renders its content with ` +
+          `(under ${String(MIN_HTML_TEXT_CHARS)}) — this page likely renders its content with ` +
           'JavaScript, which is not executed here. Try the posting’s "print" or "save as PDF" ' +
           'view and upload that instead.',
       ],
@@ -221,10 +217,11 @@ function extractFromHtml(bytes: Buffer): ExtractionResult {
     };
   }
 
-  // 0.75, deliberately below the PDF/DOCX paths' 0.9: the tag-stripper keeps
-  // page boilerplate (navigation, footers), so the text is noisier than a
-  // document export of the same posting. See htmlExtractor.ts for the trade.
-  const judged = judgeLanguage(text, [], 0.75);
+  // JSON-LD is the posting itself, boilerplate-free and purpose-built for
+  // machine reading — document-grade (0.9). Stripped markup keeps page
+  // boilerplate (navigation, footers), so it sits lower (0.75). See
+  // htmlExtractor.ts for both trades.
+  const judged = judgeLanguage(text, [], source === 'json-ld' ? 0.9 : 0.75);
   return { text, ...judged };
 }
 

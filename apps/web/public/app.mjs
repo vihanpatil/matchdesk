@@ -222,7 +222,15 @@ async function jobsView(view) {
         render();
       })
       .catch((e) => {
-        toast(String(e.message ?? e));
+        // H-120: a pre-ADR-037 server routes this POST into the job-by-id
+        // handler and answers "unknown job" — the one error this endpoint
+        // can only produce when the UI has outrun the server process.
+        const message = String(e.message ?? e);
+        toast(
+          message === 'unknown job'
+            ? 'The server is running an older build — stop and restart `pnpm serve`, then retry.'
+            : message,
+        );
       })
       .finally(() => {
         linkBtn.disabled = false;

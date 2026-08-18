@@ -52,8 +52,13 @@ fetches the URL (the product's only outbound action, bounds recorded in
 PRODUCT_DECISIONS), a zero-dependency HTML→text extractor feeds the same
 gates uploads face, PDFs served from links pass through the PDF path,
 `source_url` (migration 0005) records provenance, and the jobs view has a
-paste-a-link input. JS-rendered pages are refused with guidance. Verified
-end-to-end over real sockets and in the browser, destructive paths included.
+paste-a-link input. After H-120 (the first three real links failed —
+trap 1 at feature scale): schema.org JSON-LD postings are extracted and
+preferred, and a recognised-board fallback (BambooHR path convention,
+same-host detail endpoint) covers shells with no JSON-LD; both validated
+against the real links themselves. JS-rendered pages with neither are
+refused with guidance. Verified end-to-end over real sockets and in the
+browser, destructive paths included.
 
 **Does not exist:** the match matrix (secondary view, PRODUCT_DECISIONS), a
 packaged launcher beyond `pnpm serve`, embeddings (cascade step 4), OCR.

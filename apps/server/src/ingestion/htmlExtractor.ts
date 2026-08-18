@@ -67,6 +67,11 @@ function decodeEntities(text: string): string {
     });
 }
 
+/** Below this many letters/digits, a page's markup effectively carries no
+ *  content (the JS-rendered-shell case). Shared by the extraction gate and
+ *  the fetch layer's known-board fallback so they cannot disagree. */
+export const MIN_HTML_TEXT_CHARS = 100;
+
 export interface HtmlExtraction {
   /** The page's visible text, one line per visual block, blank-line
    *  separated paragraphs collapsed to at most one blank line. */
@@ -103,4 +108,143 @@ export function extractHtmlText(html: string): HtmlExtraction {
 
   const significantCharCount = (text.match(/[\p{L}\p{N}]/gu) ?? []).length;
   return { text, title, significantCharCount };
+}
+
+/* ── schema.org JobPosting (JSON-LD) ──────────────────────────────────────
+ *
+ * Measured 2026-08-17 (H-120): the dominant hosted-board shape is a
+ * JavaScript shell whose MARKUP carries no posting text, with the posting
+ * embedded as `<script type="application/ld+json">` JSON-LD for job-search
+ * SEO. The tag-stripper above deliberately drops scripts, so it sees
+ * nothing. JSON-LD is not site-specific scraping — it is the schema.org
+ * standard boards emit precisely so machines can read their postings, and
+ * it is BETTER than page soup: title, organization and description with no
+ * navigation boilerplate at all.
+ */
+
+const LD_JSON_BLOCK =
+  /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script\s*>/gi;
+
+interface JsonLdJobPosting {
+  readonly title: string;
+  readonly text: string;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function typeOf(record: Record<string, unknown>): readonly string[] {
+  const t = record['@type'];
+  if (typeof t === 'string') return [t];
+  if (Array.isArray(t)) return t.filter((x): x is string => typeof x === 'string');
+  return [];
+}
+
+function nameOf(value: unknown): string {
+  if (typeof value === 'string') return value;
+  const record = asRecord(value);
+  const name = record?.['name'];
+  return typeof name === 'string' ? name : '';
+}
+
+function locationLineOf(value: unknown): string {
+  const places = Array.isArray(value) ? value : [value];
+  const parts: string[] = [];
+  for (const place of places) {
+    const address = asRecord(asRecord(place)?.['address']);
+    if (address === null) continue;
+    const piece = ['addressLocality', 'addressRegion', 'addressCountry']
+      .map((k) => address[k])
+      .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+      .join(', ');
+    if (piece !== '') parts.push(piece);
+  }
+  return parts.join(' · ');
+}
+
+/** Finds the first schema.org JobPosting in the page's JSON-LD blocks and
+ *  renders it as plain text (the description is an HTML string per the
+ *  standard, so it goes through the same stripper as page markup). Returns
+ *  null when no posting with a usable description exists — the caller falls
+ *  back to markup text. Malformed JSON in one block never poisons another. */
+export function extractJobPostingJsonLd(html: string): JsonLdJobPosting | null {
+  for (const match of html.matchAll(LD_JSON_BLOCK)) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(match[1] ?? '');
+    } catch {
+      continue; // one bad block must not hide a good one elsewhere
+    }
+
+    const roots = Array.isArray(parsed) ? parsed : [parsed];
+    const candidates: Record<string, unknown>[] = [];
+    for (const root of roots) {
+      const record = asRecord(root);
+      if (record === null) continue;
+      candidates.push(record);
+      const graph = record['@graph'];
+      if (Array.isArray(graph)) {
+        for (const node of graph) {
+          const nodeRecord = asRecord(node);
+          if (nodeRecord !== null) candidates.push(nodeRecord);
+        }
+      }
+    }
+
+    for (const posting of candidates) {
+      if (!typeOf(posting).includes('JobPosting')) continue;
+      const description = posting['description'];
+      if (typeof description !== 'string' || description.trim() === '') continue;
+
+      const title = typeof posting['title'] === 'string' ? posting['title'].trim() : '';
+      const organization = nameOf(posting['hiringOrganization']);
+      const location = locationLineOf(posting['jobLocation']);
+      const employment = posting['employmentType'];
+      const employmentLine = (Array.isArray(employment) ? employment : [employment])
+        .filter((v): v is string => typeof v === 'string')
+        .join(', ');
+
+      const header = [
+        title,
+        organization,
+        [location, employmentLine].filter((x) => x !== '').join(' · '),
+      ]
+        .filter((line) => line !== '')
+        .join('\n');
+      const body = extractHtmlText(description).text;
+      const extras = ['qualifications', 'responsibilities', 'skills']
+        .map((k) => posting[k])
+        .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+        .map((v) => extractHtmlText(v).text);
+
+      return { title, text: [header, body, ...extras].filter((x) => x !== '').join('\n\n') };
+    }
+  }
+  return null;
+}
+
+export interface JobPageExtraction extends HtmlExtraction {
+  /** Where the text came from: the page's own JSON-LD JobPosting (clean,
+   *  boilerplate-free) or the stripped markup. */
+  readonly source: 'json-ld' | 'markup';
+}
+
+/** The job-page entry point (ADR-037): JSON-LD posting when the page
+ *  carries one, stripped markup otherwise. */
+export function extractJobPageText(html: string): JobPageExtraction {
+  const posting = extractJobPostingJsonLd(html);
+  if (posting !== null) {
+    const significantCharCount = (posting.text.match(/[\p{L}\p{N}]/gu) ?? []).length;
+    const markupTitle = extractHtmlText(html).title;
+    return {
+      text: posting.text,
+      title: posting.title !== '' ? posting.title : markupTitle,
+      significantCharCount,
+      source: 'json-ld',
+    };
+  }
+  return { ...extractHtmlText(html), source: 'markup' };
 }

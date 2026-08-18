@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <!-- Synthetic Ashby-shaped page (ADR-014, modeled on the measured real
+       shape 2026-08-17): a JS shell whose markup carries NO posting text,
+       with the posting embedded as schema.org JSON-LD for job-search SEO.
+       The description is an HTML STRING with entities, as real boards emit. -->
+  <head>
+    <title>Backend Engineer @ Meridian Analytics</title>
+    <script src="/static/app.js"></script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org/",
+        "@type": "JobPosting",
+        "title": "Backend Engineer, Platform",
+        "hiringOrganization": { "@type": "Organization", "name": "Meridian Analytics" },
+        "jobLocation": {
+          "@type": "Place",
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "Springfield",
+            "addressCountry": "US"
+          }
+        },
+        "employmentType": "FULL_TIME",
+        "datePosted": "2026-08-01",
+        "description": "<p>Meridian Analytics is hiring a Backend Engineer for the platform team.</p><h3>Requirements</h3><ul><li>5+ years of experience building backend services</li><li>Strong Python and PostgreSQL skills</li><li>Experience with Docker &amp; continuous integration</li><li>Bachelor&#39;s degree in Computer Science or equivalent experience</li></ul><h3>Nice to have</h3><ul><li>Kubernetes in production</li></ul>"
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <footer><a href="/about">About</a> <a href="/privacy">Privacy</a></footer>
+  </body>
+</html>

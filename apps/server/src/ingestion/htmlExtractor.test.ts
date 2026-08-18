@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { extractHtmlText } from './htmlExtractor.js';
+import { extractHtmlText, extractJobPageText, extractJobPostingJsonLd } from './htmlExtractor.js';
 
 const fixture = (name: string): string =>
   readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', name), 'utf8');
@@ -68,5 +68,48 @@ describe('extractHtmlText', () => {
     const { significantCharCount } = extractHtmlText(fixture('job-posting-spa.html'));
     expect(significantCharCount).toBeLessThan(100);
     expect(significantCharCount).toBeGreaterThan(0); // the footer nav survives
+  });
+});
+
+describe('extractJobPostingJsonLd / extractJobPageText (H-120)', () => {
+  // The dominant hosted-board shape, measured on real links 2026-08-17: a
+  // JS shell whose markup carries nothing, with the posting in JSON-LD.
+  it('recovers the posting from the Ashby-shaped fixture: title, org, location and the HTML description as text', () => {
+    const page = extractJobPageText(fixture('job-posting-jsonld.html'));
+    expect(page.source).toBe('json-ld');
+    expect(page.title).toBe('Backend Engineer, Platform');
+    const lines = page.text.split('\n');
+    expect(lines).toContain('Backend Engineer, Platform');
+    expect(lines).toContain('Meridian Analytics');
+    expect(lines).toContain('5+ years of experience building backend services');
+    expect(lines).toContain('Experience with Docker & continuous integration');
+    expect(lines).toContain("Bachelor's degree in Computer Science or equivalent experience");
+    expect(page.significantCharCount).toBeGreaterThan(100);
+    // None of the shell's boilerplate leaks into JSON-LD-sourced text.
+    expect(page.text).not.toContain('Privacy');
+  });
+
+  it('finds a JobPosting inside an @graph and inside a top-level array', () => {
+    const graph = `<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","name":"x"},{"@type":"JobPosting","title":"Data Engineer","description":"<p>Builds pipelines in Python for a data team of nine people.</p>"}]}</script>`;
+    expect(extractJobPostingJsonLd(graph)?.title).toBe('Data Engineer');
+    const arr = `<script type="application/ld+json">[{"@type":"BreadcrumbList"},{"@type":"JobPosting","title":"QA Analyst","description":"Runs the release checklist."}]</script>`;
+    expect(extractJobPostingJsonLd(arr)?.title).toBe('QA Analyst');
+  });
+
+  it('one malformed JSON-LD block does not hide a good one later in the page', () => {
+    const html = `<script type="application/ld+json">{broken</script><script type="application/ld+json">{"@type":"JobPosting","title":"Ops Lead","description":"Keeps the lights on."}</script>`;
+    expect(extractJobPostingJsonLd(html)?.title).toBe('Ops Lead');
+  });
+
+  it('a JobPosting without a usable description is not a posting — falls back to markup', () => {
+    const html = `<script type="application/ld+json">{"@type":"JobPosting","title":"Ghost"}</script><p>Visible page prose stands in.</p>`;
+    expect(extractJobPostingJsonLd(html)).toBeNull();
+    const page = extractJobPageText(html);
+    expect(page.source).toBe('markup');
+    expect(page.text).toContain('Visible page prose stands in.');
+  });
+
+  it('a page with no JSON-LD at all is plain markup extraction', () => {
+    expect(extractJobPageText(fixture('job-posting.html')).source).toBe('markup');
   });
 });

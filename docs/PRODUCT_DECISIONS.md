@@ -15,11 +15,14 @@ verification failures remain append-only in `../HONESTY_LOG.md`.
   API binds to loopback only; v1 has no LAN mode, remote sharing, cloud
   processing, or external document-content API.
 - **One bounded outbound action exists (ADR-037): fetching a job-posting
-  link the recruiter pastes.** It runs only on that explicit action,
-  contacts only the pasted URL, and sends nothing from the local store — no
-  candidate content, no job content, no identifiers. The fetched page is
-  stored and treated exactly like an uploaded file, refusal gates included.
-  Nothing is ever re-fetched in the background.
+  link the recruiter pastes.** It runs only on that explicit action and
+  sends nothing from the local store — no candidate content, no job
+  content, no identifiers. It contacts the pasted URL and — only when that
+  page carries no readable text and matches a recognised job-board
+  convention — the same posting's public data endpoint on the SAME host
+  (H-120: the request the page's own JavaScript would make). The fetched
+  posting is stored and treated exactly like an uploaded file, refusal
+  gates included. Nothing is ever re-fetched in the background.
 - V1 supports macOS, Windows, and Linux. It must have documented setup and a
   launcher that opens the local browser app.
 - Data persists locally until explicit deletion. Deletion removes original files

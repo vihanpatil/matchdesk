@@ -2071,3 +2071,34 @@ database by migration 0005.
 - **The candidate side is unchanged** — CVs arrive as files, and a
   recruiter pasting a LinkedIn _profile_ link is a different product
   decision nobody has taken.
+
+### ADR-037 amendment (H-120, same day): JSON-LD, recognised boards, and an honest bound
+
+The first three real links failed (H-120). Two extraction realities were
+missing and one bound needed widening by exactly one request:
+
+- **schema.org JSON-LD is the primary source when present.** Hosted boards
+  embed the posting as `application/ld+json` for job-search SEO; it is the
+  posting itself — title, organisation, description — with zero page
+  boilerplate, and it now beats markup soup (confidence 0.9 vs 0.75).
+- **Recognised-board fallback, path-convention detected.** A shell page
+  with no markup text and no JSON-LD may match a known board convention
+  (today: `/careers/<id>` → same-host `/careers/<id>/detail`, BambooHR's
+  public careers API — detected by PATH because BambooHR white-labels
+  custom domains). The board's JSON is re-expressed as a schema.org
+  JobPosting document so extraction takes the standard path. Any deviation
+  in response shape falls through to the SPA guidance. **The outbound
+  bound is therefore amended**: the fetch contacts the pasted URL and — for
+  a recognised board whose page carried no text — that same posting's
+  public data endpoint on the SAME host, still only on the explicit
+  recruiter action. PRODUCT_DECISIONS carries the same amendment.
+- **Deployment skew self-reports.** The disk-served UI can outrun the
+  running API process; the one error that combination produces on this
+  endpoint ("unknown job") now tells the recruiter to restart the server
+  rather than presenting a riddle.
+
+Validated against the three real links that failed, not only fixtures; the
+fixture corpus gained the shapes that were missing so the class regresses
+against tests. Still refused, with guidance: JS-rendered pages with no
+JSON-LD and no recognised convention (executing pages remains out of
+proportion for v1).

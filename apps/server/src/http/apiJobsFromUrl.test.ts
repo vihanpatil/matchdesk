@@ -60,7 +60,7 @@ describe('POST /api/jobs/from-url (ADR-037)', () => {
 
     // The stand-in job board.
     board = createServer((req, res) => {
-      const route = req.url ?? '/';
+      const route = (req.url ?? '/').split('?')[0] ?? '/';
       if (route === '/jobs/4187-senior-backend-engineer') {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
         res.end(fixture('job-posting.html'));
@@ -78,6 +78,35 @@ describe('POST /api/jobs/from-url (ADR-037)', () => {
         res.end('title,team\nEngineer,Platform\n');
       } else if (route === '/jobs/slow') {
         // Deliberately never answers; the API's fetch timeout must fire.
+      } else if (route === '/jobs/jsonld') {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end(fixture('job-posting-jsonld.html'));
+      } else if (route === '/careers/24') {
+        // BambooHR-shaped: shell page with nothing in it...
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end(fixture('job-posting-spa.html'));
+      } else if (route === '/careers/24/detail') {
+        // ...whose posting lives at the same-host detail endpoint.
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            meta: {},
+            result: {
+              jobOpening: {
+                jobOpeningName: 'Full Stack Developer: Back End Focus',
+                employmentStatusLabel: 'Full-Time',
+                location: { city: 'Springfield', state: 'Illinois' },
+                description:
+                  '<p>We are hiring a full stack developer with a backend focus for the reporting team.</p><ul><li>4+ years of experience with backend services</li><li>Python and PostgreSQL in production</li></ul>',
+              },
+            },
+          }),
+        );
+      } else if (route === '/careers/99') {
+        // A shell at a careers-like path on a NON-BambooHR host: the detail
+        // probe 404s and the SPA guidance path must stand.
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end(fixture('job-posting-spa.html'));
       } else {
         res.writeHead(404, { 'content-type': 'text/plain' });
         res.end('not found');
@@ -228,6 +257,43 @@ describe('POST /api/jobs/from-url (ADR-037)', () => {
     expect(slow.status).toBe(502);
     expect(String(slow.body['error'])).toContain('did not respond');
   }, 15000);
+
+  it('a JSON-LD shell page (the Ashby shape, H-120) ingests scoreable with the posting title', async () => {
+    const created = await fromUrl({ url: `${boardBase}/jobs/jsonld` });
+    expect(created.status).toBe(201);
+    expect(created.body['outcome']).toBe('scoreable');
+    const job = created.body['job'] as { title: string; rawText: string; parseConfidence: number };
+    // JSON-LD title beats the page <title> ("Backend Engineer @ Meridian…").
+    expect(job.title).toBe('Backend Engineer, Platform');
+    expect(job.rawText).toContain('5+ years of experience building backend services');
+    expect(job.rawText).not.toContain('Privacy'); // no shell boilerplate
+    expect(job.parseConfidence).toBe(0.9); // posting data, not tag soup
+
+    const proposal = (await (
+      await fetch(`${base}/api/jobs/${(created.body['job'] as { id: string }).id}/proposal`)
+    ).json()) as { proposal: { skills: { canonicalSkillId: string }[] } };
+    expect(proposal.proposal.skills.map((k) => k.canonicalSkillId)).toContain('python');
+  });
+
+  it('a BambooHR-convention shell (H-120) is recovered from the same-host detail endpoint', async () => {
+    const created = await fromUrl({ url: `${boardBase}/careers/24?source=aWQ9MjA=` });
+    expect(created.status).toBe(201);
+    expect(created.body['outcome']).toBe('scoreable');
+    const job = created.body['job'] as { title: string; rawText: string; sourceUrl: string };
+    expect(job.title).toBe('Full Stack Developer: Back End Focus');
+    expect(job.rawText).toContain('4+ years of experience with backend services');
+    // Provenance stays the PASTED link, not the detail endpoint.
+    expect(job.sourceUrl).toBe(`${boardBase}/careers/24?source=aWQ9MjA=`);
+  });
+
+  it('a careers-path shell whose detail probe finds nothing still gets the SPA guidance, not a crash', async () => {
+    const created = await fromUrl({ url: `${boardBase}/careers/99` });
+    expect(created.status).toBe(201);
+    expect(created.body['outcome']).toBe('needs_attention');
+    expect((created.body['job'] as { warnings: string[] }).warnings.join(' ')).toContain(
+      'JavaScript',
+    );
+  });
 
   it('refuses a cross-origin browser request — no other page may make this machine fetch links (ADR-037)', async () => {
     const forbidden = await fromUrl(
