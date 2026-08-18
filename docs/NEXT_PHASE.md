@@ -1,121 +1,90 @@
-# Next phase — first contact with reality
+# Next phase — a real pool, and the residual the last fix surfaced
 
-**Written:** 2026-08-17 · **Read `docs/SESSION_STATE.md` first.**
+**Written:** 2026-08-17 (updated same day after the H-116/H-117 fixes landed).
+**Read `docs/SESSION_STATE.md` first.**
 **Run `pnpm gate` before believing any status in any document, including this one.**
 
-The user ran the product on their own resume — the first real document it has
-ever seen. It failed twice in five minutes. Both failures are diagnosed below
-**from measurement on the actual file**, not inference. This brief is the plan
-to make the product usable.
+## What the previous version of this file planned — done, measured
 
-**Perspective, stated honestly in both directions.** The engine did not show a
-wrong number — the whole-document verdict on the resume was `English
-(correct)`, C7 refused rather than mis-scored, and the gate criteria all still
-hold. AND: the very first real CV was refused on the one line every real CV on
-earth carries, and the resulting junk job could not even be deleted. A product
-that is _safely_ unusable is still unusable. Fix order below is by user pain,
-not by architectural interest.
+The first-contact failures are fixed and closed in `HONESTY_LOG.md` /
+`docs/findings.json`; the full plan and its measurements live there.
 
----
-
-## Failure 1 · A real CV's contact line refuses the whole document (H-116)
-
-**Measured chain, each link verified on the real file:**
-
-```
-whole-document verdict:  isEnglish = TRUE  (correct)
-flagged segments:        1 of 58 — line 1, the CONTACT line
-bearing-token shape:     <Proper> <Proper> • • • <dotted> •
-```
-
-1. Line 1 of a real resume is `City, ST • (phone) • email • linkedin.com/in/…`.
-2. `stripNeutralTokens` strips emails and URLs, but its URL pattern requires
-   `https?://`. Real contact lines use **scheme-less domains**, so
-   `linkedin.com/in/username` survives and `CASED_WORD` splits it into four
-   junk "words".
-3. That lifts the line past the 6-bearing-word floor, so the sub-floor `eld`
-   pass judges it.
-4. What it judges is a Spanish-origin US city plus **the candidate's own
-   name** — H-112's finding ("a name is foreign text") arriving through the
-   ADR-022 veto, which runs on _every_ line. ADR-034's header-block exclusion
-   was applied only to the `unreadable_section` path, not here.
-
-### The fix, two small changes plus the corpus that should have existed
-
-- **F1 — dotted tokens are neutral.** Extend `stripNeutralTokens` to drop any
-  token containing a `.` or `/` (scheme-less domains, paths, `Node.js`-style
-  names). For _language judgement_ these carry no signal in any language.
-  After F1, the measured contact line strips to ~4 bearing words — under the
-  floor, never judged. This alone likely fixes the reported failure.
-- **F2 — section-gate the veto's line pass.** `lineReadsNonEnglish` inside
-  `findNonEnglishSegments` should skip lines **outside any recognised
-  section**, exactly as ADR-034 does: the header block is where names and
-  contact lines live, and it is where every measured false positive of this
-  class has come from. Foreign _content_ inserts (degree lines — the H-041
-  class) live inside sections and remain covered. Keep the function-word
-  lexicon pass un-gated: it costs 0/258 and catches header-block Romance
-  prose.
-- **F3 — the corpus this failure proves is missing.** Add 10–15 real-shaped
-  contact lines to the eval corpus: scheme-less `linkedin.com/…` and
-  `github.com/…`, bullet separators, Spanish/Vietnamese/Chinese-origin US
-  cities and names, pipe separators, multi-line headers. Synthetic values
-  (ADR-014), real shapes. **H-111 already said hand-built corpora
-  under-sample proper nouns and neutral tokens; this is the sixth instance of
-  trap 1. Write the corpus before touching the code, and watch F1/F2 fail
-  against it first** (ADR-028).
-
-### Pass criteria — measured, not argued
-
-- The real resume ingests as `scoreable` (user re-tests on their machine; the
-  repo only ever holds the synthetic shapes).
-- New contact-line corpus: **0 flagged**.
-- All 23 English CVs + full fixture corpus: still 0 false refusals.
-- All 13 non-English CVs: still refused.
-- The H-041 sub-floor catches (9 languages, in-section degree lines): still
-  caught — F2 must not reopen what ADR-034 closed. The `DOCUMENTED GAP` tests
-  stay asserting their gaps.
+- **H-116 (contact line refused the document) — CLOSED.** Corpus first
+  (ADR-028): a 15-header contact-line corpus watched failing 5/15, then F1
+  (`stripNeutralTokens` drops tokens with `/` or an internal dot — the
+  internal-only deviation from the original plan is stated in the log) took
+  it to 0/15, and F2 section-gated the veto's `eld` line pass exactly as
+  ADR-034 always did for `unreadable_section`. Three name-heavy header lines
+  were watched failing post-F1 and closed by F2. The fixture corpus gained
+  `h116-real-contact-header` (binary tier, verified failing on pre-fix code).
+  **The user still needs to re-test their real resume on their own machine**
+  — the repo only ever holds synthetic shapes (ADR-014).
+- **H-117 (no way to delete a job from the UI) — CLOSED.** Delete job on all
+  three job-page branches, confirm guard, needs-attention page is guidance
+  rather than a dead end. The destructive browser walkthrough this file
+  demanded was driven end-to-end (delete, cancelled confirm, candidate
+  delete, re-upload after delete). En route, **H-118**: this file's own claim
+  that the jobs DELETE endpoint "is tested" was false — no test exercised
+  `deleteJob` until this session's e2e test. Closed same day.
+- **H-119 — NEW, OPEN, the residual carved out of H-116's closure.**
+  A lowercase-particle Hispanic name (`Maria del Carmen Gutierrez de la
+Torre`) is still refused by the sub-floor lexicon pass, which F2
+  deliberately left un-gated. `DOCUMENTED GAP` test pins it. H-028 D3's
+  discrimination-adjacent shape: a candidate is refused in proportion to how
+  Spanish their name's spelling is. **This is first in line below.**
 
 ---
 
-## Failure 2 · Jobs cannot be deleted from the UI (H-117)
+## 1 · H-119 — separate a name's particles from Romance prose
 
-`DELETE /api/jobs/:id` exists, is tested, cascades, unlinks the file, audits.
-**No UI element calls it.** The refused resume-as-job sat on the Jobs list
-with no way to remove it — on a product whose PRODUCT_DECISIONS makes
-explicit deletion part of the privacy boundary.
+The lexicon pass cannot be section-gated (it exists to catch header-block
+Romance prose — a French cover line above the first section header). Closing
+H-119 therefore needs a signal that separates `Maria del Carmen Gutierrez de
+la Torre` from `Encadrement d une equipe de six personnes` on the same short
+line. Candidate directions, none measured yet — measure before choosing
+(H-115: do not let a name encode a hypothesis):
 
-### The fix
+- **The corpus is built and the sweep is run** — evidence in
+  `docs/research/h119-particle-names-2026-08-17/`. Measured on 10
+  lowercase-particle names and 5 header-block Romance prose lines:
+  **6 of 10 names are falsely refused today** (`Ana de la Cruz`,
+  `Jose de la Torre`, `Maria del Carmen Gutierrez de la Torre`,
+  `Lucia de los Santos del Rio`, `Carmen de la Fuente Ortiz`,
+  `Amelie le Roux de Montfort`) — the gap is far wider than the one pinned
+  name. All 5 prose lines are correctly refused.
+- **Candidate rule, measured clean on this corpus ("rule C")**: for a line
+  OUTSIDE any recognised section, the lexicon may only veto when the line
+  also carries at least one lowercase token NOT in the lexicon. Every
+  falsely-refused name has zero such tokens (its only lowercase words ARE
+  the particles); every prose line has several (`equipe`, `personnes`,
+  `oportunidad`, …). A pure narrowing of a veto — it cannot create a new
+  refusal by construction, and in-section lines (the H-087 closed catches)
+  are untouched by construction. Not landed yet: it was measured while an
+  E4 run was in flight, and the implementing session should first widen the
+  name corpus (Arabic `al-`/`bin`, Italian `di`/`della` names) before
+  flipping the `DOCUMENTED GAP` test into a closure test (ADR-028: watch it
+  fail first — it fails today).
+- Whatever the fix, the H-106 corpus (17 English lines), the closed Romance
+  catches (H-087), and the new contact-header corpus all still hold — they
+  are the measured margin this lexicon lives inside.
 
-- Delete button on the job page — **including the needs-attention branch**,
-  which currently shows the warning and nothing else. That page is where
-  deletion is most wanted (an unreadable document's only next steps are
-  "replace the file" or "remove it").
-- Same `window.confirm` guard as candidate delete, then navigate to `#/jobs`.
-- While in there: the needs-attention job page should present the warning as
-  guidance ("this document could not be read — fix the export or delete it"),
-  not a dead end.
+## 2 · Use it against a real pool
 
-### Pass criterion
+Unchanged from before, now unblocked: real CVs, at volume, on the recruiter's
+own machine — the fastest way to find what the corpus cannot (trap 1 has now
+cost seven findings). Ask the user to run their real resume first (H-116's
+final pass criterion), then a batch.
 
-Upload any unreadable file as a job → open it → delete it → it is gone from
-the list, its row and stored file are gone (verify via the existing API
-test pattern), and an opaque audit entry exists.
+## 3 · Then, in rough order of value
 
----
-
-## Why the browser verification missed both (do this differently)
-
-The ADR-036 walkthrough **only ever added things**: upload → configure →
-score → inspect. It never deleted anything, and it never uploaded a document
-with a real-shaped contact header — the fixtures' headers are a bare name.
-**A verification pass that never deletes cannot find a missing delete button**
-(H-090's one-directional-testing shape, in UI form).
-
-Next session's browser pass must walk the _destructive_ paths too: delete a
-job, delete a candidate, re-upload after delete, refuse-then-delete. And the
-fixture corpus should gain one CV whose header block looks like a real
-resume's, so ingest-level regressions of the H-116 class fail a test rather
-than a user.
+- **The match matrix** — the agreed secondary view (PRODUCT_DECISIONS).
+  200×200 stays a capacity ceiling, never a rendered layout.
+- **Recruiter conveniences**: attribute suppression with rescore, job-local
+  custom skills, background recompute with visible stale states.
+- **Packaging** — a launcher that opens the browser.
+- **UI rows for `ATTACK_CHECKLIST`** — the UI exists and now has destructive
+  controls; attack them (wrong-id DELETE, double delete, delete during
+  scoring).
 
 ---
 
@@ -123,6 +92,6 @@ than a user.
 
 - Run `pnpm gate` and `pnpm verify` yourself; write the failing test first;
   quote `n/total`; trace every fix to what the recruiter sees.
-- `HONESTY_LOG.md`/`findings.json` carry H-116 and H-117 — close them with
-  tests that fail without the fix, then re-run the gate.
+- Browser passes walk the destructive paths too — the rule is now in
+  SESSION_STATE's "How to work on this codebase".
 - The push remains **HELD**. Do not push without asking.

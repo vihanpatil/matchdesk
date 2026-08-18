@@ -1,0 +1,16 @@
+== current behaviour (header placement: line above the first section) ==
+WRONG  NAME es_del_de_la: refused=true | ruleC lowercase-non-lexicon tokens: [] -> lexicon would SKIP
+WRONG  NAME es_de_los_del: refused=true | ruleC lowercase-non-lexicon tokens: [] -> lexicon would SKIP
+WRONG  NAME es_de_la: refused=true | ruleC lowercase-non-lexicon tokens: [] -> lexicon would SKIP
+WRONG  NAME es_de_la_fuente: refused=true | ruleC lowercase-non-lexicon tokens: [] -> lexicon would SKIP
+WRONG  NAME es_short: refused=true | ruleC lowercase-non-lexicon tokens: [] -> lexicon would SKIP
+ok     NAME pt_dos_da: refused=false | ruleC lowercase-non-lexicon tokens: [dos,da] -> lexicon MAY veto
+ok     NAME nl_van_der: refused=false | ruleC lowercase-non-lexicon tokens: [van] -> lexicon MAY veto
+ok     NAME nl_van_den: refused=false | ruleC lowercase-non-lexicon tokens: [van,den] -> lexicon MAY veto
+WRONG  NAME fr_particle: refused=true | ruleC lowercase-non-lexicon tokens: [] -> lexicon would SKIP
+ok     NAME es_y: refused=false | ruleC lowercase-non-lexicon tokens: [y] -> lexicon MAY veto
+ok     PROSE fr_insert: refused=true | ruleC lowercase-non-lexicon tokens: [d,equipe,six,personnes] -> lexicon MAY veto
+ok     PROSE fr_cover: refused=true | ruleC lowercase-non-lexicon tokens: [recherche,un,poste,developpeuse,equipe,agile] -> lexicon MAY veto
+ok     PROSE es_cover: refused=true | ruleC lowercase-non-lexicon tokens: [oportunidad,crecer,area,datos] -> lexicon MAY veto
+ok     PROSE fr_objective: refused=true | ruleC lowercase-non-lexicon tokens: [operations,region,sud,equipe,locale] -> lexicon MAY veto
+ok     PROSE es_summary: refused=true | ruleC lowercase-non-lexicon tokens: [con,experiencia,gestion,proyectos,sector,bancario] -> lexicon MAY veto

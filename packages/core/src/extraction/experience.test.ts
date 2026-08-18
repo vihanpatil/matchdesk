@@ -711,3 +711,89 @@ describe('H-107: concurrent ambiguous ranges are merged, not independently summe
     expect(unreadable?.kind === 'unreadable_date_range' && unreadable.minPossibleYears).toBe(5.2);
   });
 });
+
+describe('H-110 hardening: behaviour pins for the tenure paths mutation testing found untested', () => {
+  // experience.ts is the weakest mutated module (69.36%, stryker 2026-08-17)
+  // and it computes the number a recruiter sees. Each test below pins a
+  // behaviour that is CORRECT today (measured before writing the test, per
+  // H-109 — none of these expectations was copied from a failing run) but
+  // that no existing test asserted, so a mutant could flip it silently.
+
+  it('parses a DECIMAL explicit claim: "7.5 years of experience"', () => {
+    const attrs = extractYearsExperience('7.5 years of experience in data engineering.', REF);
+    expect(years(attrs)[0]?.years).toBe(7.5);
+    expect(attrs[0]?.normalizedValue).toBe('7.5');
+  });
+
+  it('parses an explicit claim with the space eaten: "12years of experience" (PDF extraction loses spaces, H-062)', () => {
+    const attrs = extractYearsExperience(
+      'Backend developer with 12years of experience in Java.',
+      REF,
+    );
+    expect(years(attrs)[0]?.years).toBe(12);
+  });
+
+  it('parses the SINGULAR "1 year of experience" and "1 year experience"', () => {
+    expect(
+      years(extractYearsExperience('1 year of experience with Kubernetes.', REF))[0]?.years,
+    ).toBe(1);
+    expect(
+      years(extractYearsExperience('Gained 1 year experience across two teams.', REF))[0]?.years,
+    ).toBe(1);
+  });
+
+  it('a stated AGE is never tenure, whatever the spacing: "40 years old" / "40 years  old" (ADR-007)', () => {
+    // The exclusion is a \s+ lookahead: double spacing (common after PDF
+    // reflow) must not defeat it and turn a person's age into 40 years of
+    // experience.
+    expect(extractYearsExperience('Alex is 40 years old and lives in Leeds.', REF)).toHaveLength(0);
+    expect(extractYearsExperience('Alex is 40 years  old and lives in Leeds.', REF)).toHaveLength(
+      0,
+    );
+  });
+
+  it('day 31 is an unambiguous day: "31/01/2020 - 28/02/2021" resolves, not ambiguous', () => {
+    // 31 is impossible as a month in any locale, so the range is RESOLVED
+    // (B.4). A boundary mutant (13-30 instead of 13-31) would silently
+    // demote every month-end-dated range to unreadable_date_range.
+    const attrs = extractYearsExperience('Warehouse Lead, Acme, 31/01/2020 - 28/02/2021', REF_2026);
+    expect(years(attrs)[0]?.years).toBeCloseTo(1.083333, 5);
+    expect(years(attrs)[0]?.normalizedValue).toBe('1.1');
+  });
+
+  it('a month of 0 is INVALID, not resolved: "31/0/2020 - 31/5/2021" yields nothing', () => {
+    expect(extractYearsExperience('Clerk, Acme, 31/0/2020 - 31/5/2021', REF_2026)).toHaveLength(0);
+  });
+
+  it('an end date EQUAL to the reference month is not "future": "Jan 2020 - Aug 2026" at ref Aug 2026 counts fully', () => {
+    // isFutureDate is a strict >: the current month is not the future, and a
+    // recruiter reading a CV today must see a role ending this month counted.
+    const attrs = extractYearsExperience('Engineer, Acme, Jan 2020 - Aug 2026', REF_2026);
+    expect(years(attrs)[0]?.years).toBeCloseTo(6.583333, 5);
+  });
+
+  it('REVERSE-chronological overlapping roles (the standard CV order) still credit each month once', () => {
+    // Every prior overlap test happened to list roles oldest-first, so the
+    // chronological sort inside the merge was unexercised — a comparator
+    // mutant survived. Real CVs are reverse-chronological. Jan 2018 - Mar
+    // 2023 is 62 covered months = 5.1667y whichever order the roles appear.
+    const reverse = extractYearsExperience(
+      'Senior Engineer, Acme, Mar 2020 - Mar 2023\nEngineer, Globex, Jan 2018 - Jan 2021',
+      REF_2026,
+    );
+    const forward = extractYearsExperience(
+      'Engineer, Globex, Jan 2018 - Jan 2021\nSenior Engineer, Acme, Mar 2020 - Mar 2023',
+      REF_2026,
+    );
+    const total = (attrs: ReturnType<typeof extractYearsExperience>): number =>
+      years(attrs).reduce((acc, a) => acc + a.years, 0);
+    expect(total(reverse)).toBeCloseTo(62 / 12, 5);
+    expect(total(forward)).toBeCloseTo(62 / 12, 5);
+  });
+
+  it('a zero-length range ("Jan 2020 - Jan 2020") credits nothing', () => {
+    expect(extractYearsExperience('Contractor, Acme, Jan 2020 - Jan 2020', REF_2026)).toHaveLength(
+      0,
+    );
+  });
+});

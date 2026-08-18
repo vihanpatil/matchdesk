@@ -50,6 +50,34 @@ describe('corpus · binary tier · a document becomes a score', () => {
     expect(totalYearsExperience(attrs)).toBeGreaterThan(8);
   });
 
+  it('h116 · a real-shaped contact header survives the whole PDF path', async () => {
+    // H-116: the first real CV the product saw was refused on its contact
+    // line. The fixture carries the measured strongest failing shape
+    // (Spanish-origin city + scheme-less profile URL bearing the candidate's
+    // own name); before the F1/F2 fixes this exact document came back
+    // needs_attention/mixed_language_content on both container formats.
+    const entry = fixture('h116-real-contact-header');
+    const result = await extractText(await buildFixturePdf(entry), 'h116.pdf');
+
+    expect(result.parseStatus).toBe('ok');
+    expect(result.language).toBe('en');
+    expect(result.reason).toBeNull();
+
+    const attrs = extractAttributes(result.text, { referenceDate: CORPUS_REFERENCE_DATE });
+    const skills = attrs.flatMap((a) => (a.kind === 'skill' ? [a.canonicalId] : []));
+    expect(skills).toContain('typescript');
+    expect(totalYearsExperience(attrs)).toBeGreaterThan(8);
+  });
+
+  it('h116 · a real-shaped contact header survives the whole DOCX path', async () => {
+    const entry = fixture('h116-real-contact-header');
+    const result = await extractText(await buildFixtureDocx(entry), 'h116.docx');
+
+    expect(result.parseStatus).toBe('ok');
+    expect(result.language).toBe('en');
+    expect(result.reason).toBeNull();
+  });
+
   it('a clean CV survives the whole DOCX path', async () => {
     const entry = fixture('baseline-clean-cv');
     const result = await extractText(await buildFixtureDocx(entry), 'baseline.docx');

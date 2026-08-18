@@ -584,14 +584,31 @@ Ausbildung: Diplom Logistikmanagement, Universitaet Koeln`;
 });
 
 describe('sub-floor foreign inserts (H-085)', () => {
+  // The body carries a recognised Experience header, and inserts are placed
+  // INSIDE recognised sections, because that is where this class of insert
+  // lives on a real CV: a degree line sits under Education, a role line under
+  // Experience. The original fixture appended inserts to a header-only body
+  // with no section structure at all — an artifact of fixture minimalism, not
+  // a real document shape. Since H-116/F2, the veto's `eld` line pass is
+  // section-gated exactly as ADR-034's `unreadable_section` path always was,
+  // so an out-of-section insert would exercise the gate rather than the
+  // floor these tests exist to measure. The insert LINES are unchanged; only
+  // their placement moved to where the same lines actually occur.
   const englishBody = [
     'Marisol Okonkwo',
+    'Experience',
     'Senior Data Engineer, Northwind Freight, Jan 2023 - Dec 2025',
     'Built streaming pipelines in Python for shipment tracking and reconciliation.',
     'Ran the Docker based deployment platform used by four delivery teams.',
     'Owned the data quality programme covering nine downstream reporting systems.',
   ];
-  const withInsert = (line: string) => [...englishBody, line].join('\n');
+  /** Insert inside a recognised Education section — the real home of a
+   *  degree line. */
+  const withInsert = (line: string) => [...englishBody, 'Education', line].join('\n');
+  /** Insert inside the recognised Experience section — for short English
+   *  lines that must survive `eld`'s judgement where the section gate does
+   *  NOT protect them, so the bearing-word floor is what these assert. */
+  const withInSectionLine = (line: string) => [...englishBody, line].join('\n');
 
   it('CLOSED for Romance: a one-line Spanish degree is caught', () => {
     // ~70 letters — far below the ~100-letter window floor, so no window can
@@ -643,7 +660,13 @@ describe('sub-floor foreign inserts (H-085)', () => {
     'Chen Wei Ling - Lead Auditor',
     'Additional: Conversational Portuguese',
   ])('a short English line is NOT refused because of the name on it: %s', (line) => {
-    expect(findNonEnglishSegments(withInsert(line)).hasNonEnglishSegment).toBe(false);
+    // Placed INSIDE the Experience section on purpose: since F2 (H-116) the
+    // section gate protects the header block, so in-section is the one place
+    // `eld` may still judge a line — the bearing-word floor is the guard
+    // these lines measure, and out-of-section placement would let the gate
+    // pass the test with the floor deleted (trap 2, a guard that cannot
+    // fire).
+    expect(findNonEnglishSegments(withInSectionLine(line)).hasNonEnglishSegment).toBe(false);
   });
 
   // The residual, and the point is WHICH axis it lies on.
@@ -656,6 +679,11 @@ describe('sub-floor foreign inserts (H-085)', () => {
     'DOCUMENTED GAP (H-041): a %s line of %i bearing words is still SCORED',
     (_lang, _words, line) => {
       // Asserts the WRONG behaviour on purpose so it cannot be lost (H-085).
+      //
+      // In-section placement matters here too (F2/H-116): these lines sit
+      // inside the Education section, where the section gate does NOT skip
+      // them, so what this asserts stays pinned to the bearing-word floor —
+      // the axis the gap actually lies on — and not to the gate.
       //
       // THE REASON RECORDED HERE USED TO BE WRONG, and wrong for three
       // sessions. It said Germanic compound nouns carry no function words and
@@ -750,5 +778,128 @@ describe('H-106: ordinary English lines must not be refused by the sub-floor lex
     const french = withRomanceInsert('Encadrement d une equipe de six personnes');
     expect(findNonEnglishSegments(spanish).hasNonEnglishSegment).toBe(true);
     expect(findNonEnglishSegments(french).hasNonEnglishSegment).toBe(true);
+  });
+});
+
+describe('H-116: real-shaped contact headers must not refuse the document', () => {
+  // The first real CV this product ever saw was refused on line 1 — the
+  // contact line every real CV on earth carries. Measured chain (see
+  // docs/NEXT_PHASE.md): `stripNeutralTokens`'s URL pattern required
+  // `https?://`, so a scheme-less `linkedin.com/in/username` survived and
+  // split into four junk "words", lifting the line past the 6-bearing-word
+  // floor; what `eld` then judged was a Spanish-origin US city plus the
+  // candidate's own name — H-112's finding ("a name is foreign text")
+  // arriving through the ADR-022 veto, which ran on every line including the
+  // header block ADR-034 had already excluded on the `unreadable_section`
+  // path.
+  //
+  // This corpus is the population the eval set lacked (H-111, trap 1 — sixth
+  // instance): contact headers with real SHAPES, synthetic VALUES (ADR-014).
+  // Scheme-less linkedin.com/github.com domains, bullet/pipe/comma
+  // separators, bare portfolio domains, Spanish/Vietnamese/Chinese/Korean
+  // -origin US cities and names, multi-line headers. Before the H-116 fix,
+  // 5 of these 15 were falsely refused (measured: bullet_san_jose,
+  // multiline_portfolio, plain_la_mesa, labelled_links, links_own_line).
+  const CONTACT_HEADERS: Record<string, string> = {
+    bullet_san_jose:
+      'Mariana Villanueva\nSan Jose, CA • (408) 555-0123 • mariana.villanueva@example.com • linkedin.com/in/marianavillanueva',
+    pipe_el_paso:
+      'Jose Hernandez\nEl Paso, TX | (915) 555-0100 | jose.hernandez@example.com | linkedin.com/in/josehernandez | github.com/josehernandez',
+    viet_name:
+      'Nguyen Thanh Ha\nGarden Grove, CA • (714) 555-0192 • thanhha.nguyen@example.com • linkedin.com/in/nguyenthanhha',
+    chinese_name:
+      'Wei-Lin Chang\nCupertino, CA | (408) 555-0177 | weilin.chang@example.com | github.com/weilinchang',
+    santa_fe:
+      'Alejandro Munoz Delgado\nSanta Fe, NM • (505) 555-0164 • alejandro.munoz@example.com • linkedin.com/in/alejandromunozdelgado',
+    multiline_portfolio:
+      'Priya Raman\nLos Angeles, CA • (213) 555-0139\npriya.raman@example.com • priyaraman.dev • linkedin.com/in/priyaraman',
+    comma_corpus_christi:
+      'Rosa Maria Trevino\nCorpus Christi, TX, (361) 555-0186, rosa.trevino@example.com, linkedin.com/in/rosamariatrevino',
+    plain_la_mesa:
+      'Carlos Estrada\nLa Mesa, CA 91941 carlos.estrada@example.com linkedin.com/in/carlosestrada github.com/cestrada',
+    www_prefix:
+      'Tran Bao Long\nWestminster, CA • (657) 555-0110 • bao.tran@example.com • www.linkedin.com/in/tranbaolong',
+    labelled_links:
+      'Sofia Castillo\nSanta Ana, CA • (714) 555-0155\nPortfolio: sofia-castillo.dev | LinkedIn: linkedin.com/in/sofiacastillo | GitHub: github.com/scastillo',
+    hyphen_slug:
+      'Nguyen Minh Chau\nSan Gabriel, CA • (626) 555-0147 • chau.nguyen@example.com • linkedin.com/in/nguyen-minh-chau-8a2b41',
+    no_city:
+      'Rafael Ibarra Quintero\n(210) 555-0171 • rafael.ibarra@example.com • linkedin.com/in/rafaelibarraquintero • github.com/ribarra',
+    intl_style:
+      'Ha-Eun Park\nLos Gatos, CA, USA | +1 408 555 0183 | haeun.park@example.com | linkedin.com/in/haeunpark',
+    links_own_line:
+      'Guadalupe Reyes Ortiz\nlinkedin.com/in/guadalupereyesortiz • github.com/greyes • guadalupereyes.dev\nSan Antonio, TX • (726) 555-0129 • guadalupe.reyes@example.com',
+    seattle_control:
+      'Jordan Whitmore\nSeattle, WA • (206) 555-0134 • jordan.whitmore@example.com • linkedin.com/in/jordanwhitmore',
+  };
+
+  // The body a real header sits above: ordinary English, recognised sections.
+  const englishBody = [
+    'Experience',
+    'Senior Software Engineer, Meridian Analytics, 2019 to present',
+    'Built and maintained data ingestion services in Python and Go.',
+    'Led the migration of the reporting stack to containerised deployments.',
+    'Education',
+    'Bachelor of Science in Computer Science, 2015',
+  ].join('\n');
+
+  it('none of the fifteen contact headers is refused as mixed-language content', () => {
+    const falselyRefused = Object.entries(CONTACT_HEADERS)
+      .filter(
+        ([, header]) => findNonEnglishSegments(`${header}\n${englishBody}`).hasNonEnglishSegment,
+      )
+      .map(([label]) => label);
+    expect(falselyRefused).toEqual([]);
+  });
+
+  it('every contact-header document still reads English at the whole-document gate', () => {
+    // This was TRUE even during the failure — the whole-document verdict was
+    // never the problem (see NEXT_PHASE's "perspective" note). Pinned so a
+    // future fix to the veto cannot silently break the primary gate.
+    const misclassified = Object.entries(CONTACT_HEADERS)
+      .filter(
+        ([, header]) => detectLanguageHeuristic(`${header}\n${englishBody}`).isEnglish !== true,
+      )
+      .map(([label]) => label);
+    expect(misclassified).toEqual([]);
+  });
+
+  // ── F2: the veto's `eld` line pass is section-gated (ADR-034's exclusion,
+  // applied to the path it was missing from) ────────────────────────────────
+  //
+  // F1 neutralises web tokens, but a name-heavy header line with no dots at
+  // all still reaches `eld` once it carries >= 6 bearing words — and long
+  // real names do. Measured post-F1, pre-F2: all three lines below were still
+  // refused. This is H-112's finding ("a person's name is foreign text too")
+  // arriving through the ADR-022 veto, which ADR-034 already solved for the
+  // `unreadable_section` path by only judging lines inside a recognised
+  // section. F2 applies the same exclusion here: the header block — the
+  // implicit leading section where names and contact lines live — is where
+  // every measured false positive of this class has come from.
+  it.each([
+    // Capitalised name particles — common US spelling of Hispanic surnames.
+    'Maria Del Carmen Gutierrez De La Torre',
+    // Portuguese surname chain, capitalised particles.
+    'Joao Pedro Dos Santos Oliveira Da Silva',
+    // Name plus culinary title — 7 bearing words, one lowercase lexicon hit.
+    'Giovanni Esposito Rossi - Chef de Cuisine Executive',
+  ])('a name-heavy header line of >= 6 bearing words is NOT refused: %s', (line) => {
+    expect(findNonEnglishSegments(`${line}\n${englishBody}`).hasNonEnglishSegment).toBe(false);
+  });
+
+  it('DOCUMENTED GAP (H-116 residual): lowercase name particles still refuse via the lexicon', () => {
+    // Asserts the WRONG behaviour on purpose so it cannot be lost (the H-085
+    // idiom). "Maria del Carmen Gutierrez de la Torre" — the Spanish-language
+    // spelling, particles lowercase — carries three lowercase lexicon tokens
+    // ('del', 'de', 'la'), and the function-word pass is deliberately NOT
+    // section-gated: gating it would lose the header-block Romance-prose
+    // catch it exists for (a French cover line above the first section
+    // header), and it costs 0/258 on the measured English pool. That pool
+    // under-sampled lowercase-particle Hispanic names — trap 1 again. Closing
+    // this means finding a signal that separates a name's particles from
+    // Romance prose on the same short line; not chosen yet, recorded rather
+    // than papered over.
+    const line = 'Maria del Carmen Gutierrez de la Torre';
+    expect(findNonEnglishSegments(`${line}\n${englishBody}`).hasNonEnglishSegment).toBe(true);
   });
 });

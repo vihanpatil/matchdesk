@@ -69,6 +69,7 @@
  *   Norwegian, Swedish) — `eld` itself covers 60 and its own top pick
  *   (used for `isEnglish`) is not restricted to this set.
  */
+import { detectSections } from '@matchdesk/core';
 import { eld } from 'eld/extrasmall';
 
 /** Below this token count, there is not enough text to judge either way. */
@@ -432,8 +433,30 @@ const EMAIL_OR_URL = /\S+@\S+|https?:\/\/\S+/g;
 const ACRONYM = /^[A-Z][A-Z/&.-]{1,}$/;
 
 /**
- * Removes tokens that carry no language signal — emails, URLs, anything
- * containing a digit, and ALL-CAPS acronyms.
+ * A dotted or slashed token: any token containing `/`, or a `.` with a letter
+ * on BOTH sides (H-116). Scheme-less domains (`linkedin.com/in/username`,
+ * `priyaraman.dev`), paths, and `Node.js` / `STAAD.Pro`-style product names
+ * all match; for language judgement these carry no signal in any language.
+ * The `EMAIL_OR_URL` pattern above only catches URLs with an explicit
+ * `https?://`, and real contact lines do not write the scheme — measured on
+ * the first real CV this product saw, `linkedin.com/in/<name>` survived the
+ * strip, split into four junk "words" under `CASED_WORD`, lifted the contact
+ * line past the 6-bearing-word floor, and the veto refused the document on
+ * the candidate's own name (docs/NEXT_PHASE.md, H-116).
+ *
+ * Deliberately INTERNAL dots only, not "any token containing a dot":
+ * a sentence-final word (`"deliveries."`) is an ordinary language-bearing
+ * word wearing punctuation, and dropping it would change the bearing-word
+ * count of every prose line — invalidating the measured floor calibration
+ * (0/258 at W>=6) for the entire English pool rather than only the
+ * web-token population this fix targets.
+ */
+const DOTTED_OR_SLASHED = /\/|\p{L}\.\p{L}/u;
+
+/**
+ * Removes tokens that carry no language signal — emails, URLs, scheme-less
+ * domains and dotted names (H-116), anything containing a digit, and
+ * ALL-CAPS acronyms.
  *
  * Deliberately does NOT remove "anything capitalised": that was the bias in the
  * previous gate. A capitalised word may be a proper noun or may be an ordinary
@@ -447,6 +470,7 @@ function stripNeutralTokens(text: string): string {
     .filter((t) => t !== '')
     .filter((t) => !/\d/.test(t))
     .filter((t) => !ACRONYM.test(t))
+    .filter((t) => !DOTTED_OR_SLASHED.test(t))
     .join(' ');
 }
 
@@ -764,12 +788,29 @@ export function findNonEnglishSegments(text: string): MixedLanguageResult {
   //
   // Veto-only, like everything else here: it can add refusals and can never
   // manufacture an English verdict.
+  //
+  // The `eld` signal is SECTION-GATED (F2, H-116): a line outside any
+  // recognised section — the header block, where names and contact lines
+  // live — is never handed to `eld`. This is ADR-034's exclusion applied to
+  // the path it was missing from: the first real CV this product saw was
+  // refused on its contact line, a Spanish-origin US city plus the
+  // candidate's own name (H-112's "a name is foreign text", through this
+  // veto). Foreign CONTENT inserts — the H-041 degree-line class — live
+  // inside sections and remain covered. The function-word lexicon stays
+  // un-gated: it costs 0/258 on the measured English pool and catches
+  // header-block Romance prose that this gate would otherwise skip.
+  const sections = detectSections(text);
+  const insideRecognisedSection = (start: number): boolean => {
+    const section = sections.find((s) => start >= s.start && start < s.end);
+    return section?.name !== undefined && section.name !== null;
+  };
   for (const line of linesWithOffsets(text)) {
     // Two independent signals, unioned. The lexicon survives below the
     // 5-word floor where `eld` is not allowed to speak, and `eld` covers the
     // languages a 60-word lexicon never could. Neither is a threshold on the
     // other's output; deleting either loses measured recall (H-092, H-041).
-    if (!carriesNonEnglishFunctionWords(line.text) && !lineReadsNonEnglish(line.text)) continue;
+    const eldVeto = insideRecognisedSection(line.start) && lineReadsNonEnglish(line.text);
+    if (!carriesNonEnglishFunctionWords(line.text) && !eldVeto) continue;
     const alreadyReported = nonEnglishSegments.some(
       (s) => s.sourceSpan.start <= line.start && s.sourceSpan.end >= line.end,
     );

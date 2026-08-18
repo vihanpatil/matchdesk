@@ -4257,3 +4257,124 @@ The ADR-036 browser verification never caught it because the walkthrough only
 ever added things. **A verification pass that never deletes anything cannot
 find a missing delete button** — the same one-directional-testing shape as
 H-090's "tests that never watch anything fail".
+
+**CLOSED (2026-08-17, same day).** The fix followed NEXT_PHASE's plan, corpus
+first (ADR-028): a 15-header contact-line corpus went into
+`languageDetection.eval.test.ts` and was watched failing — **5 of 15 falsely
+refused** (`bullet_san_jose`, `multiline_portfolio`, `plain_la_mesa`,
+`labelled_links`, `links_own_line`), two of them at WINDOW granularity, not
+just the sub-floor line pass, because scheme-less-URL junk words inflate
+windows past the letter floor too.
+
+- **F1** — `stripNeutralTokens` now drops any token containing `/` or an
+  INTERNAL dot (letter on both sides). One stated deviation from the plan's
+  "any token containing a `.`": a sentence-final `"deliveries."` is an
+  ordinary word wearing punctuation, and dropping it would have changed the
+  bearing-word count of every prose line in the already-measured 258-line
+  pool — trap 3, invalidating the floor calibration figures silently. The
+  internal-dot rule hits exactly the population the fix targets. F1 alone
+  took the corpus from 5/15 refused to 0/15.
+- **F2** — the veto's `eld` line pass is section-gated exactly as ADR-034's
+  `unreadable_section` path always was. Measured post-F1, pre-F2: name-heavy
+  header lines of >= 6 bearing words with no dots were STILL refused
+  (`Maria Del Carmen Gutierrez De La Torre`, `Joao Pedro Dos Santos Oliveira
+Da Silva`, `Giovanni Esposito Rossi - Chef de Cuisine Executive`) — three
+  pinning tests watched failing, then closed by the gate. The function-word
+  lexicon stays un-gated per the plan (it carries the header-block
+  Romance-prose catch); what that costs is now H-119.
+- **The H-085/H-041 eval fixtures moved in-section** (`Education` /
+  `Experience` headers added to the shared body). Stated reason, per the
+  fixture rule: degree lines live under Education headers on real documents;
+  the sectionless body was fixture minimalism, and post-F2 an out-of-section
+  insert would exercise the gate rather than the floor those tests measure.
+  The insert LINES are unchanged. All 9 in-section degree-line catches still
+  caught; all 4 DOCUMENTED GAP lines still assert their gap on the
+  bearing-word axis; the 7 short-English-name lines still unflagged.
+- **The corpus the failure proved missing is now permanent**: the 15-header
+  eval block, plus `h116-real-contact-header` in the fixture corpus'
+  binary tier — verified failing on pre-fix code via stash (PDF, DOCX and
+  format-parity all fail without F1/F2), passing with it.
+
+Pass criteria: contact-line corpus 0/15 flagged; whole-document verdicts all
+still English; full suite 1069/1069 with no manifest loss; the user re-tests
+the real resume on their machine (the repo never holds it, ADR-014).
+
+---
+
+### H-118 · "DELETE /api/jobs/:id is tested" was false — the claim was carried, not measured
+
+H-117's own registry note, and NEXT_PHASE's diagnosis, both said the jobs
+DELETE endpoint "is tested". **Measured while closing H-117: no test anywhere
+exercised `deleteJob` or the route.** The only DELETE test in the repo was
+the candidates one; the two share `deleteEntity`, so the belief was not
+baseless — but the route wiring, the job entity path, the job-file unlink and
+the job audit entry were all unpinned, and a claim about test coverage was
+written into two documents without anyone grepping. Trap 3's shape (a figure
+carried across a change), applied to a coverage claim instead of a number.
+
+**CLOSED same session**: `api.test.ts` now carries a jobs-DELETE e2e test
+over a real socket, deliberately using H-117's exact scenario — an unreadable
+document uploaded as a job — asserting 204, 404 after, absence from the list,
+stored-file unlink, and the opaque audit entry.
+
+---
+
+### H-119 · A lowercase-particle Hispanic name still refuses the document
+
+Found while measuring H-116's F2, recorded as its own finding so the closure
+above does not hide a narrowing (trap 4). `Maria del Carmen Gutierrez de la
+Torre` — the Spanish-language spelling, particles lowercase, an entirely
+ordinary real name shape — carries three lowercase lexicon tokens (`del`,
+`de`, `la`) and is refused by the sub-floor function-word pass, which F2
+deliberately did NOT section-gate: gating it would lose the header-block
+Romance-prose catch it exists for, and its 0/258 measured cost was real but
+the pool under-sampled lowercase-particle Hispanic names (trap 1, seventh
+instance). The capitalised spelling of the same name is clean post-F2.
+
+A `DOCUMENTED GAP` test pins the wrong behaviour so it cannot be lost.
+Closing it needs a signal that separates a name's particles from Romance
+prose on the same short line; not chosen yet. **Open, false-refusal,
+non-blocking** — same H-028 D3 discrimination-adjacent shape as H-112, so it
+should not wait long.
+
+**Measured later the same day** (evidence:
+`docs/research/h119-particle-names-2026-08-17/`): the gap is far wider than
+the one pinned name — **6 of 10** real-shaped lowercase-particle names are
+falsely refused, including `Ana de la Cruz` and `Jose de la Torre`, while
+all 5 header-block Romance prose lines are correctly refused. A candidate
+rule was swept clean on this corpus (out-of-section lines: the lexicon may
+veto only when the line carries a lowercase NON-lexicon token — every
+falsely-refused name has none, every prose line has several). Deliberately
+NOT landed in the same session: an E4 measurement was in flight, and the
+name corpus should widen (Arabic `al-`/`bin`, Italian `di`/`della`) before
+the `DOCUMENTED GAP` test flips to a closure. The finding stays open; the
+remediation is now measured rather than hypothesised.
+
+---
+
+### H-117 addendum · CLOSED (2026-08-17, same day)
+
+The job page now offers **Delete job on all three of its branches** —
+needs-attention (where the warning is now guidance: "Replace the file with a
+cleaner export, or delete it"), unconfigured (config editor), and configured
+(alongside Score/Edit) — with the same `window.confirm` guard as candidate
+delete, navigating back to `#/jobs` after.
+
+Closure evidence, honestly itemised:
+
+- **The jobs-DELETE cascade is pinned by the new e2e test** (H-118) — that
+  test passed immediately, because the backend always worked; what it pins
+  is the cascade, not the UI defect.
+- **The UI wiring is pinned by the destructive browser walkthrough NEXT_PHASE
+  demanded**, driven end-to-end against a live server on an isolated data
+  dir: upload unreadable job → open → Delete → confirm → gone from list, row
+  404, stored file gone, `job|<id>|deleted|` audit row with null details;
+  a CANCELLED confirm leaves the job intact; candidate delete via the
+  existing button (also never walked before); re-upload after delete accepted
+  as a fresh upload; scoring still works on the touched branch (78, matching
+  ADR-036's recorded run).
+- **Stated cost, per ADR-036's accepted trade**: DOM wiring has no unit
+  test, so this closure rests on the API test plus the walkthrough. A future
+  regression of the BUTTON (not the cascade) would again need a browser pass
+  to catch — which is why "walk the destructive paths" is now written into
+  the session-state verification instructions rather than left to memory.

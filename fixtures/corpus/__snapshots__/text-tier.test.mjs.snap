@@ -396,6 +396,107 @@ exports[`corpus · text tier · full snapshots > h040-overlapping-roles-not-doub
 ]
 `;
 
+exports[`corpus · text tier · full snapshots > h116-real-contact-header · extraction is unchanged 1`] = `
+[
+  {
+    "evidence": "Jan 2020 - Present",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "6.6",
+    "span": "181..199",
+    "years": 6.583333,
+  },
+  {
+    "canonicalId": "typescript",
+    "evidence": "TypeScript",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "typescript",
+    "span": "243..253",
+  },
+  {
+    "canonicalId": "python",
+    "evidence": "Python",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "python",
+    "span": "258..264",
+  },
+  {
+    "evidence": "Jun 2017 - Dec 2019",
+    "isExplicitStatement": false,
+    "kind": "years_experience",
+    "normalized": "2.5",
+    "span": "294..313",
+    "years": 2.5,
+  },
+  {
+    "canonicalId": "postgresql",
+    "evidence": "PostgreSQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "postgresql",
+    "span": "325..335",
+  },
+  {
+    "canonicalId": "docker",
+    "evidence": "Docker",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "docker",
+    "span": "350..356",
+  },
+  {
+    "degreeLevel": "bachelor",
+    "evidence": "BSc",
+    "field": null,
+    "kind": "education",
+    "normalized": "bachelor",
+    "span": "382..385",
+  },
+  {
+    "canonicalId": "typescript",
+    "evidence": "TypeScript",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "typescript",
+    "span": "412..422",
+  },
+  {
+    "canonicalId": "python",
+    "evidence": "Python",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "python",
+    "span": "424..430",
+  },
+  {
+    "canonicalId": "postgresql",
+    "evidence": "PostgreSQL",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "postgresql",
+    "span": "432..442",
+  },
+  {
+    "canonicalId": "docker",
+    "evidence": "Docker",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "docker",
+    "span": "444..450",
+  },
+  {
+    "canonicalId": "aws",
+    "evidence": "AWS",
+    "kind": "skill",
+    "matchType": "exact",
+    "normalized": "aws",
+    "span": "452..455",
+  },
+]
+`;
+
 exports[`corpus · text tier · full snapshots > indian-ambiguous-dash-date-surfaced · extraction is unchanged 1`] = `
 [
   {

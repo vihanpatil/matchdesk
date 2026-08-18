@@ -210,4 +210,31 @@ describe('HTTP API (ADR-035)', () => {
     const audit = listAuditLogForEntity(db, 'candidate', id);
     expect(audit.some((e) => e.action === 'deleted' && e.details === null)).toBe(true);
   });
+
+  it('DELETE on a job removes the row, the stored file, and appends an opaque audit entry — including a needs-attention job (H-117)', async () => {
+    // H-117's exact scenario: an unreadable document uploaded as a JOB (the
+    // user's refused resume) sat on the Jobs list with no way to remove it.
+    // Until this test, `deleteJob` was exercised by NO test at all — the
+    // finding's own note said "DELETE /api/jobs/:id exists and is tested",
+    // and that was true only of the candidate path sharing its
+    // implementation. The unreadable-as-job path is the one the UI's delete
+    // button exists for, so it is the one pinned here.
+    const up = await upload('/api/jobs?filename=fr.docx&title=T', fixture('candidate-french.docx'));
+    expect(up.status).toBe(201);
+    expect(up.body['outcome']).toBe('needs_attention');
+    const id = (up.body['job'] as { id: string }).id;
+    const sha = (up.body['job'] as { fileSha256: string }).fileSha256;
+    expect(existsSync(getStoredFilePath(filesDir, sha))).toBe(true);
+
+    const del = await fetch(`${base}/api/jobs/${id}`, { method: 'DELETE' });
+    expect(del.status).toBe(204);
+
+    expect((await getJson(`/api/jobs/${id}`)).status).toBe(404);
+    const list = await getJson('/api/jobs');
+    expect((list.body['jobs'] as { id: string }[]).some((j) => j.id === id)).toBe(false);
+    expect(existsSync(getStoredFilePath(filesDir, sha))).toBe(false);
+
+    const audit = listAuditLogForEntity(db, 'job', id);
+    expect(audit.some((e) => e.action === 'deleted' && e.details === null)).toBe(true);
+  });
 });

@@ -36,8 +36,11 @@
  *   one orphans its snapshot rather than silently rewriting it.
  * @property {string | null} defectClass The HONESTY_LOG entry or H-028 defect
  *   this pins. `null` only for the clean baseline, which pins nothing specific.
- * @property {'wrong-score' | 'coverage-gap' | 'baseline'} severity ADR-023's
- *   classification. Only `wrong-score` fixtures gate the UI.
+ * @property {'wrong-score' | 'coverage-gap' | 'false-refusal' | 'baseline'} severity
+ *   ADR-023's classification. Only `wrong-score` fixtures gate the UI.
+ *   `false-refusal` (ADR-027's vocabulary) pins a document the system once
+ *   REFUSED but should ingest — the H-116 class; non-blocking, but a user
+ *   met it before a test did, which is why it is in the corpus now.
  * @property {string} why What went wrong, and what the correct behaviour is.
  * @property {readonly string[]} lines The document, one entry per line.
  * @property {string} [pdfUnrenderable] Present ONLY when the PDF generator
@@ -269,6 +272,33 @@ export const CORPUS = [
       'Certifications',
       '',
       'AWS Certified Solutions Architect - Professional',
+    ],
+  },
+
+  {
+    id: 'h116-real-contact-header',
+    defectClass: 'H-116',
+    severity: 'false-refusal',
+    why: 'The first real CV this product ever saw was refused on line 2 — the contact line every real resume carries. stripNeutralTokens only recognised URLs with an explicit https://, so the scheme-less linkedin.com/in/<name> slug survived, split into four junk words, lifted the line past the 6-bearing-word floor, and the ADR-022 veto judged a Spanish-origin US city plus the candidate’s own name as non-English (H-112’s shape, through the path ADR-034 had not gated). This fixture is the measured strongest failing shape from the H-116 eval corpus, carried into the binary tier so an ingest-level regression of this class fails a test rather than a user. Values synthetic (ADR-014), shape real: bullet separators, phone, e-mail, scheme-less profile URL with the candidate’s name in the slug.',
+    lines: [
+      'Mariana Villanueva',
+      'San Jose, CA • (408) 555-0123 • mariana.villanueva@example.com • linkedin.com/in/marianavillanueva',
+      '',
+      'Professional Experience',
+      '',
+      'Senior Software Engineer, Acme Corp, Jan 2020 - Present',
+      'Built and operated distributed services in TypeScript and Python.',
+      '',
+      'Software Engineer, Globex, Jun 2017 - Dec 2019',
+      'Maintained PostgreSQL databases and Docker deployments.',
+      '',
+      'Education',
+      '',
+      'BSc Computer Science',
+      '',
+      'Skills',
+      '',
+      'TypeScript, Python, PostgreSQL, Docker, AWS',
     ],
   },
 

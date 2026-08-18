@@ -53,12 +53,15 @@ packaged launcher beyond `pnpm serve`, embeddings (cascade step 4), OCR.
 ## Next phase
 
 **➡ READ `docs/NEXT_PHASE.md` FIRST.** The product met its first real CV on
-2026-08-17 and failed twice: the contact line refused the whole document
-(H-116, false-refusal — the sixth instance of trap 1), and jobs cannot be
-deleted from the UI (H-117). Both are diagnosed from measurement with a fix
-plan and pass criteria. Fix those before anything below.
+2026-08-17 and failed twice; **both failures were fixed and closed the same
+day** (H-116 via F1/F2 plus a 15-header contact-line corpus and a binary-tier
+fixture, H-117 via a Delete-job button on all three job-page branches plus
+the jobs-DELETE e2e test the endpoint never had — see H-118). The user still
+needs to re-test their real resume on their machine; the repo only holds the
+synthetic shapes. H-119 (lowercase-particle Hispanic name refused by the
+un-gated lexicon) is the new open false-refusal carved out of that closure.
 
-After that, in rough order of value:
+Next, in rough order of value:
 
 - **Use it against a real pool** — the fastest way to find what the corpus
   cannot: real CVs, at volume, on the recruiter's own machine.
@@ -72,11 +75,22 @@ After that, in rough order of value:
 
 ## Watch items — open, none blocking
 
-- **H-110 · mutation-score trend.** Four consecutive measurements declined
-  (80.42 → 79.85) with the ratchet at 79; headroom ~0.85. `experience.ts` is
-  the weakest module (69.36%) and it computes tenure. If a core change breaks
-  the build, **raise the score, never lower the ratchet** — the instruction
-  is in `stryker.config.json` where you'll read it when tempted.
+- **H-119 · lowercase name particles refuse via the lexicon.** `Maria del
+Carmen Gutierrez de la Torre` trips the sub-floor function-word pass
+  (`del`/`de`/`la`, lowercase), which F2 deliberately left un-gated because
+  it carries the header-block Romance-prose catch. A `DOCUMENTED GAP` test
+  pins it. H-028 D3's discrimination-adjacent shape — do not let it age.
+
+- **H-110 · mutation-score trend — reversed 2026-08-17.** After four declines
+  (80.42 → 79.85), this session measured 79.85 (flat; core untouched by the
+  H-116 fix) and then **80.18** after nine hardening tests written from the
+  survivor list (`experience.ts` 69.36 → 70.83 — reverse-chronological
+  overlapping roles, decimal claims, the age exclusion, day-31 boundaries).
+  Still the weakest module, 157 survivors remain, ratchet stays 79 with the
+  usual ~1 point of headroom. If a core change breaks the build, **raise the
+  score, never lower the ratchet** — the instruction is in
+  `stryker.config.json` where you'll read it when tempted. E4 runs take ~20
+  min at 1078 tests and are silent while running.
 - **ADR-033 · two live licence risk acceptances.** `dingbat-to-unicode@1.0.1`
   ships to the recruiter with no licence text anywhere (via `mammoth`);
   `stackback@0.0.2` is dev-only. Replacing `mammoth`'s dependency is a
@@ -111,6 +125,10 @@ Earned across five sessions — each rule has a finding behind it:
   stating why the new value is correct — a fixture whose purpose is forgotten
   gets "fixed" into asserting the bug (the H-037 shape). Snapshot diffs are
   reviewed line by line by the lead.
+- **A browser verification pass walks the destructive paths too** (H-117,
+  H-090's shape in UI form): delete a job, delete a candidate, cancel a
+  confirm and check nothing was deleted, re-upload after delete. A pass that
+  only ever adds things cannot find a missing delete button.
 
 ## Traps this project keeps falling into
 

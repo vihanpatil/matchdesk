@@ -216,6 +216,30 @@ async function jobsView(view) {
   else view.append(el('h2', '', ['Your jobs']), grid);
 }
 
+/**
+ * The job's delete control (H-117): same confirm guard as candidate delete,
+ * then back to the list. Present on EVERY branch of the job page — the
+ * needs-attention page is where deletion is most wanted, because an
+ * unreadable document's only next steps are "replace the file" or "remove
+ * it", and until this button existed the page offered neither.
+ * @param {string} jobId @param {string} title
+ */
+function jobDeleteButton(jobId, title) {
+  const remove = btn('danger', 'Delete job');
+  remove.addEventListener('click', () => {
+    if (!window.confirm(`Delete ${String(title)} and its file?`)) return;
+    api(`/api/jobs/${jobId}`, { method: 'DELETE' })
+      .then(() => {
+        toast('Deleted');
+        location.hash = '#/jobs';
+      })
+      .catch((e) => {
+        toast(String(e.message ?? e));
+      });
+  });
+  return remove;
+}
+
 /** @param {HTMLElement} view @param {string} jobId */
 async function jobView(view, jobId) {
   const { job } = await api(`/api/jobs/${jobId}`);
@@ -224,9 +248,14 @@ async function jobView(view, jobId) {
   view.append(back, el('h1', '', [job.title]));
 
   if (job.parseStatus !== 'ok' || job.language !== 'en') {
+    // Guidance, not a dead end (NEXT_PHASE/H-117): say what can be done
+    // about an unreadable document, and offer the one-click way out.
     view.append(
-      el('p', 'subtitle', ['This document could not be fully read, so it cannot be scored.']),
+      el('p', 'subtitle', [
+        'This document could not be read, so it cannot be scored. Replace the file with a cleaner export, or delete it.',
+      ]),
       el('div', 'reservation', [String(job.warnings.join(' ') || 'Unreadable document.')]),
+      stagger(el('div', 'row-actions', [jobDeleteButton(jobId, job.title)]), 0),
     );
     return;
   }
@@ -234,6 +263,7 @@ async function jobView(view, jobId) {
   const configured = await api(`/api/jobs/${jobId}/config`).catch(() => null);
   if (configured === null) {
     await configEditor(view, jobId);
+    view.append(stagger(el('div', 'row-actions', [jobDeleteButton(jobId, job.title)]), 4));
     return;
   }
 
@@ -241,7 +271,8 @@ async function jobView(view, jobId) {
   const actions = el('div', 'row-actions');
   const scoreBtn = btn('big', 'Score all candidates');
   const editBtn = btn('ghost', 'Edit requirements');
-  actions.append(scoreBtn, editBtn);
+  const deleteBtn = jobDeleteButton(jobId, job.title);
+  actions.append(scoreBtn, editBtn, deleteBtn);
   view.append(stagger(el('div', '', [actions]), 0));
   editBtn.addEventListener('click', () => {
     view.textContent = '';

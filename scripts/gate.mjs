@@ -5,7 +5,7 @@
  * ADR-028 for the decision.
  *
  * E1 and E4 are deliberately NOT computed here. E1 is attested in
- * `docs/ATTACK_CHECKLIST.md`; E4 comes from Stryker, which takes ~14.5 min and
+ * `docs/ATTACK_CHECKLIST.md`; E4 comes from Stryker, which takes ~22 min (measured 2026-08-17 at 1069 tests; it grows with the suite) and
  * has no business running inside a status command. Both print as "see <source>"
  * rather than being guessed at — a gate that reports a number it did not
  * measure is the H-025 failure this project keeps re-learning.
@@ -46,7 +46,9 @@ console.log(
   row('E2', gate.e2, gate.e2 ? 'every open wrong-score finding is pinned' : 'blocked by E5'),
 );
 console.log(row('E3', null, 'corpus runs in the suite — `pnpm test`'));
-console.log(row('E4', null, 'run `pnpm mutate` (~14.5 min); floor 75, ratchet 79'));
+console.log(
+  row('E4', null, 'run `pnpm mutate` (~22 min, silent while running); floor 75, ratchet 79'),
+);
 console.log(
   row(
     'E5',
