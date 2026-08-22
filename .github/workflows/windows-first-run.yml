@@ -1,0 +1,148 @@
+name: Windows first run (repo ZIP path)
+
+# ADR-039. The OTHER Windows path: the launcher a recruiter gets from GitHub's
+# "Download ZIP", with Node installed by hand and components fetched on first
+# run. The bundled release does not replace it, so it does not get to go
+# unexecuted either — this is what retires the "no MatchDesk launcher has ever
+# run on Windows" residual carried by H-122/H-123 for that path.
+#
+# Deliberately faithful to a recruiter's machine: no `corepack enable`, no pnpm
+# cache, no MATCHDESK_NO_BROWSER escape hatch. The launcher gets no help it
+# would not have in a recruiter's hands. If a step fails here, the fix belongs
+# in the launcher, not in this file.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'start-matchdesk-windows.cmd'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/windows-first-run.yml'
+
+# Nothing here writes to the repository; it only runs the launcher.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  first-run:
+    name: double-click start-matchdesk-windows.cmd
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Only this: the guide tells the recruiter to install Node.js 24, and a
+      # Node 24 install is what puts corepack (and npx, the launcher's
+      # fallback) on PATH. Nothing else is prepared for the launcher.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: First double-click (installs components, starts the server)
+        shell: pwsh
+        run: |
+          cmd /c "start-matchdesk-windows.cmd <nul"
+          if ($LASTEXITCODE -ne 0) { throw "start-matchdesk-windows.cmd exited $LASTEXITCODE" }
+
+      - name: The UI answers on 127.0.0.1:3900
+        shell: pwsh
+        run: |
+          $body = $null
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              $r = Invoke-WebRequest -Uri 'http://127.0.0.1:3900/' -UseBasicParsing -TimeoutSec 5
+              if ($r.StatusCode -eq 200) { $body = $r.Content; break }
+            } catch {
+              # not up yet
+            }
+            Start-Sleep -Seconds 2
+          }
+          if ($null -eq $body) { throw 'nothing answered on http://127.0.0.1:3900/ after the launcher returned 0' }
+          if ($body -notmatch '<title>MatchDesk</title>') { throw 'the page served is not the MatchDesk UI' }
+          Write-Host 'the MatchDesk UI is being served'
+
+      # The sentinel is the launcher's install gate (H-123): it is written only
+      # after an install that actually succeeded, and it records which package
+      # manager worked. An empty or absent sentinel means the gate is lying.
+      - name: The install sentinel records a real install
+        shell: pwsh
+        run: |
+          $sentinel = 'node_modules/.matchdesk-install-ok'
+          if (-not (Test-Path $sentinel)) { throw "$sentinel was not written" }
+          $pm = (Get-Content $sentinel -Raw).Trim()
+          if ($pm -ne 'corepack' -and $pm -ne 'npx') { throw "$sentinel says '$pm', expected 'corepack' or 'npx'" }
+          Write-Host "install sentinel: $pm"
+          if (-not (Test-Path 'node_modules/.matchdesk-lock-sig')) {
+            throw 'node_modules/.matchdesk-lock-sig was not written beside the sentinel'
+          }
+
+      # Exit 0 within 30s is NOT evidence on its own: a doomed second server
+      # can be started, die on the taken port, and the launcher still exits 0
+      # because the FIRST server answers its readiness poll. So assert what
+      # only the already-running path produces - its message - and that the
+      # second launch left no extra node.exe behind.
+      #
+      # Not "exactly one node.exe" (as the bundled launcher's smoke test
+      # asserts): this launcher starts the server as `corepack pnpm serve`, so
+      # a healthy run has corepack, pnpm and the server all as node.exe. The
+      # honest invariant here is that the count did not GROW.
+      - name: Second double-click takes the already-running path
+        shell: pwsh
+        run: |
+          $before = @(Get-Process -Name node -ErrorAction SilentlyContinue).Count
+          $sw = [System.Diagnostics.Stopwatch]::StartNew()
+          # `2>&1` merges the launcher's stderr into $out; without this the
+          # runner's $ErrorActionPreference = 'stop' can turn a single stderr
+          # line into a terminating error before anything is asserted.
+          $prevEap = $ErrorActionPreference
+          $ErrorActionPreference = 'Continue'
+          $out = cmd /c "start-matchdesk-windows.cmd <nul" 2>&1 | Out-String
+          $exit = $LASTEXITCODE
+          $ErrorActionPreference = $prevEap
+          $sw.Stop()
+          Write-Host $out
+          if ($exit -ne 0) { throw "the second start-matchdesk-windows.cmd exited $exit" }
+          if ($out -notmatch 'already running') {
+            throw "the second launch did not print the already-running message; it printed:`n$out"
+          }
+          $after = @(Get-Process -Name node -ErrorAction SilentlyContinue).Count
+          if ($after -gt $before) {
+            throw "the second launch started $($after - $before) extra node.exe process(es) - it did not take the already-running path"
+          }
+          if ($sw.Elapsed.TotalSeconds -gt 30) {
+            throw "the second launch took $([math]::Round($sw.Elapsed.TotalSeconds, 1))s - it did not take the already-running path"
+          }
+          Write-Host "already-running path: exit 0 in $([math]::Round($sw.Elapsed.TotalSeconds, 1))s, node.exe count $before -> $after"
+
+      # The server runs in a detached window, so its console output never
+      # reaches this log. When something above fails, this is the evidence.
+      - name: Evidence for a failed run
+        if: failure()
+        shell: pwsh
+        run: |
+          Write-Host '--- node / corepack / npx ---'
+          cmd /c "node -v" | Out-Host
+          cmd /c "where corepack" | Out-Host
+          cmd /c "where npx" | Out-Host
+          Write-Host '--- install markers ---'
+          Get-ChildItem -Force node_modules -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like '.matchdesk*' } | Out-Host
+          Write-Host '--- build output ---'
+          Get-ChildItem apps/server/dist/http -ErrorAction SilentlyContinue | Out-Host
+          Write-Host '--- listeners on 3900 ---'
+          cmd /c "netstat -ano | findstr :3900" | Out-Host
+          $global:LASTEXITCODE = 0
+
+      - name: Stop MatchDesk
+        if: always()
+        shell: pwsh
+        run: |
+          cmd /c "taskkill /F /IM node.exe" | Out-Host
+          $global:LASTEXITCODE = 0

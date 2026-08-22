@@ -1,0 +1,405 @@
+name: Release (bundled Windows ZIP)
+
+# ADR-039. Builds the artifact a recruiter actually downloads: compiled app +
+# production node_modules + a private copy of Node, so their setup is
+# download -> Extract All -> double-click. No Node installer, no admin prompt.
+#
+# The smoke test below is the point of this pipeline, not a formality: it is
+# the first real execution of a MatchDesk launcher on Windows.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+  # Bundle changes are exercised before they land, not after: a PR that
+  # touches the launcher or this workflow builds and smoke-tests the ZIP and
+  # uploads it as a build artifact. Only a tag push ever publishes (see the
+  # event_name guard on the publish step).
+  pull_request:
+    paths:
+      - 'release/**'
+      - '.github/workflows/release.yml'
+
+# Read-only by default; the job below elevates to `contents: write` because
+# creating a release needs it. GitHub has no step-level `permissions:`, so the
+# job is the finest scope available.
+permissions:
+  contents: read
+
+# Deliberately no cancel-in-progress: a tag build that gets cancelled halfway
+# leaves a release without its artifact.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  windows-release:
+    name: bundle / smoke test / publish (windows-x64)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    # Job-level `permissions:` REPLACES the workflow default and sets every
+    # scope it does not name to `none`, so both scopes this job uses are named.
+    permissions:
+      # gh release create / upload — the tag-push path only.
+      contents: write
+      # Reading this commit's check runs (the CI-is-green assertion below).
+      checks: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # A tag asserts that this commit passed CI; this verifies the assertion
+      # rather than trusting it. Nothing in ci.yml runs on a tag push, so
+      # without this a tag placed on a red commit would publish a release.
+      # The name below is ci.yml's `verify` job name, which is what GitHub
+      # registers the check run as. Checked before the 25-minute build, so a
+      # red commit fails in seconds.
+      - name: Require a green CI run on the tagged commit
+        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $check = 'typecheck / lint / license / test'
+          $json = gh api "repos/$env:GITHUB_REPOSITORY/commits/$env:GITHUB_SHA/check-runs?per_page=100" | Out-String
+          if ($LASTEXITCODE -ne 0) { throw "gh api check-runs failed with exit $LASTEXITCODE" }
+          $runs = @(($json | ConvertFrom-Json).check_runs)
+          $green = @($runs | Where-Object {
+            $_.name -eq $check -and $_.status -eq 'completed' -and $_.conclusion -eq 'success'
+          })
+          if ($green.Count -eq 0) {
+            $seen = if ($runs.Count -eq 0) { '(none)' }
+                    else { ($runs | ForEach-Object { "$($_.name): $($_.status)/$($_.conclusion)" }) -join "`n  " }
+            throw "no successful '$check' check run on $env:GITHUB_SHA - refusing to publish a release from a commit CI has not passed.`nCheck runs on this commit:`n  $seen"
+          }
+          Write-Host "CI is green on $env:GITHUB_SHA ('$check')"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # pnpm's default (isolated) layout is a graph of symlinks — junctions on
+      # Windows, which store ABSOLUTE paths. Zipped here and extracted on the
+      # recruiter's machine they point at this runner's disk and are dead. A
+      # hoisted node_modules is plain directories, like npm's, so the bundle
+      # survives the move. pnpm 11 reads this setting from pnpm-workspace.yaml,
+      # not .npmrc. CI-only: the file is never committed from here.
+      - name: Use a hoisted node_modules (portable bundle)
+        shell: pwsh
+        run: |
+          Add-Content -Path pnpm-workspace.yaml -Value ''
+          Add-Content -Path pnpm-workspace.yaml -Value '# CI-only (ADR-039 release pipeline).'
+          Add-Content -Path pnpm-workspace.yaml -Value 'nodeLinker: hoisted'
+          $linker = (pnpm config get node-linker | Select-Object -Last 1).Trim()
+          if ($linker -ne 'hoisted') { throw "node-linker is '$linker', expected 'hoisted'" }
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      # Exactly what `pnpm serve` does before it starts the server.
+      - name: Build the server
+        run: pnpm exec tsc --build apps/server
+
+      # `prepare` runs husky, which is a devDependency. It is still present now
+      # and gone after the next step, where the same lifecycle hook would fail
+      # the install with "husky: command not found". Dropping it here also
+      # keeps a git hook installer out of the shipped package.json.
+      - name: Drop the husky prepare hook
+        run: pnpm pkg delete scripts.prepare
+
+      # NOT `pnpm prune --prod` (which the ADR-039 spec called for): measured
+      # 2026-08-21, prune deletes apps/server/node_modules and
+      # packages/core/node_modules outright, taking the @matchdesk/* workspace
+      # links with them, and the server then dies at boot with
+      # ERR_MODULE_NOT_FOUND '@matchdesk/shared'. A production install removes
+      # devDependencies (285 MB -> 111 MB, no typescript) and keeps every
+      # workspace link intact.
+      - name: Remove devDependencies (production install)
+        run: pnpm install --frozen-lockfile --prod
+
+      - name: Verify the production tree
+        shell: pwsh
+        run: |
+          if (Test-Path node_modules/typescript) {
+            throw 'devDependencies survived: node_modules/typescript is still present'
+          }
+          $prebuild = 'node_modules/better-sqlite3/prebuilds/win32-x64.node'
+          if (-not (Test-Path $prebuild)) { throw "better-sqlite3's win32-x64 prebuild is missing ($prebuild)" }
+          foreach ($link in @('apps/server/node_modules/@matchdesk/core', 'apps/server/node_modules/@matchdesk/shared')) {
+            if (-not (Test-Path $link)) { throw "workspace package $link did not survive the production install" }
+          }
+          Write-Host "production tree ok; win32-x64 prebuild present"
+
+      - name: Stage MatchDesk/
+        shell: pwsh
+        run: |
+          @'
+          // Stages the bundled Windows release tree (ADR-039).
+          //
+          // Everything is copied with `dereference: true` because pnpm links
+          // workspace packages with symlinks (junctions on Windows, which
+          // store absolute paths); dereferencing turns them into real bytes.
+          // That is safe ONLY because the install above used a hoisted
+          // node_modules — dereferencing pnpm's isolated store would follow
+          // its cycles forever.
+          //
+          // `node_modules/.bin` is skipped: after the production install its
+          // shims still point at removed devDependencies, and cpSync throws on
+          // a dangling symlink.
+          import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+          import path from 'node:path';
+
+          const root = process.cwd();
+          const out = path.resolve(process.argv[2] ?? 'staging/MatchDesk');
+
+          // The last three are pnpm's own bookkeeping files. They embed this
+          // runner's ABSOLUTE paths, they mean nothing on the recruiter's
+          // machine, and this ZIP is a public download.
+          const skipInNodeModules = new Set([
+            '.bin',
+            '.pnpm',
+            '.cache',
+            '.modules.yaml',
+            '.package-map.json',
+            '.pnpm-workspace-state-v1.json',
+          ]);
+
+          // The @matchdesk/* copies are whole workspace packages; only their
+          // built output and manifest are needed at runtime.
+          const skipInWorkspacePkg = new Set(['.bin', '.pnpm', 'src', 'tsconfig.json']);
+          const workspacePkgFilter = (src) => {
+            const base = path.basename(src);
+            return !skipInWorkspacePkg.has(base) && !base.endsWith('.tsbuildinfo');
+          };
+
+          // A hoisted install puts @matchdesk/* copies in the ROOT
+          // node_modules too, so they get the same trim as the ones under
+          // apps/server/node_modules rather than shipping their TypeScript
+          // sources.
+          const isWorkspacePkgPath = (src) => src.split(path.sep).includes('@matchdesk');
+          const nodeModulesFilter = (src) =>
+            !skipInNodeModules.has(path.basename(src)) &&
+            (!isWorkspacePkgPath(src) || workspacePkgFilter(src));
+
+          const sqlOnly = (src) => !path.extname(src) || path.extname(src) === '.sql';
+
+          const jobs = [
+            { from: 'node_modules', to: 'node_modules', filter: nodeModulesFilter },
+            { from: 'apps/server/dist', to: 'apps/server/dist' },
+            { from: 'apps/server/package.json', to: 'apps/server/package.json' },
+            { from: 'apps/server/node_modules', to: 'apps/server/node_modules', filter: workspacePkgFilter },
+            // Each path is resolved relative to the module's OWN directory:
+            // serve.js sits in apps/server/dist/http and resolves the UI at
+            // ../../../web/public; migrate.js sits in apps/server/dist/db and
+            // resolves the schema at ../../../../migrations. The layout below
+            // is not decoration.
+            { from: 'apps/web/public', to: 'apps/web/public' },
+            { from: 'migrations', to: 'migrations', filter: sqlOnly },
+            { from: 'docs/USER_GUIDE.md', to: 'docs/USER_GUIDE.md' },
+            { from: 'package.json', to: 'package.json' },
+            { from: 'release/Start-MatchDesk.cmd', to: 'Start-MatchDesk.cmd' },
+          ];
+
+          rmSync(out, { recursive: true, force: true });
+          mkdirSync(out, { recursive: true });
+
+          for (const job of jobs) {
+            const from = path.join(root, job.from);
+            if (!existsSync(from)) throw new Error(`stage: missing source ${job.from}`);
+            cpSync(from, path.join(out, job.to), {
+              recursive: true,
+              dereference: true,
+              force: true,
+              filter: job.filter,
+            });
+          }
+
+          // Asserted here so a staging mistake fails now rather than as a
+          // mystery 500 later. The smoke test is still the real proof.
+          const required = [
+            'Start-MatchDesk.cmd',
+            'apps/server/dist/http/serve.js',
+            'apps/server/node_modules/@matchdesk/core/dist/index.js',
+            'apps/server/node_modules/@matchdesk/core/node_modules/@matchdesk/shared/dist/index.js',
+            'apps/web/public/index.html',
+            'migrations/0001_core_tables.sql',
+            'node_modules/better-sqlite3/prebuilds/win32-x64.node',
+            'docs/USER_GUIDE.md',
+          ];
+          const missing = required.filter((rel) => !existsSync(path.join(out, rel)));
+          if (missing.length > 0) throw new Error(`stage: missing after copy:\n  ${missing.join('\n  ')}`);
+
+          console.log(`staged ${out}`);
+          '@ | Set-Content -Path stage-release.mjs -Encoding utf8
+          node stage-release.mjs staging/MatchDesk
+          if (Get-ChildItem -Path staging/MatchDesk -Recurse -Force -Attributes ReparsePoint -ErrorAction SilentlyContinue) {
+            throw 'the staged tree still contains a symlink or junction; it would not survive the ZIP'
+          }
+
+      - name: Bundle the Node runtime
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          $ver = (Get-Content .nvmrc -Raw).Trim()
+          $zip = "node-v$ver-win-x64.zip"
+          $base = "https://nodejs.org/dist/v$ver"
+          Invoke-WebRequest -Uri "$base/$zip" -OutFile $zip
+          Invoke-WebRequest -Uri "$base/SHASUMS256.txt" -OutFile node-shasums.txt
+          # A runtime we hand to a recruiter is verified against nodejs.org's
+          # own checksum list, not trusted because the download succeeded.
+          $lines = @(Select-String -Path node-shasums.txt -SimpleMatch -Pattern $zip)
+          if ($lines.Count -ne 1) { throw "expected exactly one checksum line for $zip, found $($lines.Count)" }
+          $expected = ($lines[0].Line -split '\s+')[0].ToLower()
+          $actual = (Get-FileHash -Algorithm SHA256 -Path $zip).Hash.ToLower()
+          if ($expected -ne $actual) { throw "Node runtime checksum mismatch: expected $expected, got $actual" }
+          Expand-Archive -Path $zip -DestinationPath runtime-tmp -Force
+          New-Item -ItemType Directory -Force -Path staging/MatchDesk/runtime | Out-Null
+          # node.exe ONLY. The launcher runs `node serve.js` and nothing else;
+          # npm, npx and corepack add ~12 MB and several thousand files to a
+          # ZIP a recruiter has to download and Windows has to unpack, and
+          # nothing in MatchDesk ever calls them.
+          Copy-Item -Path "runtime-tmp/node-v$ver-win-x64/node.exe" -Destination staging/MatchDesk/runtime/node.exe -Force
+          if (-not (Test-Path staging/MatchDesk/runtime/node.exe)) { throw 'runtime/node.exe is missing after extraction' }
+          $printed = (& staging/MatchDesk/runtime/node.exe --version).Trim()
+          if ($printed -ne "v$ver") { throw "bundled runtime reports $printed, expected v$ver" }
+          Write-Host "bundled runtime: $printed (checksum verified)"
+
+      # The whole reason this pipeline exists. Until this step runs green, no
+      # MatchDesk launcher has ever executed on Windows (H-122/H-123 residual).
+      - name: Smoke test the staged folder
+        shell: pwsh
+        env:
+          MATCHDESK_NO_BROWSER: '1'
+        run: |
+          $staged = Join-Path $PWD 'staging/MatchDesk'
+
+          Push-Location $staged
+          cmd /c "Start-MatchDesk.cmd <nul"
+          $firstExit = $LASTEXITCODE
+          Pop-Location
+          if ($firstExit -ne 0) { throw "Start-MatchDesk.cmd exited $firstExit on a cold start" }
+
+          $body = $null
+          for ($i = 0; $i -lt 45; $i++) {
+            try {
+              $r = Invoke-WebRequest -Uri 'http://127.0.0.1:3900/' -UseBasicParsing -TimeoutSec 5
+              if ($r.StatusCode -eq 200) { $body = $r.Content; break }
+            } catch {
+              # not up yet
+            }
+            Start-Sleep -Seconds 2
+          }
+          if ($null -eq $body) { throw 'nothing answered on http://127.0.0.1:3900/ within 90 seconds' }
+          if ($body -notmatch '<title>MatchDesk</title>') { throw 'the page served is not the MatchDesk UI' }
+          Write-Host 'cold start: MatchDesk UI served on 127.0.0.1:3900'
+
+          # The UI is static files; this proves the API half of the same
+          # process is alive, which is what every page in it actually calls.
+          $api = Invoke-WebRequest -Uri 'http://127.0.0.1:3900/api/jobs' -UseBasicParsing -TimeoutSec 10
+          if ($api.StatusCode -ne 200) { throw "GET /api/jobs answered $($api.StatusCode), expected 200" }
+          Write-Host 'API: GET /api/jobs -> 200'
+
+          # Second double-click must find the running server and return at
+          # once instead of starting a second one onto the taken port.
+          #
+          # Exit 0 within 30s is NOT evidence of that on its own: a doomed
+          # second server can be started, die on the taken port, and the
+          # launcher still exits 0 because the FIRST server answers its
+          # readiness poll. So assert what only the already-running path
+          # produces - its message - and that no second node.exe exists.
+          $sw = [System.Diagnostics.Stopwatch]::StartNew()
+          Push-Location $staged
+          # `2>&1` merges the launcher's stderr into $out; without this the
+          # runner's $ErrorActionPreference = 'stop' can turn a single stderr
+          # line into a terminating error before anything is asserted.
+          $prevEap = $ErrorActionPreference
+          $ErrorActionPreference = 'Continue'
+          $out = cmd /c "Start-MatchDesk.cmd <nul" 2>&1 | Out-String
+          $secondExit = $LASTEXITCODE
+          $ErrorActionPreference = $prevEap
+          Pop-Location
+          $sw.Stop()
+          Write-Host $out
+          if ($secondExit -ne 0) { throw "the second Start-MatchDesk.cmd exited $secondExit" }
+          if ($out -notmatch 'already running') {
+            throw "the second launch did not print the already-running message; it printed:`n$out"
+          }
+          $nodes = @(Get-Process -Name node -ErrorAction SilentlyContinue)
+          if ($nodes.Count -ne 1) {
+            throw "expected exactly one node.exe after the second launch, found $($nodes.Count) - a second server was started"
+          }
+          if ($sw.Elapsed.TotalSeconds -gt 30) {
+            throw "the second launch took $([math]::Round($sw.Elapsed.TotalSeconds, 1))s - the already-running path did not fire"
+          }
+          Write-Host "already-running path: exit 0 in $([math]::Round($sw.Elapsed.TotalSeconds, 1))s, one node.exe"
+
+      # A throw in the smoke test skips the rest of its own script, so the
+      # taskkill cannot live at the bottom of it: on a failure the server
+      # would survive into the ZIP step and the runner teardown.
+      - name: Stop MatchDesk
+        if: always()
+        shell: pwsh
+        run: |
+          cmd /c "taskkill /F /IM node.exe" | Out-Host
+          $global:LASTEXITCODE = 0
+
+      - name: Zip MatchDesk-windows-x64.zip
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
+          $src = Join-Path $PWD 'staging/MatchDesk'
+          $dst = Join-Path $PWD 'MatchDesk-windows-x64.zip'
+          if (Test-Path $dst) { Remove-Item $dst -Force }
+          # $true = include the base directory, so the recruiter's Extract All
+          # produces one MatchDesk folder rather than 200 loose entries.
+          [System.IO.Compression.ZipFile]::CreateFromDirectory(
+            $src, $dst, [System.IO.Compression.CompressionLevel]::Optimal, $true)
+          Write-Host "MatchDesk-windows-x64.zip: $([math]::Round((Get-Item $dst).Length / 1MB, 1)) MB"
+
+      # EVENT and ref, not ref alone: a workflow_dispatch aimed at a tag ref
+      # is someone testing the pipeline, and it must not publish a release.
+      - name: Publish the release (tag builds)
+        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Every gh exit code is checked by hand below, so a non-zero exit is
+          # a decision here rather than an immediate stop.
+          $ErrorActionPreference = 'Continue'
+          $tag = $env:GITHUB_REF_NAME
+          # Re-running a tag build has to be safe: `gh release create` fails
+          # outright on an existing release, which would leave a re-run red for
+          # no reason. Create only if absent, then upload with --clobber.
+          gh release view $tag 2>&1 | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            # --verify-tag: refuse to invent a tag if the ref somehow is not
+            # one that exists on the remote.
+            gh release create $tag --verify-tag --generate-notes --title "MatchDesk $tag"
+            if ($LASTEXITCODE -ne 0) { throw "gh release create $tag failed with exit $LASTEXITCODE" }
+            Write-Host "created release $tag"
+          } else {
+            Write-Host "release $tag already exists - re-uploading the asset onto it"
+          }
+          gh release upload $tag MatchDesk-windows-x64.zip --clobber
+          if ($LASTEXITCODE -ne 0) { throw "gh release upload $tag failed with exit $LASTEXITCODE" }
+
+      # Everything that is not a tag push - workflow_dispatch (including one
+      # aimed at a tag ref) and the PR path - keeps the bundle as a build
+      # artifact and publishes nothing.
+      #
+      # upload-artifact wraps its upload in a ZIP of its own, so this download
+      # is a ZIP containing MatchDesk-windows-x64.zip. That is expected and
+      # only affects maintainers: the single, directly-extractable ZIP the
+      # user guide describes is the Releases asset, uploaded above as-is.
+      - name: Upload the bundle as a build artifact (dispatch and PR runs)
+        if: ${{ !(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: MatchDesk-windows-x64
+          path: MatchDesk-windows-x64.zip
+          retention-days: 14

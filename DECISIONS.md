@@ -2186,3 +2186,86 @@ UNC prefix has no macOS equivalent, where the guard is the `cd`-failure branch
 instead. Accepted as the next step, with its own ADR to follow: a prebuilt
 bundled-Node GitHub Release — the
 Node MSI's admin prompt is the one blocker no launcher copy can fix.
+
+---
+
+## ADR-039 — The recruiter's download: a bundled-Node Windows release
+
+**Date:** 2026-08-21 · **Status:** Accepted
+
+**The decision.** For Windows, the recruiter's path becomes the Releases page,
+not the green Code button. `MatchDesk-windows-x64.zip` carries the compiled
+app, its production `node_modules`, and MatchDesk's own private copy of Node
+24.19.0 in `runtime\`. Download, Extract All, double-click `Start-MatchDesk`.
+Nothing is installed on the machine and nothing asks for an administrator.
+
+**Why.** H-123 fixed thirteen ways the launcher could fail a recruiter, and
+could not fix the fourteenth: step 2 of the guide is "install Node.js", the
+Windows `.msi` raises a UAC prompt, and on a managed laptop the recruiter does
+not have that password. No amount of launcher copy closes that — the fix has
+to be that Node was never installed. It is the same reasoning as C3 at the
+socket: make the failure unreachable rather than well-explained. The bundled
+launcher is correspondingly smaller — no install phase, no Node detection, no
+package manager — because the runtime is in the box; what it keeps is H-122's
+run-from-inside-the-ZIP guard (now testing for `runtime\node.exe`, the file
+Explorer's partial unpack leaves behind), H-123's UNC refusal, the
+already-running probe, and the readiness poll before the browser opens.
+
+**What the pipeline verifies.** `.github/workflows/release.yml` builds the
+bundle on `windows-latest` and then runs it: it double-clicks
+`Start-MatchDesk.cmd` in the staged folder, waits for `127.0.0.1:3900` to
+answer 200 with the MatchDesk UI and `GET /api/jobs` to answer 200, and
+requires a second double-click to print the already-running message, leave
+exactly one `node.exe` alive, and exit 0 within seconds — exit 0 alone proves
+nothing there, because a doomed second server still exits 0 once the first one
+answers the readiness poll. That smoke test is the **first
+execution of any MatchDesk launcher on Windows** — until it ran, ADR-038's
+"verified by audit, not by execution" stood, and H-122/H-123 carried a
+zero-Windows-executions residual. `.github/workflows/windows-first-run.yml`
+retires the same residual for the other path, the repo ZIP: it double-clicks
+`start-matchdesk-windows.cmd` on a runner given nothing but Node 24 — no
+`corepack enable`, no pnpm cache, no CI-only flag in the launcher — and
+asserts the install sentinel, the served UI, and the already-running path.
+Between them, both Windows launchers are executed, not reasoned about.
+Writing the two pipelines side by side also caught a real inconsistency
+between the launchers: the repo launcher's `:wait_timeout` — the give-up path
+after the server never answers — exited 0, reporting success for a start that
+had failed, while the bundled launcher exits 1 there; the repo launcher now
+exits 1 too.
+
+**Costs, accepted.** (1) The artifact is large — the app and its dependencies
+plus a whole Node runtime, where the repo ZIP is under 1 MB. No figure is
+quoted here: the release workflow prints the ZIP's measured size on every
+build and the Releases page shows it beside the file, and a number typed into
+this file would drift away from both. (2) A bundled runtime is a runtime we
+now own: a Node security patch obliges a re-cut release, and until it is cut,
+recruiters are running the Node we shipped, not the Node they would have
+installed. (3) The release is a point in time; a recruiter on last month's ZIP
+is a month behind `main`, with no update prompt beyond re-downloading. (4) Two
+build recipes now exist for one product, and only CI executes the bundled one.
+(5) **The release smoke test does not execute the whole happy path.** It runs
+the bundled launcher with `MATCHDESK_NO_BROWSER=1`, because a headless runner
+has no browser to open, so its three `start "" http://127.0.0.1:3900` lines —
+the last step of what a recruiter actually experiences — are the one part of
+that path CI never runs. Everything up to them is executed; the browser opening
+itself is still verified by reading, not by running. `windows-first-run.yml`
+narrows the gap rather than closing it: it runs the repo launcher with no such
+flag, so the browser-opening line on THAT launcher does execute, but it is a
+different file from the bundled one.
+
+**Scope.** Windows only. macOS keeps the repo-ZIP path — the `.pkg` installer
+raises no policy blocker worth a second pipeline, and this project still has
+no Apple machine in CI to smoke-test a bundle on. The repo-ZIP path on Windows
+remains supported and is now CI-executed on every change to the launcher, the
+lock file, or the manifest, so the bundle is an easier road, not a replacement
+for the only one.
+
+**One thing the build had to be told.** `pnpm prune --prod` — the obvious way
+to drop devDependencies — deletes `apps/server/node_modules` and
+`packages/core/node_modules` outright, taking the `@matchdesk/*` workspace
+links with them; the server then dies at boot with `ERR_MODULE_NOT_FOUND
+'@matchdesk/shared'`. Measured, not assumed. The pipeline uses
+`pnpm install --frozen-lockfile --prod` instead, and installs with a hoisted
+`node_modules`, because pnpm's default layout is symlinks — junctions on
+Windows, which store absolute paths and are dead the moment the ZIP is
+extracted on another machine.

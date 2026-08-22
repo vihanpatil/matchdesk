@@ -202,7 +202,7 @@ echo   If it is still busy, give it a moment, then open this address in
 echo   your browser yourself: http://127.0.0.1:3900
 echo.
 pause
-exit /b 0
+exit /b 1
 
 :zip_error
 echo.
