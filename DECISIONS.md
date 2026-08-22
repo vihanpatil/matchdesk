@@ -2157,3 +2157,32 @@ than the per-pair detail view (that view reads the job-side run cache; a
 persisted-match detail route is a later step). The launcher opens the
 browser on a timer rather than a readiness probe — a refresh note covers
 the cold-build case.
+
+**Amended 2026-08-21 (H-123):** a 13-finding audit of the Windows first-run
+flow, prompted by a recruiter's failed first contact, closes the accepted
+timer cost above: both launchers now poll `http://127.0.0.1:3900/` with
+`curl` and open the browser when the server answers. Only Windows needs a
+fallback for a missing `curl.exe` — a fixed wait that leaves instructions on
+screen instead of vanishing — because macOS ships `curl`. The "corepack ships
+with Node" rationale is decaying upstream — old Nodes ship a broken one, Node
+25 removes it — so the launchers prefer corepack, fall back to `npx --yes
+pnpm@11.21.0`, and record which one worked. The install gate is now that
+written-on-success sentinel rather than the existence of `node_modules`, which
+a failed install satisfies forever; on both platforms a sibling file beside
+the sentinel records the `pnpm-lock.yaml` signature (size and timestamp),
+recomputed AFTER the install and compared for **inequality** on the next
+launch — not for age, so a release whose lock file predates the last install
+still triggers the refresh — and extracting a new MatchDesk over an old folder
+reinstalls instead of trusting stale components. An atomic install marker (a
+directory created with `md`/`mkdir`) admits one installer at a time, so a
+second double-click during the multi-minute install cannot leave a valid
+sentinel over a half-written tree. Both launchers probe port 3900 before
+starting and open the browser at an already-running MatchDesk rather than
+launching a second server onto a taken port; on Windows that probe needs
+`curl.exe` and is skipped without it. Launchers are renamed per platform
+(`start-matchdesk-windows.cmd`, `start-matchdesk-mac.command`) and refuse to
+run from inside the ZIP. The network-folder refusal is Windows-only: the `\\`
+UNC prefix has no macOS equivalent, where the guard is the `cd`-failure branch
+instead. Accepted as the next step, with its own ADR to follow: a prebuilt
+bundled-Node GitHub Release — the
+Node MSI's admin prompt is the one blocker no launcher copy can fix.

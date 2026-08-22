@@ -4602,3 +4602,118 @@ pitfalls that break `if (...)` blocks — not by running them. The first real
 proof is the next Windows user who double-clicks from inside a ZIP. The bug
 this closes was itself found by a user rather than by us, which is the honest
 measure of how far reading-only verification carries on this platform.
+
+---
+
+### H-123 · Thirteen findings in a flow that had never been run
+
+H-122 closed a launcher bug a recruiter found for us. That is the wrong way
+round, so the whole Windows first-run flow went to an independent audit before
+the next recruiter touched it: **thirteen findings**, and the worst class was
+not awkward copy but **dead ends** — states a user cannot get out of by
+following any instruction we shipped.
+
+1. **The install gate was `if not exist node_modules`.** A failed install
+   leaves a partial `node_modules` behind, and from that moment the gate is
+   satisfied forever: every later double-click skips the install and goes
+   straight to a `serve` that cannot work, with nothing on screen saying why.
+2. **`corepack` was assumed to exist.** ADR-038's rationale — corepack ships
+   with Node, so nothing global is installed — is decaying upstream: older
+   Nodes ship a corepack whose signature check fails (`keyid`), and Node 25
+   removes it outright. Neither case was detected; both landed in the generic
+   install-failed branch, and the guide's row for it still read "usually a
+   blocked download on a work network" — the network blamed again, for a
+   cause nobody had checked.
+3. **The one documented escape hatch was a no-op.** That row prescribed
+   `npm install -g pnpm`. Verified by reading the launcher: it invoked
+   `corepack pnpm` unconditionally and never consulted a global pnpm, so the
+   advice could not have helped anyone, ever.
+
+Fixed, in both launchers: the install gate is now a sentinel file written only
+after an install actually succeeds; corepack is preferred, `npx --yes
+pnpm@11.21.0` is the automatic fallback — retried once mid-failure, because
+corepack also fails when present — and whichever worked is recorded in the
+sentinel and reused. The browser opens on a readiness poll of
+`http://127.0.0.1:3900/` instead of a fixed 14-second wait, which **closes
+ADR-038's accepted cost**; the amendment is recorded there. The server window
+is no longer started `/min`, because a minimised window hid every crash it was
+supposed to display. The launchers are renamed per platform and refuse to run
+from inside the ZIP or from a UNC/redirected folder. The guide gained the
+admin-password and OneDrive guidance the audit asked for, and fallback copy
+that describes what the launcher is actually doing rather than promising a
+fix. The in-app toast that told a recruiter to "stop and restart `pnpm serve`"
+— a terminal command they have never typed — now names the window they have.
+
+Decisions the user took, not us: rename per platform rather than keep one
+ambiguous name on both; corepack **with** an npx fallback rather than pick
+one; and, as a follow-up with its own ADR, a prebuilt bundled-Node GitHub
+Release. That last one is the honest answer to the finding no wording can
+close — the Node MSI asks for an administrator password on a managed laptop,
+and no sentence in any launcher or guide fixes a blocker that lives in
+corporate policy.
+
+**Round 2 — the hardening pass had a HIGH defect of its own.** Everything
+above went back through an independent adversarial verification, and the worst
+finding was in the fix, not the bug: the sentinel was written behind `if
+errorlevel 1`, which is a **signed greater-or-equal test**. An installer that
+crashes exits with a negative NTSTATUS code; `errorlevel 1` reads that as
+false, and the launcher would have recorded a successful install that never
+happened — manufacturing the exact permanent dead-end finding 1 existed to
+remove, inside the code that removed it. The **Windows** launcher now compares
+`%ERRORLEVEL%` against `0` as a string; the macOS launcher branches on the
+command itself (`if $PM install; then`) and never had this defect. Four more
+from the same round: the sentinel was **update-blind**, so extracting a new
+MatchDesk over an old folder trusted the stale `node_modules` forever — Windows
+began recording a `pnpm-lock.yaml` signature and reinstalling on a mismatch,
+saying "MatchDesk was updated - refreshing its components", while macOS
+compared file ages until round 3 below made the signature the mechanism on
+**both**; neither launcher checked whether MatchDesk was **already
+running**, so a second double-click started a doomed server on a taken port
+instead of opening the browser at the one already answering; the no-`curl`
+Windows path opened a browser and then **vanished**, leaving a "cannot be
+reached" page and no window to read it against — it now leaves instructions and
+pauses; and the macOS readiness poller was **orphaned** on exit, free to open a
+browser minutes after MatchDesk had died. All five are fixed.
+
+**Round 3 — three more defects, again inside the fixes.** The round-2
+hardening went back through a second adversarial verification, which found
+three. The lock signature was captured **before** the install ran: pnpm may
+rewrite `pnpm-lock.yaml` while installing, and the recorded signature would
+then never match the file again — "MatchDesk was updated - refreshing its
+components" replaying on every launch, forever. The macOS update test was
+`-nt`, a **directional** comparison, so a release whose lock file was committed
+before the last install never triggered a refresh at all — verified
+empirically, not by reading. And the install window had **no mutual
+exclusion**: a second double-click during the multi-minute install ran a second
+pnpm over the same `node_modules`, and the loser could write a valid sentinel
+over a half-written tree — finding 1's permanent dead end, manufactured once
+more. Both launchers now recompute the signature AFTER the install, compare it
+for inequality rather than for age, and hold an atomic
+`node_modules/.matchdesk-installing` marker while installing, refusing a second
+run with directions out. Two copy defects fell in the same round: the guide's
+flat "the only time MatchDesk touches the internet is when you paste a job
+link" was **false** — the one-time component install downloads from
+`registry.npmjs.org`, and both launchers open nodejs.org when Node is missing —
+and the stale-build toast still named a Windows-only window; it now says "close
+the window MatchDesk is running in". All fixed the same session.
+
+CLOSED same session. Six residuals stay open, named rather than closed: a
+**mapped network drive letter** passes the `\\` UNC guard, which only catches
+the literal prefix; the launchers **hardcode port 3900** while the server
+honours `MATCHDESK_PORT`, so a moved port breaks both the readiness poll and
+the browser open; the `engines` floor is **24.15.0** but both launchers compare
+only the **major** version, so a 24.0.0 slips through; the already-running
+probe can only tell that **something** answers on port 3900, not that it is
+MatchDesk, so an unrelated local server there sends the browser to it; the
+Windows install-busy recovery relies on the user **deleting `node_modules` by
+hand** when a setup is killed mid-run, because a killed run leaves its marker
+directory behind; and the Windows window-title pinning and the `cmd`
+redirection-hoist behaviour are **reasoned,
+not executed** — which is the shape of the residual unchanged from H-122:
+**the number of times these launchers have been executed on Windows is still
+zero.** Every
+construct above — the sentinel round-trip through `set /p`, the `%HERE:~0,2%`
+UNC test, the string compare against `%ERRORLEVEL%`, every label and the gotos
+that reach them — was verified by reading and by lint, not by running. The
+accepted release pipeline is what changes that: it brings a Windows CI runner,
+and that will be the first time this launcher has been executed anywhere.

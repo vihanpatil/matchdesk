@@ -64,9 +64,10 @@ browser, destructive paths included.
 evaluation reads, evidence-highlighted, gaps explained — closes the
 user-reported transparency gap), reverse scoring (one candidate against
 ticked jobs, same derivation/persistence/skip semantics as the batch path),
-double-click launchers (`start-matchdesk.cmd`/`.command`) and
-`docs/USER_GUIDE.md` for non-technical setup on Windows and Mac. Windows is
-verified by audit, not yet by a real run — the ADR states the audit.
+double-click launchers (`start-matchdesk-windows.cmd`,
+`start-matchdesk-mac.command`) and `docs/USER_GUIDE.md` for non-technical
+setup on Windows and Mac. Windows is verified by audit, not yet by a real
+run — the ADR states the audit.
 
 **Does not exist:** the match matrix (secondary view, PRODUCT_DECISIONS),
 embeddings (cascade step 4), OCR, a per-pair detail route reachable from
@@ -98,7 +99,12 @@ Next, in rough order of value:
 - **Recruiter conveniences** PRODUCT_DECISIONS names: attribute suppression
   with rescore, job-local custom skills, background recompute with visible
   stale states.
-- **Packaging** — a launcher that opens the browser, per PRODUCT_DECISIONS.
+- **Packaging** — the double-click launcher shipped under ADR-038 (per-platform
+  start files, readiness-polled browser open, hardened through H-123). The next
+  step is the **bundled-Node release pipeline** — approved, pending its own
+  ADR: it removes the Node MSI's admin prompt, the one blocker no launcher copy
+  can fix, and brings the Windows CI runner that would execute these launchers
+  for the first time.
 - **UI rows for `ATTACK_CHECKLIST`** — the UI exists now, so attack it.
 
 ## Watch items — open, none blocking

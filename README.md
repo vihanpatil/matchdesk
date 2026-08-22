@@ -15,8 +15,8 @@ adversarial rounds, the append-only logs — exists to catch it.
 [docs/USER_GUIDE.md](docs/USER_GUIDE.md): it walks you from the green
 "Code → Download ZIP" button on this page to a running app in about ten
 minutes, on Windows or Mac — install Node.js 24 from nodejs.org, then
-double-click **`start-matchdesk.cmd`** (Windows) or
-**`start-matchdesk.command`** (Mac). The guide also covers day-to-day use,
+double-click **`start-matchdesk-windows.cmd`** (Windows) or
+**`start-matchdesk-mac.command`** (Mac). The guide also covers day-to-day use,
 what the scores mean, and fixes for common issues. Your documents and
 scores live in a `.matchdesk` folder in your home directory and never
 leave your machine.

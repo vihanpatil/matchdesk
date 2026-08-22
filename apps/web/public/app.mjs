@@ -228,7 +228,7 @@ async function jobsView(view) {
         const message = String(e.message ?? e);
         toast(
           message === 'unknown job'
-            ? 'The server is running an older build — stop and restart `pnpm serve`, then retry.'
+            ? 'The server is running an older build — close the window MatchDesk is running in, double-click the start file again, then retry.'
             : message,
         );
       })
