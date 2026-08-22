@@ -22,8 +22,10 @@ if [ ! -d node_modules ]; then
   echo
   corepack pnpm install || {
     echo
-    echo "  The install did not finish. Check your internet connection and"
-    echo "  run this file again. See 'Common issues' in docs/USER_GUIDE.md."
+    echo "  The install did not finish. The red text above says why."
+    echo "  If it mentions a network, a proxy, or a certificate, try again"
+    echo "  on a normal, non-work connection. Otherwise see 'Common issues'"
+    echo "  in docs/USER_GUIDE.md."
     read -r -p "Press Enter to close this window."
     exit 1
   }

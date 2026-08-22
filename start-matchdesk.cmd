@@ -7,6 +7,29 @@ rem except the one-time component install and any job links you paste.
 title MatchDesk
 cd /d "%~dp0"
 
+rem Guard: when a file is opened from inside a ZIP, Windows Explorer unpacks
+rem that one file alone into %TEMP%\GUID_zipname\ and runs it there. The rest
+rem of MatchDesk -- package.json included -- stays in the archive, so the
+rem install below fails with ERR_PNPM_NO_PKG_MANIFEST and used to print a
+rem message about the internet connection that had nothing to do with the
+rem real cause. Check for the sentinel file before doing anything else.
+if not exist "%~dp0package.json" (
+  echo.
+  echo   It looks like this file was started from inside the ZIP.
+  echo   Windows unpacks only the file you double-click, so the rest of
+  echo   MatchDesk is still inside the archive. Nothing is wrong with your
+  echo   internet connection or your Node.js install.
+  echo.
+  echo   To fix: right-click matchdesk-main.zip in your Downloads folder and
+  echo   choose "Extract All...", then pick a place you will find again,
+  echo   such as Documents. Open that extracted folder - you should see
+  echo   package.json sitting next to start-matchdesk.cmd - and double-click
+  echo   start-matchdesk.cmd from there.
+  echo.
+  pause
+  exit /b 1
+)
+
 where node >nul 2>nul
 if errorlevel 1 (
   echo.
@@ -28,9 +51,10 @@ if not exist node_modules (
   call corepack pnpm install
   if errorlevel 1 (
     echo.
-    echo   The install did not finish. Check your internet connection and
-    echo   run this file again. If it keeps failing, see "Common issues"
-    echo   in docs/USER_GUIDE.md.
+    echo   The install did not finish. The red text above says why.
+    echo   If it mentions a network, a proxy, or a certificate, try again on
+    echo   a normal, non-work connection. Otherwise see "Common issues" in
+    echo   docs/USER_GUIDE.md.
     pause
     exit /b 1
   )

@@ -4562,3 +4562,43 @@ CLOSED same session. Residual, stated: CI still cannot re-verify what only
 a platform it does not run on can show (a Windows contributor's first
 `pnpm verify` exercises the win32 waiver for the first time), and the
 actions' Node-20 deprecation warnings are cosmetic and untouched.
+
+---
+
+### H-122 · The launcher blamed the network for a mistake it could have caught
+
+A recruiter's first-contact screenshot showed `ERR_PNPM_NO_PKG_MANIFEST` with a
+path under `AppData\Local\Temp\GUID_matchdesk-main.zip\`. They had
+double-clicked `start-matchdesk.cmd` from inside the ZIP; Explorer unpacks only
+the file you click, so `cd /d "%~dp0"` landed in a temp folder holding that one
+file. USER_GUIDE step 1 does say "Extract All…", so the immediate cause was a
+skipped step — but three defects turned a skipped step into a dead end:
+
+1. **No guard for the most common way a non-technical user opens a ZIP.** The
+   launcher had no precondition check at all; it went straight to `pnpm
+install` and let pnpm produce the diagnosis.
+2. **The failure message asserted a cause it had not checked.** `if errorlevel
+1` printed "Check your internet connection" for _any_ non-zero pnpm exit.
+   Their connection was fine. This is Trap 3's shape in user-facing copy: a
+   plausible cause, written once, printed forever regardless of evidence.
+3. **The documented recovery path pointed the wrong way.** The "Common issues"
+   row the message sent them to said "Usually a blocked download on a work
+   network" and prescribed `npm install -g pnpm` — a confident misdiagnosis of
+   this exact screenshot, which would have cost them time and still failed.
+
+Fixed: a `package.json` sentinel check before anything else, with copy naming
+the ZIP cause and the fix; both launchers now say the red text above states the
+reason rather than inventing one; a dedicated `ERR_PNPM_NO_PKG_MANIFEST` row
+added as the first entry of the issues table, and the network row rewritten to
+defer to it. The identical false message in `start-matchdesk.command` was fixed
+too — macOS does not reach the failure the same way, but the sentence was
+equally untrue there.
+
+CLOSED same session. Residual, stated, and it is the uncomfortable part: **none
+of this has been executed on Windows.** Per ADR-038 the platform is audit-only
+here; the guard, its `%~dp0package.json` path, and the batch block parsing were
+verified by reading and by lint checks for the parenthesis and redirection
+pitfalls that break `if (...)` blocks — not by running them. The first real
+proof is the next Windows user who double-clicks from inside a ZIP. The bug
+this closes was itself found by a user rather than by us, which is the honest
+measure of how far reading-only verification carries on this platform.
