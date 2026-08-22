@@ -57,11 +57,13 @@ jobs:
   mutation:
     name: mutation score (packages/core)
     runs-on: ubuntu-latest
-    # Measured 2026-08-17: ~22 min locally on Apple Silicon at 1135 tests,
-    # slower on this runner — the old 30-minute cap killed the job mid-run
-    # (H-121). This is a ceiling against hangs, not a target; it grows with
-    # the suite.
-    timeout-minutes: 60
+    # Measured on THIS runner, not locally (H-121's lesson, learned twice):
+    # 58m24s green on 2026-08-22 (run 32552837467), then 60m18s killed by the
+    # old 60-minute cap the same day (run 32556392474) — runner variance rides
+    # the edge of any cap set at the last measurement. This is a ceiling
+    # against hangs, not a target; it grows with the suite. Re-measure from
+    # the Actions log, never from a local run.
+    timeout-minutes: 90
     # Separate job, not part of `verify`: it takes ~8.5 min, which is too slow
     # to sit in front of every commit, but it is the only check that measures
     # whether the tests are REAL rather than whether lines ran (ADR-020).
